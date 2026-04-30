@@ -3,21 +3,30 @@ import ApplicationServices
 import ClipboardCore
 import Foundation
 
-final class SystemPasteboardClient: @unchecked Sendable, PasteboardReading, PasteboardWriting, PasteEventPosting {
-  private let pasteboard = NSPasteboard.general
-  private let markerType = NSPasteboard.PasteboardType("com.local.clipboard-manager.marker")
+public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReading, PasteboardWriting, PasteEventPosting {
+  private let pasteboard: NSPasteboard
+  private let markerType: NSPasteboard.PasteboardType
 
-  func currentChangeCount() async -> Int {
+  public init(
+    pasteboard: NSPasteboard = .general,
+    markerType: NSPasteboard.PasteboardType = NSPasteboard.PasteboardType("com.local.clipboard-manager.marker")
+  ) {
+    self.pasteboard = pasteboard
+    self.markerType = markerType
+  }
+
+  public func currentChangeCount() async -> Int {
     pasteboard.changeCount
   }
 
-  func readCurrentCapture() async -> ClipboardCapture? {
+  public func readCurrentCapture() async -> ClipboardCapture? {
     guard let items = pasteboard.pasteboardItems,
-          let item = items.first else {
+          let item = items.first,
+          !items.contains(where: containsSelfWriteMarker) else {
       return nil
     }
 
-    let types = Set(item.types.map(\.rawValue))
+    let types = Set(items.flatMap { $0.types.map(\.rawValue) })
     let app = NSWorkspace.shared.frontmostApplication
     let now = Date()
 
@@ -60,7 +69,7 @@ final class SystemPasteboardClient: @unchecked Sendable, PasteboardReading, Past
     return nil
   }
 
-  func write(payload: ClipboardPayload, marker: String) async -> Bool {
+  public func write(payload: ClipboardPayload, marker: String) async -> Bool {
     guard let items = makePasteboardItems(payload: payload, marker: marker) else {
       return false
     }
@@ -69,17 +78,17 @@ final class SystemPasteboardClient: @unchecked Sendable, PasteboardReading, Past
     return pasteboard.writeObjects(items)
   }
 
-  func containsMarker(_ marker: String) async -> Bool {
+  public func containsMarker(_ marker: String) async -> Bool {
     pasteboard.pasteboardItems?.contains { item in
       item.string(forType: markerType) == marker
     } ?? false
   }
 
-  func isAccessibilityTrusted() -> Bool {
+  public func isAccessibilityTrusted() -> Bool {
     AXIsProcessTrustedWithOptions(nil)
   }
 
-  func postCommandV() async -> Bool {
+  public func postCommandV() async -> Bool {
     guard isAccessibilityTrusted() else {
       return false
     }
@@ -133,5 +142,9 @@ final class SystemPasteboardClient: @unchecked Sendable, PasteboardReading, Past
 
   private func setMarker(_ marker: String, on item: NSPasteboardItem) -> Bool {
     item.setString(marker, forType: markerType)
+  }
+
+  private func containsSelfWriteMarker(_ item: NSPasteboardItem) -> Bool {
+    item.string(forType: markerType) != nil
   }
 }

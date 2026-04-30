@@ -6,7 +6,9 @@ let package = Package(
   platforms: [.macOS(.v14)],
   products: [
     .library(name: "ClipboardCore", targets: ["ClipboardCore"]),
-    .executable(name: "ClipboardApp", targets: ["ClipboardApp"])
+    .library(name: "ClipboardPlatform", targets: ["ClipboardPlatform"]),
+    .executable(name: "ClipboardApp", targets: ["ClipboardApp"]),
+    .executable(name: "ClipboardManualProbe", targets: ["ClipboardManualProbe"])
   ],
   targets: [
     .target(
@@ -14,15 +16,30 @@ let package = Package(
       dependencies: [],
       path: "Sources/ClipboardCore"
     ),
+    .target(
+      name: "ClipboardPlatform",
+      dependencies: ["ClipboardCore"],
+      path: "Sources/ClipboardPlatform"
+    ),
     .executableTarget(
       name: "ClipboardApp",
-      dependencies: ["ClipboardCore"],
+      dependencies: ["ClipboardCore", "ClipboardPlatform"],
       path: "Sources/ClipboardApp"
+    ),
+    .executableTarget(
+      name: "ClipboardManualProbe",
+      dependencies: ["ClipboardCore", "ClipboardPlatform"],
+      path: "Sources/ClipboardManualProbe"
     ),
     .testTarget(
       name: "ClipboardCoreTests",
       dependencies: ["ClipboardCore"],
       path: "Tests/ClipboardCoreTests"
+    ),
+    .testTarget(
+      name: "ClipboardPlatformTests",
+      dependencies: ["ClipboardCore", "ClipboardPlatform"],
+      path: "Tests/ClipboardPlatformTests"
     )
   ]
 )

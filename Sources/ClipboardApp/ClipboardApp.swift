@@ -1,5 +1,6 @@
 import SwiftUI
 import ClipboardCore
+import ClipboardPlatform
 
 @main
 struct ClipboardApp: App {
