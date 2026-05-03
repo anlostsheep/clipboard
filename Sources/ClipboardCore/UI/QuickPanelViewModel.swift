@@ -13,6 +13,7 @@ public struct QuickPanelSelectionIntent: Equatable, Sendable {
 public actor QuickPanelViewModel {
   private let store: any HistoryStore
   private let pageLimit: Int
+  private var refreshGeneration = 0
   public private(set) var items: [ClipboardRecord] = []
   public private(set) var selectedIndex: Int = 0
 
@@ -22,7 +23,15 @@ public actor QuickPanelViewModel {
   }
 
   public func refresh(query: String) async {
-    items = await store.fetchPage(query: query, limit: pageLimit)
+    refreshGeneration += 1
+    let generation = refreshGeneration
+    let refreshedItems = await store.fetchPage(query: query, limit: pageLimit)
+
+    guard generation == refreshGeneration else {
+      return
+    }
+
+    items = refreshedItems
     selectedIndex = items.isEmpty ? 0 : min(selectedIndex, items.count - 1)
   }
 
