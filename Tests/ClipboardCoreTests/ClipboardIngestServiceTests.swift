@@ -51,4 +51,23 @@ final class ClipboardIngestServiceTests: XCTestCase {
     XCTAssertEqual(record.metadata?.indexingState, .excerptIndexed)
     XCTAssertEqual(records.count, 1)
   }
+
+  func testPayloadStoreSavesAndLoadsPayloadByRecordID() async throws {
+    let store = InMemoryPayloadStore()
+    let id = UUID(uuidString: "00000000-0000-0000-0000-000000000060")!
+
+    await store.save(.text("hello"), for: id)
+    let payload = await store.loadPayload(for: id)
+
+    XCTAssertEqual(payload, .text("hello"))
+  }
+
+  func testPayloadStoreReturnsNilForMissingRecordID() async throws {
+    let store = InMemoryPayloadStore()
+    let id = UUID(uuidString: "00000000-0000-0000-0000-000000000061")!
+
+    let payload = await store.loadPayload(for: id)
+
+    XCTAssertNil(payload)
+  }
 }

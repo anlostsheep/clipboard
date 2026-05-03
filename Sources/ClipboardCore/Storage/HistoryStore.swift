@@ -38,3 +38,22 @@ public actor InMemoryHistoryStore: HistoryStore {
     return Array(filtered.prefix(max(0, limit)))
   }
 }
+
+public protocol ClipboardPayloadStore: Sendable {
+  func save(_ payload: ClipboardPayload, for recordID: UUID) async
+  func loadPayload(for recordID: UUID) async -> ClipboardPayload?
+}
+
+public actor InMemoryPayloadStore: ClipboardPayloadStore {
+  private var payloadsByRecordID: [UUID: ClipboardPayload] = [:]
+
+  public init() {}
+
+  public func save(_ payload: ClipboardPayload, for recordID: UUID) async {
+    payloadsByRecordID[recordID] = payload
+  }
+
+  public func loadPayload(for recordID: UUID) async -> ClipboardPayload? {
+    payloadsByRecordID[recordID]
+  }
+}
