@@ -1,14 +1,24 @@
 import SwiftUI
 import ClipboardCore
 import ClipboardPlatform
+import Foundation
 
 @main
 struct ClipboardApp: App {
   @State private var services = AppServices()
+  @State private var hotKeyRegistrar = GlobalHotKeyRegistrar()
 
   var body: some Scene {
     WindowGroup("Clipboard") {
       ClipboardRootView(services: services)
+        .task {
+          let status = hotKeyRegistrar.registerCommandShiftV {
+            services.quickPanelController.toggle()
+          }
+          if status != 0 {
+            NSLog("Failed to register Command-Shift-V hotkey: OSStatus \(status)")
+          }
+        }
     }
   }
 }
