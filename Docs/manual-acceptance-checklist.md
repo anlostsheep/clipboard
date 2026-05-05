@@ -66,6 +66,7 @@ swift run ClipboardManualProbe read-once
 - [ ] 启动 app 并授权辅助功能后，复制 3 条不同文本，主窗口 Session items 增长
 - [ ] 按 `Command+Shift+V` 后浮动 QuickPanel 出现在当前屏幕中心附近
 - [ ] QuickPanel 首屏显示最近复制的 session 历史，最新记录排在最上方
+- [ ] QuickPanel 每行左侧显示来源 App 图标；无法识别来源 App 时回退为内容类型图标
 - [ ] 输入搜索关键词后，列表只保留匹配标题、摘要或来源 App 的记录
 - [ ] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
 - [ ] 按 `Escape` 关闭 QuickPanel
