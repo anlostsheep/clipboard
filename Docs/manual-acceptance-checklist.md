@@ -61,6 +61,18 @@ swift run ClipboardManualProbe read-once
 - [ ] 设置为“仅复制”后，`Enter` 只写入剪贴板，不模拟 `Cmd+V`
 - [ ] 运行期撤销辅助功能权限后，自动粘贴阻断并提示重新授权
 
+## QuickPanel 快捷键
+
+- [ ] 启动 app 并授权辅助功能后，复制 3 条不同文本，主窗口 Session items 增长
+- [ ] 按 `Command+Shift+V` 后浮动 QuickPanel 出现在当前屏幕中心附近
+- [ ] QuickPanel 首屏显示最近复制的 session 历史，最新记录排在最上方
+- [ ] 输入搜索关键词后，列表只保留匹配标题、摘要或来源 App 的记录
+- [ ] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
+- [ ] 按 `Escape` 关闭 QuickPanel
+- [ ] 在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，选中记录后按 `Return`，记录被复制并自动粘贴
+- [ ] 撤销辅助功能权限后，按 `Return` 不静默失败，footer 显示失败原因
+- [ ] 复制 10MB JSON 后打开 QuickPanel，列表只显示摘要，不渲染全文
+
 ## 失败提示
 
 - [ ] 写入剪贴板失败有事务状态
