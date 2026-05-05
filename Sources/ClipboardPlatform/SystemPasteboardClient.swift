@@ -88,6 +88,26 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
     AXIsProcessTrustedWithOptions(nil)
   }
 
+  public func requestAccessibilityTrustPrompt() -> Bool {
+    let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+    let options = [promptKey: true] as CFDictionary
+    return AXIsProcessTrustedWithOptions(options)
+  }
+
+  public func openAccessibilitySettings() {
+    let urls = [
+      "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+      "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility"
+    ]
+
+    for urlString in urls {
+      guard let url = URL(string: urlString), NSWorkspace.shared.open(url) else {
+        continue
+      }
+      return
+    }
+  }
+
   public func postCommandV() async -> Bool {
     guard isAccessibilityTrusted() else {
       return false
