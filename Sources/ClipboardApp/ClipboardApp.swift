@@ -242,6 +242,7 @@ private struct ClipboardRootView: View {
   private func ingest(_ capture: ClipboardCapture, summaryPrefix: String) async {
     do {
       if let record = try await services.ingestService.ingest(capture) {
+        await services.payloadStore.save(capture.payload, for: record.id)
         lastCaptureSummary = "\(summaryPrefix) \(record.primaryType.rawValue) from \(record.sourceAppName ?? "unknown app")."
       } else {
         lastCaptureSummary = "Clipboard capture was ignored by the privacy policy."
