@@ -1,3 +1,4 @@
+import AppKit
 import ClipboardCore
 import SwiftUI
 
@@ -6,6 +7,7 @@ struct QuickPanelView: View {
   let onClose: () -> Void
   let onSubmit: () -> Void
   @FocusState private var isSearchFocused: Bool
+  @State private var sourceAppIconProvider = SourceAppIconProvider()
 
   var body: some View {
     VStack(spacing: 0) {
@@ -62,9 +64,13 @@ struct QuickPanelView: View {
     } else {
       ScrollViewReader { proxy in
         List(Array(state.items.enumerated()), id: \.element.id) { index, record in
-          QuickPanelRow(record: record, isSelected: index == state.selectedIndex)
-            .id(record.id)
-            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+          QuickPanelRow(
+            record: record,
+            isSelected: index == state.selectedIndex,
+            sourceIcon: sourceAppIconProvider.icon(for: record)
+          )
+          .id(record.id)
+          .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
         }
         .listStyle(.plain)
         .onChange(of: state.selectedIndex) { _, selectedIndex in
@@ -105,12 +111,15 @@ struct QuickPanelView: View {
 private struct QuickPanelRow: View {
   let record: ClipboardRecord
   let isSelected: Bool
+  let sourceIcon: NSImage?
 
   var body: some View {
     HStack(alignment: .top, spacing: 10) {
-      Image(systemName: iconName)
-        .frame(width: 22)
-        .foregroundStyle(isSelected ? .white : .cyan)
+      SourceIconView(
+        sourceIcon: sourceIcon,
+        fallbackSymbolName: iconName,
+        isSelected: isSelected
+      )
 
       VStack(alignment: .leading, spacing: 4) {
         HStack {
@@ -156,5 +165,32 @@ private struct QuickPanelRow: View {
     case .file:
       return "doc"
     }
+  }
+}
+
+private struct SourceIconView: View {
+  let sourceIcon: NSImage?
+  let fallbackSymbolName: String
+  let isSelected: Bool
+
+  var body: some View {
+    ZStack {
+      RoundedRectangle(cornerRadius: 6)
+        .fill(isSelected ? Color.white.opacity(0.18) : Color.secondary.opacity(0.12))
+
+      if let sourceIcon {
+        Image(nsImage: sourceIcon)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 22, height: 22)
+          .clipShape(RoundedRectangle(cornerRadius: 5))
+      } else {
+        Image(systemName: fallbackSymbolName)
+          .font(.system(size: 16, weight: .medium))
+          .foregroundStyle(isSelected ? .white : .cyan)
+      }
+    }
+    .frame(width: 30, height: 30)
+    .accessibilityHidden(true)
   }
 }
