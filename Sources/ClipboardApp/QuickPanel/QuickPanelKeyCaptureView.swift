@@ -68,6 +68,10 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
         return event
       }
 
+      if event.window?.firstResponder?.hasMarkedTextInput == true {
+        return event
+      }
+
       switch event.keyCode {
       case 53:
         onCancel()
@@ -93,3 +97,9 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
 }
 
 final class KeyCaptureNSView: NSView {}
+
+private extension NSResponder {
+  var hasMarkedTextInput: Bool {
+    (self as? NSTextInputClient)?.hasMarkedText() ?? false
+  }
+}

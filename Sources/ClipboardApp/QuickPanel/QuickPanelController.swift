@@ -5,6 +5,7 @@ import SwiftUI
 final class QuickPanelController {
   private let state: QuickPanelState
   private var panel: NSPanel?
+  private var previousApplication: NSRunningApplication?
 
   init(state: QuickPanelState) {
     self.state = state
@@ -19,6 +20,7 @@ final class QuickPanelController {
   }
 
   func show() {
+    rememberPreviousApplication()
     let panel = panel ?? makePanel()
     self.panel = panel
 
@@ -30,6 +32,7 @@ final class QuickPanelController {
 
     NSApp.activate(ignoringOtherApps: true)
     panel.makeKeyAndOrderFront(nil)
+    focusSearchField(in: panel)
   }
 
   func hide() {
@@ -37,9 +40,15 @@ final class QuickPanelController {
   }
 
   private func makePanel() -> NSPanel {
-    let content = QuickPanelView(state: state) { [weak self] in
-      self?.hide()
-    }
+    let content = QuickPanelView(
+      state: state,
+      onClose: { [weak self] in
+        self?.hide()
+      },
+      onSubmit: { [weak self] in
+        self?.submitSelection()
+      }
+    )
     let hostingView = NSHostingView(rootView: content)
     let panel = KeyablePanel(
       contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
@@ -75,6 +84,47 @@ final class QuickPanelController {
     )
     panel.setFrame(NSRect(origin: origin, size: size), display: true)
   }
+
+  private func rememberPreviousApplication() {
+    let frontmostApplication = NSWorkspace.shared.frontmostApplication
+    if frontmostApplication?.bundleIdentifier == Bundle.main.bundleIdentifier {
+      previousApplication = nil
+    } else {
+      previousApplication = frontmostApplication
+    }
+  }
+
+  private func submitSelection() {
+    let targetApplication = previousApplication
+    hide()
+
+    if let targetApplication, !targetApplication.isTerminated {
+      targetApplication.activate(options: [.activateAllWindows])
+    }
+
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 120_000_000)
+      await state.selectCurrent(autoPaste: true)
+    }
+  }
+
+  private func focusSearchField(in panel: NSPanel, attemptsRemaining: Int = 4) {
+    guard attemptsRemaining > 0 else {
+      return
+    }
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak panel] in
+      guard let panel else {
+        return
+      }
+
+      if let textField = panel.contentView?.firstSubview(of: NSTextField.self) {
+        panel.makeFirstResponder(textField)
+      } else {
+        self.focusSearchField(in: panel, attemptsRemaining: attemptsRemaining - 1)
+      }
+    }
+  }
 }
 
 private final class KeyablePanel: NSPanel {
@@ -84,5 +134,21 @@ private final class KeyablePanel: NSPanel {
 
   override var canBecomeMain: Bool {
     true
+  }
+}
+
+private extension NSView {
+  func firstSubview<T: NSView>(of type: T.Type) -> T? {
+    if let view = self as? T {
+      return view
+    }
+
+    for subview in subviews {
+      if let match = subview.firstSubview(of: type) {
+        return match
+      }
+    }
+
+    return nil
   }
 }

@@ -4,6 +4,8 @@ import SwiftUI
 struct QuickPanelView: View {
   @ObservedObject var state: QuickPanelState
   let onClose: () -> Void
+  let onSubmit: () -> Void
+  @FocusState private var isSearchFocused: Bool
 
   var body: some View {
     VStack(spacing: 0) {
@@ -20,8 +22,12 @@ struct QuickPanelView: View {
     .frame(width: 620, height: 420)
     .background(.regularMaterial)
     .overlay(keyCapture.frame(width: 0, height: 0))
+    .onAppear {
+      isSearchFocused = true
+    }
     .task {
       await state.refresh()
+      isSearchFocused = true
     }
   }
 
@@ -38,6 +44,7 @@ struct QuickPanelView: View {
         )
       )
       .textFieldStyle(.plain)
+      .focused($isSearchFocused)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
@@ -89,11 +96,7 @@ struct QuickPanelView: View {
       onMove: { delta in
         state.moveSelection(delta: delta)
       },
-      onSubmit: {
-        Task {
-          await state.selectCurrent(autoPaste: true)
-        }
-      },
+      onSubmit: onSubmit,
       onCancel: onClose
     )
   }
