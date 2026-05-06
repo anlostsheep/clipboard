@@ -31,6 +31,8 @@ private struct ClipboardRootView: View {
   @State private var status = "Checking accessibility"
   @State private var records: [ClipboardRecord] = []
   @State private var lastCaptureSummary = "No clipboard item captured in this session."
+  @AppStorage(ClipboardAppSettings.quickPanelReturnCopiesOnlyKey)
+  private var quickPanelReturnCopiesOnly = false
   private let authorizationTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
   private let clipboardTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
@@ -119,6 +121,18 @@ private struct ClipboardRootView: View {
         Button("Recheck Accessibility") {
           refreshAuthorization()
         }
+
+        Divider()
+
+        Toggle(isOn: $quickPanelReturnCopiesOnly) {
+          Text("Return copies only")
+        }
+        .toggleStyle(.checkbox)
+
+        Text("When enabled, QuickPanel Return copies the selected item. Press Command+V to paste it.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
 
         Spacer()
 
