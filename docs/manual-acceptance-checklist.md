@@ -13,7 +13,7 @@
 
 ## 启动前置
 
-- [ ] `macos-clipboard-manager/Scripts/verify.sh` 通过
+- [ ] `Scripts/verify.sh` 通过
 - [ ] `swift run ClipboardManualProbe self-check` 输出 `write: ok`
 - [ ] `swift run ClipboardManualProbe accessibility` 输出 `accessibility: authorized`
 - [ ] 如果输出 `accessibility: required`，先在系统设置中授权，再重新验证
@@ -23,7 +23,6 @@
 每个来源复制后运行：
 
 ```bash
-cd macos-clipboard-manager
 swift run ClipboardManualProbe read-once
 ```
 
