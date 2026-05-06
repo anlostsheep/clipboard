@@ -96,6 +96,7 @@ final class QuickPanelController {
 
   private func submitSelection() {
     let targetApplication = previousApplication
+    let autoPaste = ClipboardAppSettings.quickPanelAutoPasteEnabled()
     hide()
 
     if let targetApplication, !targetApplication.isTerminated {
@@ -104,7 +105,7 @@ final class QuickPanelController {
 
     Task { @MainActor in
       try? await Task.sleep(nanoseconds: 120_000_000)
-      await state.selectCurrent(autoPaste: true)
+      await state.selectCurrent(autoPaste: autoPaste)
     }
   }
 
