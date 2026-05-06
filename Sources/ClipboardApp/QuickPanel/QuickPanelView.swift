@@ -8,6 +8,8 @@ struct QuickPanelView: View {
   let onSubmit: () -> Void
   @FocusState private var isSearchFocused: Bool
   @State private var sourceAppIconProvider = SourceAppIconProvider()
+  @AppStorage(ClipboardAppSettings.quickPanelReturnCopiesOnlyKey)
+  private var quickPanelReturnCopiesOnly = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -84,12 +86,16 @@ struct QuickPanelView: View {
     }
   }
 
+  private var shortcutHint: String {
+    quickPanelReturnCopiesOnly ? "Return Copy  Cmd+V Paste  Esc Close" : "Return Paste  Esc Close"
+  }
+
   private var footer: some View {
     HStack {
       Text(state.footerStatus)
         .foregroundStyle(.secondary)
       Spacer()
-      Text("Return Paste  Esc Close")
+      Text(shortcutHint)
         .foregroundStyle(.secondary)
     }
     .font(.caption)
