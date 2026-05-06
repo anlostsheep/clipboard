@@ -73,6 +73,7 @@ swift run ClipboardManualProbe read-once
 - [ ] 未勾选 `Return copies only` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，选中记录后按 `Return`，记录被复制并自动粘贴
 - [ ] 勾选 `Return copies only` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，选中记录后按 `Return`，目标文本框不立即粘贴
 - [ ] 勾选 `Return copies only` 后，`Return` 选择记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
+- [ ] 勾选 `Return copies only` 后，QuickPanel footer 显示 `Return Copy  Cmd+V Paste  Esc Close`
 - [ ] 重启 app 后，`Return copies only` 勾选状态保持不变
 - [ ] 撤销辅助功能权限后，按 `Return` 不静默失败，footer 显示失败原因
 - [ ] 复制 10MB JSON 后打开 QuickPanel，列表只显示摘要，不渲染全文
