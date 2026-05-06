@@ -7,7 +7,17 @@ final class PrivacyPolicyTests: XCTestCase {
 
     XCTAssertTrue(policy.shouldIgnore(pasteboardTypes: ["org.nspasteboard.ConcealedType"], sourceBundleId: nil))
     XCTAssertTrue(policy.shouldIgnore(pasteboardTypes: ["org.nspasteboard.TransientType"], sourceBundleId: nil))
+    XCTAssertTrue(policy.shouldIgnore(pasteboardTypes: ["org.chromium.web-custom-data"], sourceBundleId: nil))
     XCTAssertFalse(policy.shouldIgnore(pasteboardTypes: ["public.utf8-plain-text"], sourceBundleId: nil))
+  }
+
+  func testStandardPolicyDoesNotIgnoreUsefulImageWithChromiumTransientMetadata() {
+    let policy = PrivacyPolicy.standard
+
+    XCTAssertFalse(policy.shouldIgnore(
+      pasteboardTypes: ["public.tiff", "org.chromium.web-custom-data"],
+      sourceBundleId: "com.google.Chrome"
+    ))
   }
 
   func testUniversalClipboardCanBeDisabled() {

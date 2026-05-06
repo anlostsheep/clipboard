@@ -1,3 +1,4 @@
+import AppKit
 import ClipboardCore
 import Combine
 import Foundation
@@ -91,6 +92,15 @@ final class QuickPanelState: ObservableObject {
     default:
       footerStatus = "Paste transaction ended in \(transaction.state)"
     }
+  }
+
+  func imagePreview(for record: ClipboardRecord) async -> NSImage? {
+    guard record.primaryType == .image,
+          case let .image(data, _) = await payloadStore.loadPayload(for: record.id) else {
+      return nil
+    }
+
+    return NSImage(data: data)
   }
 
   @discardableResult

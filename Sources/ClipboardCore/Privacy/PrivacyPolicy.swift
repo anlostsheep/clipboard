@@ -58,7 +58,8 @@ public struct PrivacyPolicy: Equatable, Sendable {
       return true
     }
 
-    if !pasteboardTypes.isDisjoint(with: ignoredTransientTypes) {
+    let nonTransientTypes = pasteboardTypes.subtracting(ignoredTransientTypes)
+    if !pasteboardTypes.isDisjoint(with: ignoredTransientTypes), nonTransientTypes.isEmpty {
       return true
     }
 

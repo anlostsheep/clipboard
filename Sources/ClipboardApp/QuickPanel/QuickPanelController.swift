@@ -4,11 +4,16 @@ import SwiftUI
 @MainActor
 final class QuickPanelController {
   private let state: QuickPanelState
+  private let prepareForShow: @MainActor () async -> Void
   private var panel: NSPanel?
   private var previousApplication: NSRunningApplication?
 
-  init(state: QuickPanelState) {
+  init(
+    state: QuickPanelState,
+    prepareForShow: @escaping @MainActor () async -> Void = {}
+  ) {
     self.state = state
+    self.prepareForShow = prepareForShow
   }
 
   func toggle() {
@@ -26,13 +31,13 @@ final class QuickPanelController {
 
     position(panel)
 
-    Task {
+    Task { @MainActor in
+      await prepareForShow()
       await state.refresh()
+      NSApp.activate(ignoringOtherApps: true)
+      panel.makeKeyAndOrderFront(nil)
+      focusSearchField(in: panel)
     }
-
-    NSApp.activate(ignoringOtherApps: true)
-    panel.makeKeyAndOrderFront(nil)
-    focusSearchField(in: panel)
   }
 
   func hide() {

@@ -9,13 +9,19 @@ final class AppServices {
   let systemClient: SystemPasteboardClient
   let ingestService: ClipboardIngestService
   let monitor: ClipboardMonitor
+  let captureCoordinator: ClipboardCaptureCoordinator
   let pasteController: PasteController
   lazy var quickPanelState = QuickPanelState(
     viewModel: QuickPanelViewModel(store: store, pageLimit: 50),
     payloadStore: payloadStore,
     pasteController: pasteController
   )
-  lazy var quickPanelController = QuickPanelController(state: quickPanelState)
+  lazy var quickPanelController = QuickPanelController(
+    state: quickPanelState,
+    prepareForShow: { [weak self] in
+      await self?.prepareQuickPanelForShow()
+    }
+  )
 
   init(
     store: InMemoryHistoryStore = InMemoryHistoryStore(),
@@ -31,6 +37,19 @@ final class AppServices {
       largeTextPolicy: .default
     )
     self.monitor = ClipboardMonitor(reader: systemClient)
+    self.captureCoordinator = ClipboardCaptureCoordinator(
+      monitor: monitor,
+      ingestService: ingestService,
+      payloadStore: payloadStore
+    )
     self.pasteController = PasteController(pasteboard: systemClient, eventPoster: systemClient)
+  }
+
+  private func prepareQuickPanelForShow() async {
+    do {
+      _ = try await captureCoordinator.captureLatestChange()
+    } catch {
+      NSLog("Failed to capture latest clipboard item before showing QuickPanel: \(error.localizedDescription)")
+    }
   }
 }

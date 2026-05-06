@@ -246,17 +246,19 @@ private struct ClipboardRootView: View {
       isPollingClipboard = false
     }
 
-    guard let capture = await services.monitor.poll() else {
-      return
+    do {
+      if let record = try await services.captureCoordinator.captureLatestChange() {
+        lastCaptureSummary = "Auto-captured \(record.primaryType.rawValue) from \(record.sourceAppName ?? "unknown app")."
+        await refreshRecords()
+      }
+    } catch {
+      lastCaptureSummary = "Failed to ingest clipboard item: \(error.localizedDescription)"
     }
-
-    await ingest(capture, summaryPrefix: "Auto-captured")
   }
 
   private func ingest(_ capture: ClipboardCapture, summaryPrefix: String) async {
     do {
-      if let record = try await services.ingestService.ingest(capture) {
-        await services.payloadStore.save(capture.payload, for: record.id)
+      if let record = try await services.captureCoordinator.ingest(capture) {
         lastCaptureSummary = "\(summaryPrefix) \(record.primaryType.rawValue) from \(record.sourceAppName ?? "unknown app")."
       } else {
         lastCaptureSummary = "Clipboard capture was ignored by the privacy policy."

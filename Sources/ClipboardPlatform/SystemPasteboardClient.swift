@@ -30,9 +30,9 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
     let app = NSWorkspace.shared.frontmostApplication
     let now = Date()
 
-    if let string = item.string(forType: .string), !string.isEmpty {
+    if let image = firstImagePayload(in: items) {
       return ClipboardCapture(
-        payload: .text(string),
+        payload: .image(data: image.data, uti: image.type.rawValue),
         pasteboardTypes: types,
         sourceAppBundleId: app?.bundleIdentifier,
         sourceAppName: app?.localizedName,
@@ -40,9 +40,9 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
       )
     }
 
-    if let data = item.data(forType: .png) {
+    if let string = item.string(forType: .string), !string.isEmpty {
       return ClipboardCapture(
-        payload: .image(data: data, uti: NSPasteboard.PasteboardType.png.rawValue),
+        payload: .text(string),
         pasteboardTypes: types,
         sourceAppBundleId: app?.bundleIdentifier,
         sourceAppName: app?.localizedName,
@@ -64,6 +64,26 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
         sourceAppName: app?.localizedName,
         capturedAt: now
       )
+    }
+
+    return nil
+  }
+
+  private func firstImagePayload(in items: [NSPasteboardItem]) -> (data: Data, type: NSPasteboard.PasteboardType)? {
+    let imageTypes: [NSPasteboard.PasteboardType] = [
+      .png,
+      .tiff,
+      NSPasteboard.PasteboardType("public.jpeg"),
+      NSPasteboard.PasteboardType("public.heic"),
+      NSPasteboard.PasteboardType("com.compuserve.gif")
+    ]
+
+    for item in items {
+      for type in imageTypes {
+        if let data = item.data(forType: type), !data.isEmpty {
+          return (data, type)
+        }
+      }
     }
 
     return nil

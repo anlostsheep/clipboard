@@ -96,6 +96,40 @@ final class SystemPasteboardClientTests: XCTestCase {
     XCTAssertTrue(capture.pasteboardTypes.contains(NSPasteboard.PasteboardType.png.rawValue))
   }
 
+  func testExternalTiffImageCanBeCaptured() async throws {
+    let pasteboard = makePasteboard()
+    let client = SystemPasteboardClient(pasteboard: pasteboard)
+    let tiffData = Data([0x4D, 0x4D, 0x00, 0x2A])
+    let item = NSPasteboardItem()
+
+    XCTAssertTrue(item.setData(tiffData, forType: .tiff))
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+
+    let captured = await client.readCurrentCapture()
+    let capture = try XCTUnwrap(captured)
+
+    XCTAssertEqual(capture.payload, .image(data: tiffData, uti: NSPasteboard.PasteboardType.tiff.rawValue))
+    XCTAssertTrue(capture.pasteboardTypes.contains(NSPasteboard.PasteboardType.tiff.rawValue))
+  }
+
+  func testImageDataIsPreferredWhenClipboardItemAlsoHasTextMetadata() async throws {
+    let pasteboard = makePasteboard()
+    let client = SystemPasteboardClient(pasteboard: pasteboard)
+    let pngData = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    let item = NSPasteboardItem()
+
+    XCTAssertTrue(item.setString("https://example.com/image.png", forType: .string))
+    XCTAssertTrue(item.setData(pngData, forType: .png))
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+
+    let captured = await client.readCurrentCapture()
+    let capture = try XCTUnwrap(captured)
+
+    XCTAssertEqual(capture.payload, .image(data: pngData, uti: NSPasteboard.PasteboardType.png.rawValue))
+  }
+
   private func makePasteboard() -> NSPasteboard {
     let name = NSPasteboard.Name("com.local.clipboard-manager.tests.\(UUID().uuidString)")
     let pasteboard = NSPasteboard(name: name)
