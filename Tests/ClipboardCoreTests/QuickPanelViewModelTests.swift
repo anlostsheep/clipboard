@@ -48,6 +48,19 @@ final class QuickPanelViewModelTests: XCTestCase {
     XCTAssertEqual(intent, QuickPanelSelectionIntent(recordID: firstID, autoPaste: true))
   }
 
+  func testSelectedIntentCanRequestCopyOnlyMode() async throws {
+    let store = InMemoryHistoryStore()
+    let recordID = UUID(uuidString: "00000000-0000-0000-0000-000000000023")!
+    _ = try await store.upsert(makeRecord(id: recordID, title: "copy only", lastCopiedAt: 1))
+
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+    await viewModel.refresh(query: "")
+
+    let intent = await viewModel.selectedIntent(autoPaste: false)
+
+    XCTAssertEqual(intent, QuickPanelSelectionIntent(recordID: recordID, autoPaste: false))
+  }
+
   private func makeRecord(id: UUID, title: String, lastCopiedAt: TimeInterval) -> ClipboardRecord {
     ClipboardRecord(
       id: id,
