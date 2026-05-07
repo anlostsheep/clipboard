@@ -15,11 +15,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindowController: NSWindowController?
     private var settingsWindow: NSWindow?
 
+    // Explicit entry point: Swift's default `@main` synthesis on an
+    // NSApplicationDelegate class does not set this instance as the application
+    // delegate, so `applicationDidFinishLaunching` would never fire. We wire it
+    // up manually here before starting the run loop.
+    nonisolated static func main() {
+        MainActor.assumeIsolated {
+            let delegate = AppDelegate()
+            NSApplication.shared.delegate = delegate
+        }
+        NSApplication.shared.run()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-
         services = AppServices()
-
         setupStatusBar()
         setupHotKey()
         checkFirstLaunch()
