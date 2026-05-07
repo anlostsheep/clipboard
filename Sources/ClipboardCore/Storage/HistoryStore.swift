@@ -37,6 +37,11 @@ public actor InMemoryHistoryStore: HistoryStore {
     }
     return Array(filtered.prefix(max(0, limit)))
   }
+
+  /// Removes all stored records. Used by HistorySettingsView "Clear All" action.
+  public func removeAll() {
+    recordsByHash.removeAll()
+  }
 }
 
 public protocol ClipboardPayloadStore: Sendable {

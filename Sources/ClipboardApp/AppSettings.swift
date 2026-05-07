@@ -1,13 +1,80 @@
 import Foundation
+import Carbon
 
 enum ClipboardAppSettings {
-  static let quickPanelReturnCopiesOnlyKey = "quickPanel.returnCopiesOnly"
+    // MARK: - Existing
+    static let quickPanelReturnCopiesOnlyKey = "quickPanel.returnCopiesOnly"
 
-  static func quickPanelReturnCopiesOnly(defaults: UserDefaults = .standard) -> Bool {
-    defaults.bool(forKey: quickPanelReturnCopiesOnlyKey)
-  }
+    static func quickPanelReturnCopiesOnly(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: quickPanelReturnCopiesOnlyKey)
+    }
 
-  static func quickPanelAutoPasteEnabled(defaults: UserDefaults = .standard) -> Bool {
-    !quickPanelReturnCopiesOnly(defaults: defaults)
-  }
+    static func quickPanelAutoPasteEnabled(defaults: UserDefaults = .standard) -> Bool {
+        !quickPanelReturnCopiesOnly(defaults: defaults)
+    }
+
+    // MARK: - Hotkey
+    static let hotkeyKeyCodeKey = "hotkey.keyCode"
+    static let hotkeyModifiersKey = "hotkey.modifiers"
+
+    static func hotkeyKeyCode(defaults: UserDefaults = .standard) -> UInt32 {
+        let stored = defaults.integer(forKey: hotkeyKeyCodeKey)
+        return stored > 0 ? UInt32(stored) : UInt32(kVK_ANSI_V)
+    }
+
+    static func hotkeyModifiers(defaults: UserDefaults = .standard) -> UInt32 {
+        let stored = defaults.integer(forKey: hotkeyModifiersKey)
+        return stored > 0 ? UInt32(stored) : UInt32(cmdKey | shiftKey)
+    }
+
+    static func saveHotkey(keyCode: UInt32, modifiers: UInt32, defaults: UserDefaults = .standard) {
+        defaults.set(Int(keyCode), forKey: hotkeyKeyCodeKey)
+        defaults.set(Int(modifiers), forKey: hotkeyModifiersKey)
+    }
+
+    // MARK: - Panel Position
+    static let panelPositionModeKey = "quickPanel.positionMode"
+
+    static func panelPositionMode(defaults: UserDefaults = .standard) -> PanelPositionMode {
+        guard let raw = defaults.string(forKey: panelPositionModeKey),
+              let mode = PanelPositionMode(rawValue: raw) else {
+            return .center
+        }
+        return mode
+    }
+
+    // MARK: - Launch
+    static let hasLaunchedKey = "app.hasLaunched"
+
+    static func hasLaunched(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: hasLaunchedKey)
+    }
+
+    static func markLaunched(defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: hasLaunchedKey)
+    }
+
+    // MARK: - History
+    static let maxHistoryCountKey = "history.maxCount"
+    static let defaultMaxHistoryCount = 200
+
+    static func maxHistoryCount(defaults: UserDefaults = .standard) -> Int {
+        let stored = defaults.integer(forKey: maxHistoryCountKey)
+        return stored > 0 ? stored : defaultMaxHistoryCount
+    }
+}
+
+// MARK: - Panel Position Mode
+enum PanelPositionMode: String, CaseIterable {
+    case center      = "center"
+    case followMouse = "followMouse"
+    case menuBar     = "menuBar"
+
+    var displayName: String {
+        switch self {
+        case .center:      return "居中"
+        case .followMouse: return "跟随鼠标"
+        case .menuBar:     return "菜单栏图标下方"
+        }
+    }
 }
