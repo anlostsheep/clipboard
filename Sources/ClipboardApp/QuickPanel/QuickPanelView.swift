@@ -50,6 +50,15 @@ struct QuickPanelView: View {
       )
       .textFieldStyle(.plain)
       .focused($isSearchFocused)
+
+      Button {
+        AppDelegate.shared.openSettings()
+      } label: {
+        Image(systemName: "gearshape")
+          .foregroundStyle(.secondary)
+      }
+      .buttonStyle(.plain)
+      .help("打开设置")
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
