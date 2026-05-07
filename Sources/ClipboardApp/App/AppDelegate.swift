@@ -8,7 +8,7 @@ import Carbon
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
-    private var services: AppServices!
+    var services: AppServices!
     private var statusBarController: StatusBarController!
     private var hotKeyManager: HotKeyManager!
     private var welcomeWindowController: NSWindowController?
