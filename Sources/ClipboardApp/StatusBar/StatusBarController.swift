@@ -25,7 +25,7 @@ final class StatusBarController {
         statusItem?.button?.window?.frame.origin ?? .zero
     }
 
-    @objc private func handleClick(_ sender: NSStatusBarButton) {
+    @MainActor @objc private func handleClick(_ sender: NSStatusBarButton) {
         guard let event = NSApp.currentEvent else { return }
         if event.type == .rightMouseUp {
             showContextMenu()
@@ -36,19 +36,16 @@ final class StatusBarController {
 
     private func showContextMenu() {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(
-            title: "退出 Clipboard",
-            action: #selector(quitAction),
-            keyEquivalent: "q"
-        ))
-        menu.items.last?.target = self
+        let quitItem = NSMenuItem(title: "退出 Clipboard", action: #selector(quitAction), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
 
         statusItem?.menu = menu
         statusItem?.button?.performClick(nil)
         statusItem?.menu = nil
     }
 
-    @objc private func quitAction() {
+    @MainActor @objc private func quitAction() {
         onQuit()
     }
 }
