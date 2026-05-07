@@ -1,0 +1,130 @@
+import AppKit
+import SwiftUI
+import ClipboardCore
+import ClipboardPlatform
+import Carbon
+
+@MainActor
+@main
+final class AppDelegate: NSObject, NSApplicationDelegate {
+
+    private var services: AppServices!
+    private var statusBarController: StatusBarController!
+    private var hotKeyManager: HotKeyManager!
+    private var welcomeWindowController: NSWindowController?
+    private var settingsWindow: NSWindow?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+
+        services = AppServices()
+
+        setupStatusBar()
+        setupHotKey()
+        checkFirstLaunch()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        hotKeyManager.unregister()
+    }
+
+    // MARK: - Status Bar
+
+    private func setupStatusBar() {
+        statusBarController = StatusBarController(
+            onLeftClick: { [weak self] iconOrigin in
+                guard let self else { return }
+                self.services.quickPanelController.statusBarIconOrigin = iconOrigin
+                self.services.quickPanelController.toggle(trigger: .statusBarClick(iconOrigin: iconOrigin))
+            },
+            onQuit: {
+                NSApp.terminate(nil)
+            }
+        )
+        statusBarController.setup()
+    }
+
+    // MARK: - Hot Key
+
+    private func setupHotKey() {
+        hotKeyManager = HotKeyManager()
+        let keyCode = ClipboardAppSettings.hotkeyKeyCode()
+        let modifiers = ClipboardAppSettings.hotkeyModifiers()
+
+        do {
+            try hotKeyManager.register(keyCode: keyCode, modifiers: modifiers) { [weak self] in
+                guard let self else { return }
+                let iconOrigin = self.statusBarController.iconOrigin
+                self.services.quickPanelController.statusBarIconOrigin = iconOrigin
+                self.services.quickPanelController.toggle(trigger: .hotkey)
+            }
+        } catch {
+            NSLog("Failed to register hotkey: \(error). Retrying with default Cmd+Shift+V.")
+            tryRegisterDefaultHotKey()
+        }
+    }
+
+    private func tryRegisterDefaultHotKey() {
+        let defaultKeyCode = UInt32(kVK_ANSI_V)
+        let defaultModifiers = UInt32(cmdKey | shiftKey)
+        try? hotKeyManager.register(keyCode: defaultKeyCode, modifiers: defaultModifiers) { [weak self] in
+            self?.services.quickPanelController.toggle(trigger: .hotkey)
+        }
+        ClipboardAppSettings.saveHotkey(keyCode: defaultKeyCode, modifiers: defaultModifiers)
+    }
+
+    // MARK: - First Launch
+
+    private func checkFirstLaunch() {
+        guard !ClipboardAppSettings.hasLaunched() else { return }
+        showWelcomeWindow()
+    }
+
+    private func showWelcomeWindow() {
+        let welcomeView = WelcomeView {
+            ClipboardAppSettings.markLaunched()
+            self.welcomeWindowController?.close()
+            self.welcomeWindowController = nil
+        }
+        let hostingController = NSHostingController(rootView: welcomeView)
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "欢迎使用 Clipboard"
+        window.styleMask = NSWindow.StyleMask([.titled, .closable])
+        window.setFrame(NSRect(x: 0, y: 0, width: 480, height: 360), display: true)
+        window.center()
+        window.isReleasedWhenClosed = false
+        let wc = NSWindowController(window: window)
+        wc.showWindow(nil as AnyObject?)
+        NSApp.activate(ignoringOtherApps: true)
+        welcomeWindowController = wc
+    }
+
+    // MARK: - Settings Window
+
+    func openSettings() {
+        if let existing = settingsWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let settingsView = SettingsRootView(services: services, hotKeyManager: hotKeyManager)
+        let hostingController = NSHostingController(rootView: settingsView)
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "设置"
+        window.styleMask = NSWindow.StyleMask([.titled, .closable, .resizable])
+        window.setFrame(NSRect(x: 0, y: 0, width: 660, height: 480), display: true)
+        window.minSize = NSSize(width: 560, height: 380)
+        window.center()
+        window.isReleasedWhenClosed = false
+        settingsWindow = window
+        let wc = NSWindowController(window: window)
+        wc.showWindow(nil as AnyObject?)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+extension AppDelegate {
+    static var shared: AppDelegate {
+        NSApp.delegate as! AppDelegate
+    }
+}
