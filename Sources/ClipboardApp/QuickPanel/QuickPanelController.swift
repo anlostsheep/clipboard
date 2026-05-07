@@ -93,8 +93,9 @@ final class QuickPanelController {
     /// - Status-bar clicks always use `statusBarClickOrigin`.
     /// - Hot-key invocations respect the user's `PanelPositionMode` preference.
     private func position(_ panel: NSPanel, trigger: TriggerSource) {
-        let screen = PanelPositionCalculator.mouseScreen()
-        let visibleFrame = screen.visibleFrame
+        let visibleFrame = PanelPositionCalculator.mouseScreen()?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900) // last resort fallback
         let size = panel.frame.size
 
         let origin: NSPoint
@@ -115,10 +116,17 @@ final class QuickPanelController {
                     panelSize: size, visibleFrame: visibleFrame
                 )
             case .menuBar:
-                // Fall back to the last known status-bar icon position.
-                origin = PanelPositionCalculator.statusBarClickOrigin(
-                    iconOrigin: statusBarIconOrigin, panelSize: size, visibleFrame: visibleFrame
-                )
+                // Use the last known status-bar icon position when available;
+                // fall back to center when the origin has not been set yet.
+                if statusBarIconOrigin != .zero {
+                    origin = PanelPositionCalculator.statusBarClickOrigin(
+                        iconOrigin: statusBarIconOrigin, panelSize: size, visibleFrame: visibleFrame
+                    )
+                } else {
+                    origin = PanelPositionCalculator.centerOrigin(
+                        panelSize: size, visibleFrame: visibleFrame
+                    )
+                }
             }
         }
 

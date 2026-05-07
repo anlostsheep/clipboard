@@ -53,11 +53,11 @@ public enum PanelPositionCalculator {
     }
 
     /// Returns the NSScreen that currently contains the mouse pointer.
-    /// Falls back to the main screen, then the first available screen.
-    public static func mouseScreen() -> NSScreen {
+    /// Falls back to the main screen. Returns nil only when no screens are available,
+    /// which callers must handle gracefully rather than force-unwrapping.
+    public static func mouseScreen() -> NSScreen? {
         let mouse = NSEvent.mouseLocation
         return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
             ?? NSScreen.main
-            ?? NSScreen.screens[0]
     }
 }
