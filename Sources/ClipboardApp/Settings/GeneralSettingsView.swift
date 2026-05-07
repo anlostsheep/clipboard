@@ -38,9 +38,8 @@ struct GeneralSettingsView: View {
                         Label("未授权 — 自动粘贴功能不可用", systemImage: "exclamationmark.circle.fill")
                             .foregroundStyle(.orange)
                         Spacer()
-                        Button("前往系统设置") {
-                            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-                            NSWorkspace.shared.open(url)
+                        Button("授权辅助功能") {
+                            requestAccessibilityPermission()
                         }
                     }
                 }
@@ -89,6 +88,14 @@ struct GeneralSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear { isAuthorized = AXIsProcessTrusted() }
+    }
+
+    /// Triggers the macOS native accessibility prompt. The system dialog's
+    /// "Open System Settings" button pre-populates this app in the Accessibility
+    /// list — no manual "+" step required.
+    private func requestAccessibilityPermission() {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
     }
 
     private func reRegisterHotKey(keyCode: UInt32, modifiers: UInt32) {

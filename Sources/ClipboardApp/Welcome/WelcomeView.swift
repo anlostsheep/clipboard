@@ -40,13 +40,27 @@ struct WelcomeView: View {
                     Spacer()
 
                     if !isAuthorized {
-                        Button("打开系统设置") {
-                            openAccessibilitySettings()
+                        Button("授权辅助功能") {
+                            requestAccessibilityPermission()
                         }
                     }
                 }
                 .padding(12)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+
+                if !isAuthorized {
+                    HStack(spacing: 4) {
+                        Text("如未弹出系统对话框，")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("手动打开系统设置") {
+                            openAccessibilitySettings()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
             }
 
             Spacer()
@@ -69,6 +83,16 @@ struct WelcomeView: View {
 
     private func checkAuthorization() {
         isAuthorized = AXIsProcessTrusted()
+    }
+
+    /// Triggers the macOS native accessibility prompt. Unlike opening Settings
+    /// via URL, the system dialog's "Open System Settings" button pre-populates
+    /// the app in the Accessibility list — no manual "+" / locate-app step.
+    /// On a second invocation after a prior denial the system suppresses this
+    /// dialog; the manual "打开系统设置" link below the button covers that case.
+    private func requestAccessibilityPermission() {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
     }
 
     private func openAccessibilitySettings() {
