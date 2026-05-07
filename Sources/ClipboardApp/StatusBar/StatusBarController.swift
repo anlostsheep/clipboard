@@ -13,7 +13,7 @@ final class StatusBarController {
 
     func setup() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "clipboard", accessibilityDescription: "Clipboard")
+        item.button?.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard")
         item.button?.image?.isTemplate = true
         item.button?.target = self
         item.button?.action = #selector(handleClick(_:))
