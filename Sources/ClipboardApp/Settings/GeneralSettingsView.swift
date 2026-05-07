@@ -51,20 +51,13 @@ struct GeneralSettingsView: View {
                     Text("呼出快捷面板")
                     Spacer()
                     HotKeyRecorderView(
-                        keyCode: Binding(
-                            get: { UInt32(storedKeyCode) },
-                            set: { newKC in
-                                storedKeyCode = Int(newKC)
-                                reRegisterHotKey(keyCode: newKC, modifiers: UInt32(storedModifiers))
-                            }
-                        ),
-                        modifiers: Binding(
-                            get: { UInt32(storedModifiers) },
-                            set: { newMods in
-                                storedModifiers = Int(newMods)
-                                reRegisterHotKey(keyCode: UInt32(storedKeyCode), modifiers: newMods)
-                            }
-                        ),
+                        keyCode: UInt32(storedKeyCode),
+                        modifiers: UInt32(storedModifiers),
+                        onCommit: { newKC, newMods in
+                            storedKeyCode = Int(newKC)
+                            storedModifiers = Int(newMods)
+                            reRegisterHotKey(keyCode: newKC, modifiers: newMods)
+                        },
                         onConflict: { msg in conflictMessage = msg }
                     )
                 }

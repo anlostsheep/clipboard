@@ -4,8 +4,11 @@ import ClipboardCore
 import SwiftUI
 
 struct HotKeyRecorderView: View {
-    @Binding var keyCode: UInt32
-    @Binding var modifiers: UInt32
+    /// Currently displayed key code. Read-only; updates flow through `onCommit`
+    /// so a single keypress produces exactly one registration round-trip.
+    let keyCode: UInt32
+    let modifiers: UInt32
+    var onCommit: (UInt32, UInt32) -> Void
     var onConflict: (String) -> Void
 
     @State private var isRecording = false
@@ -47,10 +50,8 @@ struct HotKeyRecorderView: View {
             isRecording = false
             return
         }
-        self.keyCode = keyCode
-        self.modifiers = modifiers
         isRecording = false
-        ClipboardAppSettings.saveHotkey(keyCode: keyCode, modifiers: modifiers)
+        onCommit(keyCode, modifiers)
     }
 
     // MARK: - Human-readable display
