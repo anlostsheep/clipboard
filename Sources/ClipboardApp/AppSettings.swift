@@ -18,18 +18,18 @@ enum ClipboardAppSettings {
     static let hotkeyModifiersKey = "hotkey.modifiers"
 
     static func hotkeyKeyCode(defaults: UserDefaults = .standard) -> UInt32 {
-        let stored = defaults.object(forKey: hotkeyKeyCodeKey)
-        return (stored as? UInt32) ?? UInt32(kVK_ANSI_V)
+        let stored = defaults.integer(forKey: hotkeyKeyCodeKey)
+        return stored > 0 ? UInt32(stored) : UInt32(kVK_ANSI_V)
     }
 
     static func hotkeyModifiers(defaults: UserDefaults = .standard) -> UInt32 {
-        let stored = defaults.object(forKey: hotkeyModifiersKey)
-        return (stored as? UInt32) ?? UInt32(cmdKey | shiftKey)
+        let stored = defaults.integer(forKey: hotkeyModifiersKey)
+        return stored > 0 ? UInt32(stored) : UInt32(cmdKey | shiftKey)
     }
 
     static func saveHotkey(keyCode: UInt32, modifiers: UInt32, defaults: UserDefaults = .standard) {
-        defaults.set(keyCode, forKey: hotkeyKeyCodeKey)
-        defaults.set(modifiers, forKey: hotkeyModifiersKey)
+        defaults.set(Int(keyCode), forKey: hotkeyKeyCodeKey)
+        defaults.set(Int(modifiers), forKey: hotkeyModifiersKey)
     }
 
     // MARK: - Panel Position
