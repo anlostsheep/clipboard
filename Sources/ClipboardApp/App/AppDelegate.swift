@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarController: StatusBarController!
     private var hotKeyManager: HotKeyManager!
     private var welcomeWindowController: NSWindowController?
+    private var settingsWindowController: NSWindowController?
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -67,10 +68,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func tryRegisterDefaultHotKey() {
         let defaultKeyCode = UInt32(kVK_ANSI_V)
         let defaultModifiers = UInt32(cmdKey | shiftKey)
-        try? hotKeyManager.register(keyCode: defaultKeyCode, modifiers: defaultModifiers) { [weak self] in
-            self?.services.quickPanelController.toggle(trigger: .hotkey)
+        do {
+            try hotKeyManager.register(keyCode: defaultKeyCode, modifiers: defaultModifiers) { [weak self] in
+                self?.services.quickPanelController.toggle(trigger: .hotkey)
+            }
+            ClipboardAppSettings.saveHotkey(keyCode: defaultKeyCode, modifiers: defaultModifiers)
+        } catch {
+            NSLog("Failed to register default hotkey Cmd+Shift+V: \(error). Hotkey unavailable.")
         }
-        ClipboardAppSettings.saveHotkey(keyCode: defaultKeyCode, modifiers: defaultModifiers)
     }
 
     // MARK: - First Launch
@@ -81,10 +86,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showWelcomeWindow() {
-        let welcomeView = WelcomeView {
+        let welcomeView = WelcomeView { [weak self] in
             ClipboardAppSettings.markLaunched()
-            self.welcomeWindowController?.close()
-            self.welcomeWindowController = nil
+            self?.welcomeWindowController?.close()
+            self?.welcomeWindowController = nil
         }
         let hostingController = NSHostingController(rootView: welcomeView)
         let window = NSWindow(contentViewController: hostingController)
@@ -102,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings Window
 
     func openSettings() {
-        if let existing = settingsWindow, existing.isVisible {
+        if let existing = settingsWindow, existing.isVisible || existing.isMiniaturized {
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -119,6 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow = window
         let wc = NSWindowController(window: window)
         wc.showWindow(nil as AnyObject?)
+        settingsWindowController = wc
         NSApp.activate(ignoringOtherApps: true)
     }
 }
