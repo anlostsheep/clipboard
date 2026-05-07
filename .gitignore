@@ -1,0 +1,4 @@
+.worktrees/
+.build/
+*.o
+*.d
