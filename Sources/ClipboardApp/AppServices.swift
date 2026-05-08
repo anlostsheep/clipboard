@@ -1,16 +1,26 @@
+import AppKit
 import ClipboardCore
 import ClipboardPlatform
 import Foundation
+import os.log
 
 @MainActor
 final class AppServices {
-  let store: InMemoryHistoryStore
-  let payloadStore: InMemoryPayloadStore
+  enum StorageHealth {
+    case ok
+    case disabled(reason: String)
+    case failing(reason: String)
+  }
+
+  let store: any HistoryStore
+  let payloadStore: any ClipboardPayloadStore
   let systemClient: SystemPasteboardClient
   let ingestService: ClipboardIngestService
   let monitor: ClipboardMonitor
   let captureCoordinator: ClipboardCaptureCoordinator
   let pasteController: PasteController
+  private(set) var storageHealth: StorageHealth = .ok
+
   lazy var quickPanelState = QuickPanelState(
     viewModel: QuickPanelViewModel(store: store, pageLimit: 50),
     payloadStore: payloadStore,
@@ -23,16 +33,17 @@ final class AppServices {
     }
   )
 
-  init(
-    store: InMemoryHistoryStore = InMemoryHistoryStore(),
-    payloadStore: InMemoryPayloadStore = InMemoryPayloadStore(),
-    systemClient: SystemPasteboardClient = SystemPasteboardClient()
-  ) {
-    self.store = store
-    self.payloadStore = payloadStore
-    self.systemClient = systemClient
+  private static let logger = Logger(subsystem: "clipboard.app", category: "AppServices")
+
+  init() {
+    let bundleId = Bundle.main.bundleIdentifier ?? "com.local.clipboard-manager"
+    let (storeImpl, payloadImpl, health) = AppServices.makeStorage(bundleId: bundleId)
+    self.store = storeImpl
+    self.payloadStore = payloadImpl
+    self.storageHealth = health
+    self.systemClient = SystemPasteboardClient()
     self.ingestService = ClipboardIngestService(
-      store: store,
+      store: storeImpl,
       privacyPolicy: .standard,
       largeTextPolicy: .default
     )
@@ -40,9 +51,70 @@ final class AppServices {
     self.captureCoordinator = ClipboardCaptureCoordinator(
       monitor: monitor,
       ingestService: ingestService,
-      payloadStore: payloadStore
+      payloadStore: payloadImpl
     )
     self.pasteController = PasteController(pasteboard: systemClient, eventPoster: systemClient)
+  }
+
+  /// Attempts to construct SQLite-backed storage; returns InMemory + .disabled on failure.
+  private static func makeStorage(bundleId: String) -> (any HistoryStore, any ClipboardPayloadStore, StorageHealth) {
+    do {
+      let paths = try ApplicationSupportPaths(bundleIdentifier: bundleId)
+      try paths.prepare()
+      let policy = RetentionPolicy(
+        maxCount: ClipboardAppSettings.storageMaxHistoryCount(),
+        maxAgeDays: ClipboardAppSettings.storageMaxAgeDays()
+      )
+      let sqliteStore = try SQLiteHistoryStore(
+        databaseFile: paths.databaseFile,
+        retentionPolicy: policy
+      )
+      let healing = SelfHealingHistoryStore(underlying: sqliteStore)
+      let payloads = try SQLitePayloadStore(payloadsDirectory: paths.payloadsDirectory)
+      logger.info("storage initialized at \(paths.baseDirectory.path)")
+      return (healing, payloads, .ok)
+    } catch {
+      logger.error("storage init failed: \(String(describing: error))")
+      let reason = "无法访问存储位置：\(error.localizedDescription)"
+      _ = AppServices.presentStartupFailure(reason: reason)
+      return (InMemoryHistoryStore(), InMemoryPayloadStore(), .disabled(reason: reason))
+    }
+  }
+
+  private static func presentStartupFailure(reason: String) -> Bool {
+    let alert = NSAlert()
+    alert.messageText = "无法持久化剪贴板历史"
+    alert.informativeText = """
+      剪贴板管理器无法访问存储位置。
+
+      \(reason)
+
+      可能原因：磁盘空间不足、文件夹权限异常、或应用从只读位置（如 DMG）运行。
+      """
+    alert.addButton(withTitle: "在 Finder 中显示")
+    alert.addButton(withTitle: "重试")
+    alert.addButton(withTitle: "仅本次会话运行")
+    alert.addButton(withTitle: "退出")
+
+    let response = alert.runModal()
+    switch response {
+    case .alertFirstButtonReturn:
+      let support = (try? FileManager.default.url(
+        for: .applicationSupportDirectory,
+        in: .userDomainMask,
+        appropriateFor: nil,
+        create: false
+      )) ?? URL(fileURLWithPath: NSHomeDirectory())
+      NSWorkspace.shared.activateFileViewerSelecting([support])
+      return false
+    case .alertSecondButtonReturn:
+      return true  // caller should retry makeStorage
+    case .alertThirdButtonReturn:
+      return false
+    default:
+      NSApp.terminate(nil)
+      return false
+    }
   }
 
   private func prepareQuickPanelForShow() async {

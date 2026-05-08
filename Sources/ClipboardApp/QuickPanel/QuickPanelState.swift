@@ -11,7 +11,7 @@ final class QuickPanelState: ObservableObject {
   @Published private(set) var footerStatus = "Ready"
 
   private let viewModel: QuickPanelViewModel
-  private let payloadStore: InMemoryPayloadStore
+  private let payloadStore: any ClipboardPayloadStore
   private let pasteController: PasteController
   private var refreshTask: Task<Void, Never>?
   private var refreshGeneration = 0
@@ -19,7 +19,7 @@ final class QuickPanelState: ObservableObject {
 
   init(
     viewModel: QuickPanelViewModel,
-    payloadStore: InMemoryPayloadStore,
+    payloadStore: any ClipboardPayloadStore,
     pasteController: PasteController
   ) {
     self.viewModel = viewModel
