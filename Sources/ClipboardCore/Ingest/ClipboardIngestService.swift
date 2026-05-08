@@ -17,18 +17,27 @@ public struct ClipboardIngestService: Sendable {
   }
 
   public func ingest(_ capture: ClipboardCapture) async throws -> ClipboardRecord? {
+    guard let record = try makeRecord(from: capture) else { return nil }
+    return try await store.upsert(record)
+  }
+
+  /// Builds the record without persisting it. Returns nil if PrivacyPolicy filters this capture.
+  public func makeRecord(from capture: ClipboardCapture) throws -> ClipboardRecord? {
     guard !privacyPolicy.shouldIgnore(
       pasteboardTypes: capture.pasteboardTypes,
       sourceBundleId: capture.sourceAppBundleId
     ) else {
       return nil
     }
-
-    let record = try makeRecord(from: capture)
-    return try await store.upsert(record)
+    return try constructRecord(from: capture)
   }
 
-  private func makeRecord(from capture: ClipboardCapture) throws -> ClipboardRecord {
+  /// Persists an already-constructed record to the store.
+  public func persist(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    try await store.upsert(record)
+  }
+
+  private func constructRecord(from capture: ClipboardCapture) throws -> ClipboardRecord {
     switch capture.payload {
     case let .text(text):
       return makeTextRecord(text: text, capture: capture)

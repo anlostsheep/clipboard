@@ -17,6 +17,9 @@ public actor SQLiteHistoryStore: HistoryStore {
   private let connection: SQLiteConnection
   private let retentionPolicy: RetentionPolicy
   private var indexByHash: [String: ClipboardRecord] = [:]
+  /// True while upsert holds an explicit BEGIN IMMEDIATE transaction, so that
+  /// deleteRecords called from enforceRetention can reuse the outer transaction.
+  private var inExplicitTransaction = false
   private static let logger = Logger(subsystem: "clipboard.storage", category: "SQLiteHistoryStore")
 
   public init(
@@ -66,20 +69,33 @@ public actor SQLiteHistoryStore: HistoryStore {
   }
 
   public func upsert(_ record: ClipboardRecord) async throws -> ClipboardRecord {
-    if let existing = indexByHash[record.contentHash] {
-      var updated = existing
-      updated.copyCount += 1
-      updated.lastCopiedAt = record.lastCopiedAt
-      try writeRecord(updated)
-      indexByHash[updated.contentHash] = updated
-      try enforceRetention()
-      return updated
-    }
+    // Wrap writeRecord + enforceRetention in a single transaction so that a crash
+    // between the two operations cannot leave DB in a partially-retained state (spec §4).
+    try connection.exec("BEGIN IMMEDIATE")
+    inExplicitTransaction = true
+    defer { inExplicitTransaction = false }
 
-    try writeRecord(record)
-    indexByHash[record.contentHash] = record
-    try enforceRetention()
-    return record
+    do {
+      let result: ClipboardRecord
+      if let existing = indexByHash[record.contentHash] {
+        var updated = existing
+        updated.copyCount += 1
+        updated.lastCopiedAt = record.lastCopiedAt
+        try writeRecord(updated)
+        indexByHash[updated.contentHash] = updated
+        result = updated
+      } else {
+        try writeRecord(record)
+        indexByHash[record.contentHash] = record
+        result = record
+      }
+      try enforceRetention()  // runs inside the same transaction via inExplicitTransaction flag
+      try connection.exec("COMMIT")
+      return result
+    } catch {
+      try? connection.exec("ROLLBACK")
+      throw error
+    }
   }
 
   public func fetchAll() async throws -> [ClipboardRecord] {
@@ -162,10 +178,13 @@ public actor SQLiteHistoryStore: HistoryStore {
     _ = try stmt.step()
   }
 
-  /// Deletes records by UUID inside a single transaction.
+  /// Deletes records by UUID.
+  /// When called from within an existing transaction (inExplicitTransaction == true), reuses
+  /// the outer transaction. Otherwise wraps the deletes in its own BEGIN IMMEDIATE/COMMIT.
   private func deleteRecords(ids: [UUID]) throws {
     guard !ids.isEmpty else { return }
-    try connection.exec("BEGIN IMMEDIATE")
+    let needsOwnTransaction = !inExplicitTransaction
+    if needsOwnTransaction { try connection.exec("BEGIN IMMEDIATE") }
     do {
       let stmt = try connection.prepare("DELETE FROM records WHERE id = ?")
       defer { stmt.finalize() }
@@ -174,9 +193,9 @@ public actor SQLiteHistoryStore: HistoryStore {
         stmt.bindText(1, id.uuidString)
         _ = try stmt.step()
       }
-      try connection.exec("COMMIT")
+      if needsOwnTransaction { try connection.exec("COMMIT") }
     } catch {
-      try? connection.exec("ROLLBACK")
+      if needsOwnTransaction { try? connection.exec("ROLLBACK") }
       throw error
     }
   }

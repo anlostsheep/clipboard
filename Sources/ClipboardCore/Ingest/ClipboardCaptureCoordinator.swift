@@ -31,36 +31,30 @@ public struct ClipboardCaptureCoordinator: Sendable {
   }
 
   public func ingest(_ capture: ClipboardCapture) async throws -> ClipboardRecord? {
+    // Build the record first (privacy check + metadata) without touching the DB.
+    guard let record = try ingestService.makeRecord(from: capture) else { return nil }
+
+    // Persist payload to file system before writing to DB (spec §4 ordering).
+    // If payload save fails, no DB row is ever written — no orphan records.
+    try await payloadStore.save(capture.payload, for: record.id)
+
     var attempts = 0
     while true {
       do {
-        guard let record = try await ingestService.ingest(capture) else { return nil }
-        try await payloadStore.save(capture.payload, for: record.id)
-        return record
+        let stored = try await ingestService.persist(record)
+        return stored
       } catch let error as StorageError {
         attempts += 1
-        let placeholder = ClipboardRecord(
-          id: UUID(),
-          contentHash: "",
-          primaryType: .text,
-          title: "",
-          plainTextPreview: nil,
-          sourceAppBundleId: nil,
-          sourceAppName: nil,
-          sourceDeviceHint: .local,
-          createdAt: capture.capturedAt,
-          lastCopiedAt: capture.capturedAt,
-          copyCount: 0,
-          isPinned: false,
-          isFavorite: false,
-          groupIds: [],
-          retentionExempt: false,
-          metadata: nil,
-          pasteboardTypes: capture.pasteboardTypes
-        )
-        let handled = await failureHandler.handleStorageFailure(error, record: placeholder)
-        if handled { return nil }
-        if attempts >= 10 { return nil }  // safety guard against infinite loops
+        let handled = await failureHandler.handleStorageFailure(error, record: record)
+        if handled {
+          // Handler took ownership (e.g. paused monitor); clean up the payload file.
+          try? await payloadStore.delete(for: record.id)
+          return nil
+        }
+        if attempts >= 10 {
+          try? await payloadStore.delete(for: record.id)
+          return nil  // safety guard against infinite loops
+        }
       }
     }
   }
