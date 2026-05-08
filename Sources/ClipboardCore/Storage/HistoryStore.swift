@@ -12,8 +12,9 @@ public protocol HistoryStore: Sendable {
   func fetchPage(query: String, limit: Int) async throws -> [ClipboardRecord]
   func count() async throws -> Int
   func removeAll() async throws
-  /// 删除最旧 ceil(N * percent) 条非豁免记录（is_pinned=0 AND is_favorite=0 AND retention_exempt=0）。
-  /// 返回实际删除数；若没有可删记录返回 0。
+  /// Removes the oldest ceil(N × percent) non-exempt records
+  /// (isPinned=false AND isFavorite=false AND retentionExempt=false).
+  /// Returns the actual number of records removed; returns 0 if no candidates exist or percent <= 0.
   func evictOldest(percent: Double) async throws -> Int
 }
 
@@ -62,7 +63,8 @@ public actor InMemoryHistoryStore: HistoryStore {
       .filter { !$0.isPinned && !$0.isFavorite && !$0.retentionExempt }
       .sorted { $0.lastCopiedAt < $1.lastCopiedAt }
     guard !candidates.isEmpty else { return 0 }
-    let target = max(1, Int((Double(candidates.count) * percent).rounded(.up)))
+    let target = Int((Double(candidates.count) * percent).rounded(.up))
+    guard target > 0 else { return 0 }
     let toRemove = candidates.prefix(target)
     for record in toRemove {
       recordsByHash.removeValue(forKey: record.contentHash)
