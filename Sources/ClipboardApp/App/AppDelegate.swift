@@ -118,6 +118,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings Window
 
     func openSettings() {
+        // Dismiss the QuickPanel first: NSPanel.hidesOnDeactivate only fires
+        // when the entire NSApplication deactivates, so opening another window
+        // within the same app would otherwise leave the QuickPanel visible.
+        services.quickPanelController.hide()
+
         if let existing = settingsWindow, existing.isVisible || existing.isMiniaturized {
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
