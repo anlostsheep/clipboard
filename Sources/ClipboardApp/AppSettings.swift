@@ -63,6 +63,17 @@ enum ClipboardAppSettings {
         let stored = defaults.integer(forKey: maxHistoryCountKey)
         return stored > 0 ? stored : defaultMaxHistoryCount
     }
+
+    // MARK: - Appearance
+    static let appearanceModeKey = "appearance.mode"
+
+    static func appearanceMode(defaults: UserDefaults = .standard) -> AppearanceMode {
+        guard let raw = defaults.string(forKey: appearanceModeKey),
+              let mode = AppearanceMode(rawValue: raw) else {
+            return .system
+        }
+        return mode
+    }
 }
 
 // MARK: - Panel Position Mode
