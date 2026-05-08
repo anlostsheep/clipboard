@@ -2,18 +2,34 @@ import Foundation
 import SQLite3
 import os.log
 
+/// Configures how many records the store will retain before evicting old entries.
+public struct RetentionPolicy: Sendable {
+  public let maxCount: Int
+  public let maxAgeDays: Int
+
+  public init(maxCount: Int = 5000, maxAgeDays: Int = 180) {
+    self.maxCount = maxCount
+    self.maxAgeDays = maxAgeDays
+  }
+}
+
 public actor SQLiteHistoryStore: HistoryStore {
   private let connection: SQLiteConnection
+  private let retentionPolicy: RetentionPolicy
   private var indexByHash: [String: ClipboardRecord] = [:]
   private static let logger = Logger(subsystem: "clipboard.storage", category: "SQLiteHistoryStore")
 
-  public init(databaseFile: URL) throws {
+  public init(
+    databaseFile: URL,
+    retentionPolicy: RetentionPolicy = RetentionPolicy()
+  ) throws {
     let dir = databaseFile.deletingLastPathComponent()
     let fm = FileManager.default
     if !fm.fileExists(atPath: dir.path) {
       try fm.createDirectory(at: dir, withIntermediateDirectories: true)
     }
     self.connection = try SQLiteConnection(path: databaseFile.path)
+    self.retentionPolicy = retentionPolicy
     try SQLiteSchema.setupPragmas(connection: connection)
     try SQLiteSchema.migrate(connection: connection)
     self.indexByHash = try Self.loadInitialIndex(connection: connection)
@@ -31,11 +47,13 @@ public actor SQLiteHistoryStore: HistoryStore {
       updated.lastCopiedAt = record.lastCopiedAt
       try writeRecord(updated)
       indexByHash[updated.contentHash] = updated
+      try enforceRetention()
       return updated
     }
 
     try writeRecord(record)
     indexByHash[record.contentHash] = record
+    try enforceRetention()
     return record
   }
 
@@ -63,9 +81,22 @@ public actor SQLiteHistoryStore: HistoryStore {
     indexByHash.removeAll()
   }
 
+  /// Removes the oldest `percent` fraction of non-exempt records.
+  /// Returns the number of records actually removed.
   public func evictOldest(percent: Double) async throws -> Int {
-    // Placeholder; real implementation arrives in Task 11
-    return 0
+    let candidates = indexByHash.values
+      .filter { !$0.isPinned && !$0.isFavorite && !$0.retentionExempt }
+      .sorted { $0.lastCopiedAt < $1.lastCopiedAt }
+    guard !candidates.isEmpty else { return 0 }
+    let target = Int((Double(candidates.count) * percent).rounded(.up))
+    guard target > 0 else { return 0 }
+    let toRemove = Array(candidates.prefix(target))
+    try deleteRecords(ids: toRemove.map(\.id))
+    for record in toRemove {
+      indexByHash.removeValue(forKey: record.contentHash)
+    }
+    try connection.exec("PRAGMA incremental_vacuum")
+    return toRemove.count
   }
 
   // MARK: - Internal
@@ -104,6 +135,62 @@ public actor SQLiteHistoryStore: HistoryStore {
     stmt.bindText(17, try Self.encodeJSON(Array(r.pasteboardTypes)))
     stmt.bindText(18, nil)  // payload_ref handled separately by PayloadStore
     _ = try stmt.step()
+  }
+
+  /// Deletes records by UUID inside a single transaction.
+  private func deleteRecords(ids: [UUID]) throws {
+    guard !ids.isEmpty else { return }
+    try connection.exec("BEGIN IMMEDIATE")
+    do {
+      let stmt = try connection.prepare("DELETE FROM records WHERE id = ?")
+      defer { stmt.finalize() }
+      for id in ids {
+        stmt.reset()
+        stmt.bindText(1, id.uuidString)
+        _ = try stmt.step()
+      }
+      try connection.exec("COMMIT")
+    } catch {
+      try? connection.exec("ROLLBACK")
+      throw error
+    }
+  }
+
+  /// Dual-gate retention: evict over-age records first, then over-count records.
+  /// Pinned, favourite, and retentionExempt records are never touched.
+  private func enforceRetention() throws {
+    let now = Date().timeIntervalSince1970
+    let ageCutoff = now - Double(retentionPolicy.maxAgeDays * 86_400)
+
+    // Non-exempt records sorted newest → oldest
+    let nonExempt = indexByHash.values
+      .filter { !$0.isPinned && !$0.isFavorite && !$0.retentionExempt }
+      .sorted { $0.lastCopiedAt > $1.lastCopiedAt }
+
+    var deathRow: [UUID] = []
+
+    // Gate 1: over-age
+    for record in nonExempt where record.lastCopiedAt.timeIntervalSince1970 < ageCutoff {
+      deathRow.append(record.id)
+    }
+
+    // Gate 2: over-count (oldest records at the tail of `nonExempt`)
+    if nonExempt.count > retentionPolicy.maxCount {
+      let overflow = nonExempt.suffix(nonExempt.count - retentionPolicy.maxCount)
+      for record in overflow where !deathRow.contains(record.id) {
+        deathRow.append(record.id)
+      }
+    }
+
+    guard !deathRow.isEmpty else { return }
+
+    let removedHashes = indexByHash.values
+      .filter { deathRow.contains($0.id) }
+      .map(\.contentHash)
+    try deleteRecords(ids: deathRow)
+    for hash in removedHashes {
+      indexByHash.removeValue(forKey: hash)
+    }
   }
 
   // MARK: - Static helpers (callable before actor isolation in init)

@@ -37,9 +37,51 @@ final class SQLiteHistoryStoreTests: XCTestCase {
     let countAfter = try await store.count()
     XCTAssertEqual(countAfter, 1)
   }
+
+  func testEnforceRetentionTrimsByCount() async throws {
+    let store = try SQLiteHistoryStore(
+      databaseFile: tempDir.appendingPathComponent("test.sqlite"),
+      retentionPolicy: RetentionPolicy(maxCount: 3, maxAgeDays: 365)
+    )
+    for i in 1...5 {
+      _ = try await store.upsert(makeRecord(hash: "h\(i)", title: "t\(i)"))
+    }
+    // dual-gate should trim the oldest 2 records after the last upsert
+    let count = try await store.count()
+    XCTAssertEqual(count, 3)
+  }
+
+  func testEnforceRetentionExemptsPinnedAndFavorite() async throws {
+    let store = try SQLiteHistoryStore(
+      databaseFile: tempDir.appendingPathComponent("test.sqlite"),
+      retentionPolicy: RetentionPolicy(maxCount: 1, maxAgeDays: 365)
+    )
+    _ = try await store.upsert(makeRecord(hash: "pin", title: "p", isPinned: true))
+    _ = try await store.upsert(makeRecord(hash: "fav", title: "f", isFavorite: true))
+    _ = try await store.upsert(makeRecord(hash: "normal", title: "n"))
+    // maxCount = 1 but exempt items don't count toward quota: all 3 are kept
+    let count = try await store.count()
+    XCTAssertEqual(count, 3)
+  }
+
+  func testEvictOldestReturnsCount() async throws {
+    let store = try SQLiteHistoryStore(databaseFile: tempDir.appendingPathComponent("test.sqlite"))
+    for i in 1...10 {
+      _ = try await store.upsert(makeRecord(hash: "h\(i)", title: "t\(i)"))
+    }
+    let removed = try await store.evictOldest(percent: 0.20)
+    XCTAssertEqual(removed, 2)  // ceil(10 * 0.2) = 2
+    let count = try await store.count()
+    XCTAssertEqual(count, 8)
+  }
 }
 
-private func makeRecord(hash: String, title: String = "title") -> ClipboardRecord {
+private func makeRecord(
+  hash: String,
+  title: String = "title",
+  isPinned: Bool = false,
+  isFavorite: Bool = false
+) -> ClipboardRecord {
   ClipboardRecord(
     id: UUID(),
     contentHash: hash,
@@ -50,10 +92,10 @@ private func makeRecord(hash: String, title: String = "title") -> ClipboardRecor
     sourceAppName: "App",
     sourceDeviceHint: .local,
     createdAt: Date(timeIntervalSince1970: 0),
-    lastCopiedAt: Date(timeIntervalSince1970: 0),
+    lastCopiedAt: Date(timeIntervalSinceNow: -TimeInterval(abs(hash.hashValue) % 10000)),
     copyCount: 1,
-    isPinned: false,
-    isFavorite: false,
+    isPinned: isPinned,
+    isFavorite: isFavorite,
     groupIds: [],
     retentionExempt: false,
     metadata: nil,
