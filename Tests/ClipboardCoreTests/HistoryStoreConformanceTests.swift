@@ -133,3 +133,42 @@ private func assertEvictOldestRoundsUp<S: HistoryStore>(
   let countAfterEvict = try await store.count()
   XCTAssertEqual(countAfterEvict, 0, file: file, line: line)
 }
+
+// MARK: - SQLiteHistoryStore conformance
+
+final class SQLiteHistoryStoreConformanceTests: XCTestCase {
+  var tempDir: URL!
+
+  override func setUp() async throws {
+    tempDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("clipboard-conformance-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+  }
+
+  override func tearDown() async throws {
+    try? FileManager.default.removeItem(at: tempDir)
+  }
+
+  func testSQLiteConformsToContract() async throws {
+    let counter = TestCounter()
+    let dir = tempDir!  // capture for closure; avoids implicitly-unwrapped optional in async context
+    // Use a permissive RetentionPolicy so that records with epoch-era timestamps
+    // (used by the conformance helpers) are never evicted during assertions.
+    let policy = RetentionPolicy(maxCount: 100_000, maxAgeDays: 365 * 200)
+    try await runHistoryStoreConformance {
+      let n = await counter.next()
+      let url = dir.appendingPathComponent("test-\(n).sqlite")
+      return try SQLiteHistoryStore(databaseFile: url, retentionPolicy: policy)
+    }
+  }
+}
+
+/// Provides an isolated, monotonically increasing counter for unique DB filenames
+/// across parallel assertion helpers.
+actor TestCounter {
+  private var n = 0
+  func next() -> Int {
+    n += 1
+    return n
+  }
+}
