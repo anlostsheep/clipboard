@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        AppearanceController.apply(ClipboardAppSettings.appearanceMode())
         services = AppServices()
         setupStatusBar()
         setupHotKey()
