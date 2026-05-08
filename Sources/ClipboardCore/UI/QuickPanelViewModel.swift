@@ -25,7 +25,7 @@ public actor QuickPanelViewModel {
   public func refresh(query: String) async {
     refreshGeneration += 1
     let generation = refreshGeneration
-    let refreshedItems = await store.fetchPage(query: query, limit: pageLimit)
+    let refreshedItems = (try? await store.fetchPage(query: query, limit: pageLimit)) ?? []
 
     guard generation == refreshGeneration else {
       return

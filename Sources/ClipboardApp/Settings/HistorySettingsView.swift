@@ -32,7 +32,7 @@ struct HistorySettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            Task { recordCount = await store.fetchAll().count }
+            Task { recordCount = (try? await store.count()) ?? 0 }
         }
         .confirmationDialog(
             "确定要清除所有剪贴板历史吗？此操作无法撤销。",
@@ -41,7 +41,7 @@ struct HistorySettingsView: View {
         ) {
             Button("清除全部", role: .destructive) {
                 Task {
-                    await store.removeAll()
+                    try? await store.removeAll()
                     recordCount = 0
                 }
             }

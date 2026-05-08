@@ -17,7 +17,7 @@ final class ClipboardIngestServiceTests: XCTestCase {
     )
 
     let record = try await service.ingest(capture)
-    let records = await store.fetchAll()
+    let records = try await store.fetchAll()
 
     XCTAssertNil(record)
     XCTAssertEqual(records.count, 0)
@@ -38,7 +38,7 @@ final class ClipboardIngestServiceTests: XCTestCase {
 
     let ingestedRecord = try await service.ingest(capture)
     let record = try XCTUnwrap(ingestedRecord)
-    let records = await store.fetchAll()
+    let records = try await store.fetchAll()
 
     XCTAssertTrue(record.isLargeContent)
     XCTAssertLessThanOrEqual(record.title.count, 120)
