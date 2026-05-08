@@ -17,6 +17,9 @@ struct GeneralSettingsView: View {
     @AppStorage(ClipboardAppSettings.quickPanelReturnCopiesOnlyKey)
     private var returnCopiesOnly: Bool = false
 
+    @AppStorage(ClipboardAppSettings.appearanceModeKey)
+    private var appearanceModeRaw: String = AppearanceMode.system.rawValue
+
     @State private var conflictMessage: String = ""
     @State private var isAuthorized: Bool = false
 
@@ -27,8 +30,28 @@ struct GeneralSettingsView: View {
         )
     }
 
+    private var appearanceMode: Binding<AppearanceMode> {
+        Binding(
+            get: { AppearanceMode(rawValue: appearanceModeRaw) ?? .system },
+            set: { appearanceModeRaw = $0.rawValue }
+        )
+    }
+
     var body: some View {
         Form {
+            Section("外观") {
+                Picker("色系", selection: appearanceMode) {
+                    ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: appearanceModeRaw) { _, newRaw in
+                    let mode = AppearanceMode(rawValue: newRaw) ?? .system
+                    AppearanceController.apply(mode)
+                }
+            }
+
             Section("辅助功能权限") {
                 HStack {
                     if isAuthorized {

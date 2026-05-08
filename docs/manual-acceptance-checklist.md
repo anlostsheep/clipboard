@@ -150,3 +150,32 @@ CPU/内存:
 - [ ] 多次点击 ⚙️，设置窗口只有一个实例（重复点击置前）
 - [ ] 设置窗口左侧可切换通用 / 隐私 / 历史记录页
 - [ ] 修改设置后关闭窗口，重启后设置保持不变
+
+## 外观主题（v3 新增）
+
+设置 → 通用 → 外观 提供三选一 Picker：跟随系统 / 浅色 / 深色。验证下列 6 个组合：
+
+| # | 系统外观 | App 设置 | 期望结果 |
+|---|---|---|---|
+| 1 | Light | 跟随系统 | QuickPanel / Settings / Welcome / 菜单栏下拉全为亮色 |
+| 2 | Light | 浅色 | 同上 |
+| 3 | Light | 深色 | 全部为暗色（不跟随系统） |
+| 4 | Dark | 跟随系统 | 全部为暗色 |
+| 5 | Dark | 浅色 | 全部为亮色（不跟随系统） |
+| 6 | Dark | 深色 | 同 #4 |
+
+切换系统外观命令（用于测试）：
+
+```bash
+# 切到亮色
+osascript -e 'tell application "System Events" to tell appearance preferences to set dark mode to false'
+
+# 切到暗色
+osascript -e 'tell application "System Events" to tell appearance preferences to set dark mode to true'
+```
+
+- [ ] 在「设置」窗口本身切换 Picker，整窗立即变色，**无需重启 app**
+- [ ] 切换后立即按 Cmd+Shift+V 唤出 QuickPanel，颜色与设置一致
+- [ ] 切换后右键点击菜单栏图标，下拉菜单颜色与设置一致
+- [ ] 设置为「强制亮色」时关闭 app 重启，外观仍为亮色（持久化生效）
+- [ ] 设置为「跟随系统」时切换系统外观，app 跟随变化

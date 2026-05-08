@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Carbon
 
@@ -62,6 +63,17 @@ enum ClipboardAppSettings {
         let stored = defaults.integer(forKey: maxHistoryCountKey)
         return stored > 0 ? stored : defaultMaxHistoryCount
     }
+
+    // MARK: - Appearance
+    static let appearanceModeKey = "appearance.mode"
+
+    static func appearanceMode(defaults: UserDefaults = .standard) -> AppearanceMode {
+        guard let raw = defaults.string(forKey: appearanceModeKey),
+              let mode = AppearanceMode(rawValue: raw) else {
+            return .system
+        }
+        return mode
+    }
 }
 
 // MARK: - Panel Position Mode
@@ -75,6 +87,30 @@ enum PanelPositionMode: String, CaseIterable {
         case .center:      return "居中"
         case .followMouse: return "跟随鼠标"
         case .menuBar:     return "菜单栏图标下方"
+        }
+    }
+}
+
+// MARK: - Appearance Mode
+
+enum AppearanceMode: String, CaseIterable {
+    case system
+    case light
+    case dark
+
+    var displayName: String {
+        switch self {
+        case .system: return "跟随系统"
+        case .light:  return "浅色"
+        case .dark:   return "深色"
+        }
+    }
+
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light:  return NSAppearance(named: .aqua)
+        case .dark:   return NSAppearance(named: .darkAqua)
         }
     }
 }

@@ -40,6 +40,11 @@ let package = Package(
       name: "ClipboardPlatformTests",
       dependencies: ["ClipboardCore", "ClipboardPlatform"],
       path: "Tests/ClipboardPlatformTests"
+    ),
+    .testTarget(
+      name: "ClipboardAppTests",
+      dependencies: ["ClipboardApp"],
+      path: "Tests/ClipboardAppTests"
     )
   ]
 )
