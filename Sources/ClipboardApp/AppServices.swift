@@ -4,6 +4,70 @@ import ClipboardPlatform
 import Foundation
 import os.log
 
+// MARK: - HealthBox
+
+/// Indirect reference that lets DefaultStorageFailureHandler update AppServices.storageHealth
+/// without capturing `self` before all stored properties are initialized.
+@MainActor
+final class HealthBox {
+  weak var owner: AppServices?
+  init() {}
+}
+
+// MARK: - DefaultStorageFailureHandler
+
+final class DefaultStorageFailureHandler: StorageFailureHandler {
+  private let monitor: ClipboardMonitor
+  private let store: any HistoryStore
+  private let notifier: StorageHealthNotifier
+  private let onHealthChange: @Sendable (AppServices.StorageHealth) async -> Void
+
+  init(
+    monitor: ClipboardMonitor,
+    store: any HistoryStore,
+    notifier: StorageHealthNotifier,
+    onHealthChange: @escaping @Sendable (AppServices.StorageHealth) async -> Void
+  ) {
+    self.monitor = monitor
+    self.store = store
+    self.notifier = notifier
+    self.onHealthChange = onHealthChange
+  }
+
+  func handleStorageFailure(_ error: StorageError, record: ClipboardRecord) async -> Bool {
+    let strategy = await MainActor.run { ClipboardAppSettings.storageFailureStrategy() }
+    let message = "磁盘空间不足：\(String(describing: error))"
+
+    switch strategy {
+    case .continueEvicting:
+      do {
+        let removed = try await store.evictOldest(percent: 0.10)
+        if removed == 0 {
+          await monitor.pause()
+          await notifier.notifyFailure(.diskFull, message: message + "（无可删记录，已暂停监控）")
+          await onHealthChange(.disabled(reason: "磁盘满且无可删记录"))
+          return true
+        }
+        return false  // let the caller retry
+      } catch {
+        await notifier.notifyFailure(.other, message: String(describing: error))
+        return true
+      }
+    case .pauseMonitoring:
+      await monitor.pause()
+      await notifier.notifyFailure(.diskFull, message: message)
+      await onHealthChange(.disabled(reason: "用户策略：暂停监控"))
+      return true
+    case .skipRecord:
+      await notifier.notifyFailure(.diskFull, message: message)
+      await onHealthChange(.failing(reason: "跳过当前记录"))
+      return true
+    }
+  }
+}
+
+// MARK: - AppServices
+
 @MainActor
 final class AppServices {
   enum StorageHealth {
@@ -50,12 +114,25 @@ final class AppServices {
       largeTextPolicy: .default
     )
     self.monitor = ClipboardMonitor(reader: systemClient)
+    // Use a box so the closure can weakly reference AppServices without
+    // capturing `self` before all stored properties are initialized.
+    let healthBox = HealthBox()
+    let handler = DefaultStorageFailureHandler(
+      monitor: monitor,
+      store: storeImpl,
+      notifier: storageNotifier,
+      onHealthChange: { newHealth in
+        await MainActor.run { healthBox.owner?.storageHealth = newHealth }
+      }
+    )
     self.captureCoordinator = ClipboardCaptureCoordinator(
       monitor: monitor,
       ingestService: ingestService,
-      payloadStore: payloadImpl
+      payloadStore: payloadImpl,
+      failureHandler: handler
     )
     self.pasteController = PasteController(pasteboard: systemClient, eventPoster: systemClient)
+    healthBox.owner = self
 
     // Notify user if storage could not be initialized
     if case .disabled(let reason) = storageHealth {
