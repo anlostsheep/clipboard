@@ -1,3 +1,4 @@
+import ClipboardCore
 import SwiftUI
 
 enum SettingsPage: String, CaseIterable, Identifiable {
@@ -36,7 +37,13 @@ struct SettingsRootView: View {
             case .privacy:
                 PrivacySettingsView()
             case .history:
-                HistorySettingsView(store: services.store)
+                HistorySettingsView(
+                    store: services.store,
+                    storageHealth: services.storageHealth,
+                    baseDirectory: try? ApplicationSupportPaths(
+                        bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.local.clipboard-manager"
+                    ).baseDirectory
+                )
             case nil:
                 GeneralSettingsView(hotKeyManager: hotKeyManager)
             }
