@@ -21,6 +21,8 @@ final class AppServices {
   let pasteController: PasteController
   private(set) var storageHealth: StorageHealth = .ok
 
+  let storageNotifier = StorageHealthNotifier()
+
   lazy var quickPanelState = QuickPanelState(
     viewModel: QuickPanelViewModel(store: store, pageLimit: 50),
     payloadStore: payloadStore,
@@ -54,6 +56,13 @@ final class AppServices {
       payloadStore: payloadImpl
     )
     self.pasteController = PasteController(pasteboard: systemClient, eventPoster: systemClient)
+
+    // Notify user if storage could not be initialized
+    if case .disabled(let reason) = storageHealth {
+      Task { @MainActor in
+        await self.storageNotifier.notifyFailure(.permission, message: reason)
+      }
+    }
   }
 
   /// Attempts to construct SQLite-backed storage; returns InMemory + .disabled on failure.
