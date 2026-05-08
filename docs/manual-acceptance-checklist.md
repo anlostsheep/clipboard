@@ -179,3 +179,36 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [ ] 切换后右键点击菜单栏图标，下拉菜单颜色与设置一致
 - [ ] 设置为「强制亮色」时关闭 app 重启，外观仍为亮色（持久化生效）
 - [ ] 设置为「跟随系统」时切换系统外观，app 跟随变化
+
+## 持久化存储（2026-05-08 引入）
+
+### 基础持久化
+- [ ] 首次启动 → 复制 5 条不同内容 → 退出应用 → 重启 → QuickPanel 应显示全部 5 条
+- [ ] 退出后查看 `~/Library/Application Support/<bundle-id>/clipboard.sqlite` 文件存在
+- [ ] 复制图片 → 退出 → 重启 → 选择该图片粘贴成功
+
+### 双堡垒淘汰
+- [ ] 设置 maxCount = 50 → 复制 60 条 → 重启 → count 应为 50（前 10 条最旧的被删）
+- [ ] pin 一条 → 复制大量记录直至超 maxCount → pin 项保留
+- [ ] 调整系统时间或 maxAgeDays = 1 → 复制内容 → 等 25 小时 / 改时间 → 该条应被删（除非 pinned）
+
+### 启动失败降级
+- [ ] 把 `~/Library/Application Support/<bundle-id>/` 目录权限改为 0444 → 启动应弹"无法持久化"alert
+- [ ] 选择"仅本次会话运行" → 状态栏徽标变橙色 → 历史仅在内存
+- [ ] 恢复权限后重启 → 状态栏恢复绿色
+
+### 损坏检测
+- [ ] 退出应用，把 clipboard.sqlite 替换为随机字节 → 重启 → 应弹错误提示并备份原文件为 clipboard.corrupt.<ts>.sqlite
+- [ ] 重启后历史应为空（新建 DB）
+
+### 设置项
+- [ ] HistorySettingsView 显示绿色"持久化正常"徽标
+- [ ] 修改 maxCount stepper → 下次复制时生效
+- [ ] "在 Finder 中显示"按钮打开 Application Support 目录
+- [ ] "清除全部历史" → DB 清空，count 归零
+- [ ] 失败策略 picker 切换"暂停剪贴板监控" → 模拟磁盘满 → ClipboardMonitor 应停止
+
+### 性能
+- [ ] 持续重度复制 24 小时（>1000 条），观察 `du -sh` 应保持合理增长（每条平均 < 5KB 元数据）
+- [ ] 27K 条记录场景下，QuickPanel 打开延迟 < 500ms（用 swift run ClipboardManualProbe 加压数据后实测）
+- [ ] 单次复制 → 写入完成的端到端延迟 < 50ms 中位数（用 os_signpost 观察）
