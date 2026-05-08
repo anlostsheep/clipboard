@@ -5,6 +5,9 @@ public protocol StorageFailureHandler: Sendable {
   /// Returns true if the failure has been handled (e.g. monitor paused) — caller should NOT retry.
   /// Returns false to indicate the strategy is "continue evicting" — caller should attempt another upsert.
   func handleStorageFailure(_ error: StorageError, record: ClipboardRecord) async -> Bool
+
+  /// Called after a successful persist. Used to clear failure state and send recovery notifications.
+  func reportSuccess() async
 }
 
 public struct ClipboardCaptureCoordinator: Sendable {
@@ -42,6 +45,7 @@ public struct ClipboardCaptureCoordinator: Sendable {
     while true {
       do {
         let stored = try await ingestService.persist(record)
+        await failureHandler.reportSuccess()
         return stored
       } catch let error as StorageError {
         attempts += 1

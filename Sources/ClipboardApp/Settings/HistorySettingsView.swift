@@ -2,9 +2,11 @@ import ClipboardCore
 import SwiftUI
 
 struct HistorySettingsView: View {
-    let store: any HistoryStore
-    let storageHealth: AppServices.StorageHealth
+    @ObservedObject var services: AppServices
     let baseDirectory: URL?
+
+    private var store: any HistoryStore { services.store }
+    private var storageHealth: AppServices.StorageHealth { services.storageHealth }
 
     @AppStorage(ClipboardAppSettings.maxHistoryCountStorageKey)
     private var maxHistoryCount: Int = ClipboardAppSettings.defaultStorageMaxHistoryCount

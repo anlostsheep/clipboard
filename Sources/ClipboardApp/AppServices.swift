@@ -1,6 +1,7 @@
 import AppKit
 import ClipboardCore
 import ClipboardPlatform
+import Combine
 import Foundation
 import os.log
 
@@ -48,6 +49,8 @@ final class DefaultStorageFailureHandler: StorageFailureHandler {
           await onHealthChange(.disabled(reason: "磁盘满且无可删记录"))
           return true
         }
+        // Eviction succeeded — notify the user (Layer 2 eviction path).
+        await notifier.notifyAutoEvict(removed: removed)
         return false  // let the caller retry
       } catch {
         await notifier.notifyFailure(.other, message: String(describing: error))
@@ -64,12 +67,17 @@ final class DefaultStorageFailureHandler: StorageFailureHandler {
       return true
     }
   }
+
+  func reportSuccess() async {
+    await notifier.notifyRecovered()
+    await onHealthChange(.ok)
+  }
 }
 
 // MARK: - AppServices
 
 @MainActor
-final class AppServices {
+final class AppServices: ObservableObject {
   enum StorageHealth {
     case ok
     case disabled(reason: String)
@@ -83,7 +91,7 @@ final class AppServices {
   let monitor: ClipboardMonitor
   let captureCoordinator: ClipboardCaptureCoordinator
   let pasteController: PasteController
-  private(set) var storageHealth: StorageHealth = .ok
+  @Published private(set) var storageHealth: StorageHealth = .ok
 
   let storageNotifier = StorageHealthNotifier()
 

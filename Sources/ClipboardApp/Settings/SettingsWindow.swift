@@ -38,8 +38,7 @@ struct SettingsRootView: View {
                 PrivacySettingsView()
             case .history:
                 HistorySettingsView(
-                    store: services.store,
-                    storageHealth: services.storageHealth,
+                    services: services,
                     baseDirectory: try? ApplicationSupportPaths(
                         bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.local.clipboard-manager"
                     ).baseDirectory

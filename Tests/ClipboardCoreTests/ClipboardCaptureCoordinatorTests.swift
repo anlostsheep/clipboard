@@ -41,6 +41,7 @@ final class ClipboardCaptureCoordinatorTests: XCTestCase {
 
 private struct NoopFailureHandler: StorageFailureHandler {
   func handleStorageFailure(_ error: StorageError, record: ClipboardRecord) async -> Bool { true }
+  func reportSuccess() async {}
 }
 
 private final class FakePasteboardReader: PasteboardReading {

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import ClipboardCore
 import ClipboardPlatform
@@ -14,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var welcomeWindowController: NSWindowController?
     private var settingsWindowController: NSWindowController?
     private var settingsWindow: NSWindow?
+    private var healthSubscriber: AnyCancellable?
 
     // Explicit entry point: Swift's default `@main` synthesis on an
     // NSApplicationDelegate class does not set this instance as the application
@@ -55,6 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         statusBarController.setup()
         statusBarController.updateStorageHealth(services.storageHealth)
+
+        // Keep the status bar icon in sync with runtime health changes.
+        healthSubscriber = services.$storageHealth.sink { [weak self] health in
+            self?.statusBarController.updateStorageHealth(health)
+        }
     }
 
     // MARK: - Hot Key

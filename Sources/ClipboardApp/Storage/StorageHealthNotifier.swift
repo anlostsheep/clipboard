@@ -23,11 +23,11 @@ final class StorageHealthNotifier {
   }
 
   /// Sends an auto-eviction notification if the user has opted in via settings.
-  func notifyAutoEvict(removed: Int, freed: String) async {
+  func notifyAutoEvict(removed: Int) async {
     guard ClipboardAppSettings.storageNotifyOnAutoEvict() else { return }
     await sendNotification(
       title: "已自动清理空间",
-      body: "剪贴板自动清理了 \(removed) 条最旧记录，释放约 \(freed)。"
+      body: "剪贴板自动清理了 \(removed) 条最旧记录以释放空间。"
     )
   }
 
