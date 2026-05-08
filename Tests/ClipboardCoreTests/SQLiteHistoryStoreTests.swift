@@ -74,6 +74,29 @@ final class SQLiteHistoryStoreTests: XCTestCase {
     let count = try await store.count()
     XCTAssertEqual(count, 8)
   }
+
+  func testCorruptedDatabaseIsBackedUp() async throws {
+    let dbPath = tempDir.appendingPathComponent("test.sqlite")
+    // Write garbage content so integrity check fails
+    try Data("not a sqlite file".utf8).write(to: dbPath)
+
+    do {
+      _ = try SQLiteHistoryStore(databaseFile: dbPath)
+      XCTFail("Should have thrown an error or succeeded after auto-backup")
+    } catch StorageError.underlying(let msg) {
+      XCTAssert(
+        msg.contains("integrity") || msg.contains("rc="),
+        "Expected integrity or rc= in error message, got: \(msg)"
+      )
+    }
+
+    // Verify backup file was created
+    let entries = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+    XCTAssert(
+      entries.contains(where: { $0.hasPrefix("clipboard.corrupt.") }),
+      "Expected backup file with prefix 'clipboard.corrupt.' but found: \(entries)"
+    )
+  }
 }
 
 private func makeRecord(

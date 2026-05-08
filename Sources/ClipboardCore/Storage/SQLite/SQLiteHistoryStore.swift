@@ -28,7 +28,27 @@ public actor SQLiteHistoryStore: HistoryStore {
     if !fm.fileExists(atPath: dir.path) {
       try fm.createDirectory(at: dir, withIntermediateDirectories: true)
     }
-    self.connection = try SQLiteConnection(path: databaseFile.path)
+    let conn: SQLiteConnection
+    do {
+      conn = try SQLiteConnection(path: databaseFile.path)
+      // Run a quick integrity check before trusting the database.
+      // sqlite3_open_v2 succeeds even for garbage files; PRAGMA quick_check
+      // detects structural corruption by reading the B-tree pages.
+      let stmt = try conn.prepare("PRAGMA quick_check")
+      defer { stmt.finalize() }
+      _ = try stmt.step()
+      let status = stmt.columnText(0) ?? ""
+      if status != "ok" {
+        throw StorageError.underlying("integrity check failed: \(status)")
+      }
+    } catch let error as StorageError {
+      if case .underlying = error, fm.fileExists(atPath: databaseFile.path) {
+        let backup = try SQLiteSchema.backupCorruptedDatabase(at: databaseFile)
+        Self.logger.error("backed up corrupted DB to \(backup.path)")
+      }
+      throw error
+    }
+    self.connection = conn
     self.retentionPolicy = retentionPolicy
     try SQLiteSchema.setupPragmas(connection: connection)
     try SQLiteSchema.migrate(connection: connection)
@@ -38,6 +58,11 @@ public actor SQLiteHistoryStore: HistoryStore {
   /// Clears the in-memory index. Does not close the underlying connection.
   public func close() {
     indexByHash.removeAll()
+  }
+
+  /// Returns all valid record UUIDs as a Set of strings for SQLitePayloadStore.removeOrphans prefix matching.
+  public func referencedPayloadFilenamePrefixes() async -> Set<String> {
+    Set(indexByHash.values.map { $0.id.uuidString })
   }
 
   public func upsert(_ record: ClipboardRecord) async throws -> ClipboardRecord {
