@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
         statusBarController.setup()
+        statusBarController.updateStorageHealth(services.storageHealth)
     }
 
     // MARK: - Hot Key
