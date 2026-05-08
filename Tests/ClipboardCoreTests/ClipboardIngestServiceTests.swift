@@ -56,8 +56,8 @@ final class ClipboardIngestServiceTests: XCTestCase {
     let store = InMemoryPayloadStore()
     let id = UUID(uuidString: "00000000-0000-0000-0000-000000000060")!
 
-    await store.save(.text("hello"), for: id)
-    let payload = await store.loadPayload(for: id)
+    try await store.save(.text("hello"), for: id)
+    let payload = try await store.loadPayload(for: id)
 
     XCTAssertEqual(payload, .text("hello"))
   }
@@ -66,7 +66,7 @@ final class ClipboardIngestServiceTests: XCTestCase {
     let store = InMemoryPayloadStore()
     let id = UUID(uuidString: "00000000-0000-0000-0000-000000000061")!
 
-    let payload = await store.loadPayload(for: id)
+    let payload = try await store.loadPayload(for: id)
 
     XCTAssertNil(payload)
   }

@@ -73,7 +73,7 @@ final class QuickPanelState: ObservableObject {
       return
     }
 
-    guard let payload = await payloadStore.loadPayload(for: record.id) else {
+    guard let payload = try? await payloadStore.loadPayload(for: record.id) else {
       footerStatus = "Payload is unavailable in this session"
       return
     }
@@ -96,7 +96,7 @@ final class QuickPanelState: ObservableObject {
 
   func imagePreview(for record: ClipboardRecord) async -> NSImage? {
     guard record.primaryType == .image,
-          case let .image(data, _) = await payloadStore.loadPayload(for: record.id) else {
+          case let .image(data, _) = try? await payloadStore.loadPayload(for: record.id) else {
       return nil
     }
 

@@ -28,7 +28,7 @@ public struct ClipboardCaptureCoordinator: Sendable {
       return nil
     }
 
-    await payloadStore.save(capture.payload, for: record.id)
+    try await payloadStore.save(capture.payload, for: record.id)
     return record
   }
 }

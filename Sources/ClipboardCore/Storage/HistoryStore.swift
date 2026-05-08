@@ -74,8 +74,10 @@ public actor InMemoryHistoryStore: HistoryStore {
 }
 
 public protocol ClipboardPayloadStore: Sendable {
-  func save(_ payload: ClipboardPayload, for recordID: UUID) async
-  func loadPayload(for recordID: UUID) async -> ClipboardPayload?
+  func save(_ payload: ClipboardPayload, for recordID: UUID) async throws
+  func loadPayload(for recordID: UUID) async throws -> ClipboardPayload?
+  /// Removes the payload for the given record. Idempotent: succeeds silently if no entry exists.
+  func delete(for recordID: UUID) async throws
 }
 
 public actor InMemoryPayloadStore: ClipboardPayloadStore {
@@ -83,11 +85,15 @@ public actor InMemoryPayloadStore: ClipboardPayloadStore {
 
   public init() {}
 
-  public func save(_ payload: ClipboardPayload, for recordID: UUID) async {
+  public func save(_ payload: ClipboardPayload, for recordID: UUID) async throws {
     payloadsByRecordID[recordID] = payload
   }
 
-  public func loadPayload(for recordID: UUID) async -> ClipboardPayload? {
+  public func loadPayload(for recordID: UUID) async throws -> ClipboardPayload? {
     payloadsByRecordID[recordID]
+  }
+
+  public func delete(for recordID: UUID) async throws {
+    payloadsByRecordID.removeValue(forKey: recordID)
   }
 }
