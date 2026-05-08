@@ -55,15 +55,6 @@ enum ClipboardAppSettings {
         defaults.set(true, forKey: hasLaunchedKey)
     }
 
-    // MARK: - History
-    static let maxHistoryCountKey = "history.maxCount"
-    static let defaultMaxHistoryCount = 200
-
-    static func maxHistoryCount(defaults: UserDefaults = .standard) -> Int {
-        let stored = defaults.integer(forKey: maxHistoryCountKey)
-        return stored > 0 ? stored : defaultMaxHistoryCount
-    }
-
     // MARK: - Storage
 
     static let maxHistoryCountStorageKey = "history.maxCount"  // 沿用旧 key，调整默认值

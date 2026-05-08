@@ -151,46 +151,52 @@ final class AppServices: ObservableObject {
   }
 
   /// Attempts to construct SQLite-backed storage; returns InMemory + .disabled on failure.
+  /// When the user chooses "重试" in the startup failure dialog, the loop retries.
   private static func makeStorage(bundleId: String) -> (any HistoryStore, any ClipboardPayloadStore, StorageHealth) {
-    do {
-      let paths = try ApplicationSupportPaths(bundleIdentifier: bundleId)
-      try paths.prepare()
-      let policy = RetentionPolicy(
-        maxCount: ClipboardAppSettings.storageMaxHistoryCount(),
-        maxAgeDays: ClipboardAppSettings.storageMaxAgeDays()
-      )
-      let sqliteStore = try SQLiteHistoryStore(
-        databaseFile: paths.databaseFile,
-        retentionPolicy: policy
-      )
-      let healing = SelfHealingHistoryStore(underlying: sqliteStore)
-      let payloads = try SQLitePayloadStore(payloadsDirectory: paths.payloadsDirectory)
-      logger.info("storage initialized at \(paths.baseDirectory.path)")
+    while true {
+      do {
+        let paths = try ApplicationSupportPaths(bundleIdentifier: bundleId)
+        try paths.prepare()
+        let policy = RetentionPolicy(
+          maxCount: ClipboardAppSettings.storageMaxHistoryCount(),
+          maxAgeDays: ClipboardAppSettings.storageMaxAgeDays()
+        )
+        let sqliteStore = try SQLiteHistoryStore(
+          databaseFile: paths.databaseFile,
+          retentionPolicy: policy
+        )
+        let healing = SelfHealingHistoryStore(underlying: sqliteStore)
+        let payloads = try SQLitePayloadStore(payloadsDirectory: paths.payloadsDirectory)
+        logger.info("storage initialized at \(paths.baseDirectory.path)")
 
-      // Schedule orphan payload file scan 5s after launch (spec §6).
-      // Captures sqliteStore and payloads directly (pre-wrapping) to access
-      // concrete methods not on the HistoryStore protocol.
-      // Use a local logger to avoid capturing the @MainActor-isolated static property.
-      let scanLogger = Logger(subsystem: "clipboard.app", category: "AppServices")
-      Task.detached(priority: .background) {
-        try? await Task.sleep(nanoseconds: 5_000_000_000)
-        let prefixes = await sqliteStore.referencedPayloadFilenamePrefixes()
-        do {
-          let removed = try await payloads.removeOrphans(keepingPrefixes: prefixes)
-          if removed > 0 {
-            scanLogger.info("orphan scan removed \(removed) stale payload file(s)")
+        // Schedule orphan payload file scan 5s after launch (spec §6).
+        // Captures sqliteStore and payloads directly (pre-wrapping) to access
+        // concrete methods not on the HistoryStore protocol.
+        // Use a local logger to avoid capturing the @MainActor-isolated static property.
+        let scanLogger = Logger(subsystem: "clipboard.app", category: "AppServices")
+        Task.detached(priority: .background) {
+          try? await Task.sleep(nanoseconds: 5_000_000_000)
+          let prefixes = await sqliteStore.referencedPayloadFilenamePrefixes()
+          do {
+            let removed = try await payloads.removeOrphans(keepingPrefixes: prefixes)
+            if removed > 0 {
+              scanLogger.info("orphan scan removed \(removed) stale payload file(s)")
+            }
+          } catch {
+            scanLogger.error("orphan scan failed: \(String(describing: error))")
           }
-        } catch {
-          scanLogger.error("orphan scan failed: \(String(describing: error))")
         }
-      }
 
-      return (healing, payloads, .ok)
-    } catch {
-      logger.error("storage init failed: \(String(describing: error))")
-      let reason = "无法访问存储位置：\(error.localizedDescription)"
-      _ = AppServices.presentStartupFailure(reason: reason)
-      return (InMemoryHistoryStore(), InMemoryPayloadStore(), .disabled(reason: reason))
+        return (healing, payloads, .ok)
+      } catch {
+        logger.error("storage init failed: \(String(describing: error))")
+        let reason = "无法访问存储位置：\(error.localizedDescription)"
+        let shouldRetry = AppServices.presentStartupFailure(reason: reason)
+        if !shouldRetry {
+          return (InMemoryHistoryStore(), InMemoryPayloadStore(), .disabled(reason: reason))
+        }
+        // shouldRetry == true → loop continues and retries storage init
+      }
     }
   }
 
