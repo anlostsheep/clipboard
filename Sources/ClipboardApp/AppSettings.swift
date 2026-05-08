@@ -64,6 +64,41 @@ enum ClipboardAppSettings {
         return stored > 0 ? stored : defaultMaxHistoryCount
     }
 
+    // MARK: - Storage
+
+    static let maxHistoryCountStorageKey = "history.maxCount"  // 沿用旧 key，调整默认值
+    static let defaultStorageMaxHistoryCount = 5000
+
+    static func storageMaxHistoryCount(defaults: UserDefaults = .standard) -> Int {
+        let stored = defaults.integer(forKey: maxHistoryCountStorageKey)
+        return stored > 0 ? stored : defaultStorageMaxHistoryCount
+    }
+
+    static let maxAgeDaysKey = "storage.maxAgeDays"
+    static let defaultMaxAgeDays = 180
+
+    static func storageMaxAgeDays(defaults: UserDefaults = .standard) -> Int {
+        let stored = defaults.integer(forKey: maxAgeDaysKey)
+        return stored > 0 ? stored : defaultMaxAgeDays
+    }
+
+    static let failureRecoveryStrategyKey = "storage.failureRecoveryStrategy"
+
+    static func storageFailureStrategy(defaults: UserDefaults = .standard) -> StorageFailureStrategy {
+        guard let raw = defaults.string(forKey: failureRecoveryStrategyKey),
+              let strategy = StorageFailureStrategy(rawValue: raw) else {
+            return .continueEvicting
+        }
+        return strategy
+    }
+
+    static let notifyOnAutoEvictKey = "storage.notifyOnAutoEvict"
+
+    static func storageNotifyOnAutoEvict(defaults: UserDefaults = .standard) -> Bool {
+        if defaults.object(forKey: notifyOnAutoEvictKey) == nil { return true }
+        return defaults.bool(forKey: notifyOnAutoEvictKey)
+    }
+
     // MARK: - Appearance
     static let appearanceModeKey = "appearance.mode"
 
@@ -111,6 +146,22 @@ enum AppearanceMode: String, CaseIterable {
         case .system: return nil
         case .light:  return NSAppearance(named: .aqua)
         case .dark:   return NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+// MARK: - Storage Failure Strategy
+
+enum StorageFailureStrategy: String, CaseIterable {
+    case continueEvicting
+    case pauseMonitoring
+    case skipRecord
+
+    var displayName: String {
+        switch self {
+        case .continueEvicting: return "自动删除最旧记录直到能继续保存"
+        case .pauseMonitoring:  return "暂停剪贴板监控"
+        case .skipRecord:       return "跳过当前记录，不删除历史"
         }
     }
 }
