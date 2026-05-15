@@ -17,6 +17,8 @@ func runHistoryStoreConformance<S: HistoryStore>(
   try await assertUpsertDeduplicatesByHash(makeStore, file: file, line: line)
   try await assertFetchPageReturnsByRecency(makeStore, file: file, line: line)
   try await assertFetchPageFiltersByQuery(makeStore, file: file, line: line)
+  try await assertFetchPageFiltersByContentType(makeStore, file: file, line: line)
+  try await assertFetchPageFiltersByGroup(makeStore, file: file, line: line)
   try await assertCountReflectsRecords(makeStore, file: file, line: line)
   try await assertRemoveAllClearsStore(makeStore, file: file, line: line)
   try await assertEvictOldestRespectsExemptions(makeStore, file: file, line: line)
@@ -27,15 +29,17 @@ private func makeRecord(
   id: UUID = UUID(),
   hash: String,
   title: String = "title",
+  primaryType: ClipboardContentType = .text,
   lastCopiedAt: TimeInterval = 0,
   isPinned: Bool = false,
   isFavorite: Bool = false,
-  retentionExempt: Bool = false
+  retentionExempt: Bool = false,
+  groupIds: [String] = []
 ) -> ClipboardRecord {
   ClipboardRecord(
     id: id,
     contentHash: hash,
-    primaryType: .text,
+    primaryType: primaryType,
     title: title,
     plainTextPreview: title,
     sourceAppBundleId: nil,
@@ -46,7 +50,7 @@ private func makeRecord(
     copyCount: 1,
     isPinned: isPinned,
     isFavorite: isFavorite,
-    groupIds: [],
+    groupIds: groupIds,
     retentionExempt: retentionExempt,
     metadata: nil,
     pasteboardTypes: ["public.utf8-plain-text"]
@@ -81,6 +85,32 @@ private func assertFetchPageFiltersByQuery<S: HistoryStore>(
   _ = try await store.upsert(makeRecord(hash: "b", title: "beta", lastCopiedAt: 2))
   let page = try await store.fetchPage(query: "alp", limit: 10)
   XCTAssertEqual(page.map(\.title), ["alpha"], file: file, line: line)
+}
+
+private func assertFetchPageFiltersByContentType<S: HistoryStore>(
+  _ make: () async throws -> S, file: StaticString, line: UInt
+) async throws {
+  let store = try await make()
+  _ = try await store.upsert(makeRecord(hash: "a", title: "docs", primaryType: .text, lastCopiedAt: 1))
+  _ = try await store.upsert(makeRecord(hash: "b", title: "site", primaryType: .link, lastCopiedAt: 2))
+  let page = try await store.fetchPage(
+    HistoryQuery(text: "", contentTypes: [.link], groupIDs: []),
+    limit: 10
+  )
+  XCTAssertEqual(page.map(\.title), ["site"], file: file, line: line)
+}
+
+private func assertFetchPageFiltersByGroup<S: HistoryStore>(
+  _ make: () async throws -> S, file: StaticString, line: UInt
+) async throws {
+  let store = try await make()
+  _ = try await store.upsert(makeRecord(hash: "a", title: "personal", lastCopiedAt: 1, groupIds: ["home"]))
+  _ = try await store.upsert(makeRecord(hash: "b", title: "ticket", lastCopiedAt: 2, groupIds: ["work", "today"]))
+  let page = try await store.fetchPage(
+    HistoryQuery(text: "", contentTypes: [], groupIDs: ["work"]),
+    limit: 10
+  )
+  XCTAssertEqual(page.map(\.title), ["ticket"], file: file, line: line)
 }
 
 private func assertCountReflectsRecords<S: HistoryStore>(

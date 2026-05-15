@@ -90,6 +90,7 @@ final class AppServices: ObservableObject {
   let ingestService: ClipboardIngestService
   let monitor: ClipboardMonitor
   let captureCoordinator: ClipboardCaptureCoordinator
+  let captureLoop: ClipboardCaptureLoop
   let pasteController: PasteController
   @Published private(set) var storageHealth: StorageHealth = .ok
 
@@ -133,14 +134,19 @@ final class AppServices: ObservableObject {
         await MainActor.run { healthBox.owner?.storageHealth = newHealth }
       }
     )
-    self.captureCoordinator = ClipboardCaptureCoordinator(
+    let coordinator = ClipboardCaptureCoordinator(
       monitor: monitor,
       ingestService: ingestService,
       payloadStore: payloadImpl,
       failureHandler: handler
     )
+    self.captureCoordinator = coordinator
+    self.captureLoop = ClipboardCaptureLoop(coordinator: coordinator)
     self.pasteController = PasteController(pasteboard: systemClient, eventPoster: systemClient)
     healthBox.owner = self
+    Task {
+      await captureLoop.start()
+    }
 
     // Notify user if storage could not be initialized
     if case .disabled(let reason) = storageHealth {

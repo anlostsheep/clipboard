@@ -95,8 +95,8 @@ actor FakeHistoryStore: HistoryStore {
   }
 
   func fetchAll() async throws -> [ClipboardRecord] { Array(stored.values) }
-  func fetchPage(query: String, limit: Int) async throws -> [ClipboardRecord] {
-    Array(stored.values.prefix(limit))
+  func fetchPage(_ query: HistoryQuery, limit: Int) async throws -> [ClipboardRecord] {
+    Array(stored.values.filter { query.matches($0) }.prefix(limit))
   }
   func count() async throws -> Int { stored.count }
   func removeAll() async throws { stored.removeAll() }

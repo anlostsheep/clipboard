@@ -35,8 +35,8 @@ public actor SelfHealingHistoryStore: HistoryStore {
     try await underlying.fetchAll()
   }
 
-  public func fetchPage(query: String, limit: Int) async throws -> [ClipboardRecord] {
-    try await underlying.fetchPage(query: query, limit: limit)
+  public func fetchPage(_ query: HistoryQuery, limit: Int) async throws -> [ClipboardRecord] {
+    try await underlying.fetchPage(query, limit: limit)
   }
 
   public func count() async throws -> Int {

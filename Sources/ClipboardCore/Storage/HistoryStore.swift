@@ -6,16 +6,54 @@ public enum StorageError: Error, Equatable {
   case underlying(String)
 }
 
+public struct HistoryQuery: Equatable, Sendable {
+  public var text: String
+  public var contentTypes: Set<ClipboardContentType>
+  public var groupIDs: Set<String>
+
+  public init(
+    text: String = "",
+    contentTypes: Set<ClipboardContentType> = [],
+    groupIDs: Set<String> = []
+  ) {
+    self.text = text
+    self.contentTypes = contentTypes
+    self.groupIDs = groupIDs
+  }
+
+  var normalizedText: String {
+    text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  }
+
+  func matches(_ record: ClipboardRecord) -> Bool {
+    let textMatches = normalizedText.isEmpty ||
+      record.title.lowercased().contains(normalizedText) ||
+      (record.plainTextPreview?.lowercased().contains(normalizedText) ?? false) ||
+      (record.sourceAppName?.lowercased().contains(normalizedText) ?? false)
+
+    let typeMatches = contentTypes.isEmpty || contentTypes.contains(record.primaryType)
+    let groupMatches = groupIDs.isEmpty || !Set(record.groupIds).isDisjoint(with: groupIDs)
+
+    return textMatches && typeMatches && groupMatches
+  }
+}
+
 public protocol HistoryStore: Sendable {
   func upsert(_ record: ClipboardRecord) async throws -> ClipboardRecord
   func fetchAll() async throws -> [ClipboardRecord]
-  func fetchPage(query: String, limit: Int) async throws -> [ClipboardRecord]
+  func fetchPage(_ query: HistoryQuery, limit: Int) async throws -> [ClipboardRecord]
   func count() async throws -> Int
   func removeAll() async throws
   /// Removes the oldest ceil(N × percent) non-exempt records
   /// (isPinned=false AND isFavorite=false AND retentionExempt=false).
   /// Returns the actual number of records removed; returns 0 if no candidates exist or percent <= 0.
   func evictOldest(percent: Double) async throws -> Int
+}
+
+public extension HistoryStore {
+  func fetchPage(query text: String, limit: Int) async throws -> [ClipboardRecord] {
+    try await fetchPage(HistoryQuery(text: text), limit: limit)
+  }
 }
 
 public actor InMemoryHistoryStore: HistoryStore {
@@ -39,14 +77,9 @@ public actor InMemoryHistoryStore: HistoryStore {
     recordsByHash.values.sorted { $0.lastCopiedAt > $1.lastCopiedAt }
   }
 
-  public func fetchPage(query: String, limit: Int) async throws -> [ClipboardRecord] {
-    let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  public func fetchPage(_ query: HistoryQuery, limit: Int) async throws -> [ClipboardRecord] {
     let all = try await fetchAll()
-    let filtered = normalized.isEmpty ? all : all.filter { record in
-      record.title.lowercased().contains(normalized) ||
-        (record.plainTextPreview?.lowercased().contains(normalized) ?? false) ||
-        (record.sourceAppName?.lowercased().contains(normalized) ?? false)
-    }
+    let filtered = all.filter { query.matches($0) }
     return Array(filtered.prefix(max(0, limit)))
   }
 

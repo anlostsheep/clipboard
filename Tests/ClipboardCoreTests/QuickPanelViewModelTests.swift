@@ -61,11 +61,48 @@ final class QuickPanelViewModelTests: XCTestCase {
     XCTAssertEqual(intent, QuickPanelSelectionIntent(recordID: recordID, autoPaste: false))
   }
 
-  private func makeRecord(id: UUID, title: String, lastCopiedAt: TimeInterval) -> ClipboardRecord {
+  func testRefreshCanFilterByContentTypeAndGroup() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000024")!,
+      title: "text work",
+      primaryType: .text,
+      lastCopiedAt: 1,
+      groupIds: ["work"]
+    ))
+    _ = try await store.upsert(makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000025")!,
+      title: "link work",
+      primaryType: .link,
+      lastCopiedAt: 2,
+      groupIds: ["work"]
+    ))
+    _ = try await store.upsert(makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000026")!,
+      title: "link home",
+      primaryType: .link,
+      lastCopiedAt: 3,
+      groupIds: ["home"]
+    ))
+
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+    await viewModel.refresh(query: "", contentTypes: [.link], groupIDs: ["work"])
+    let titles = await viewModel.items.map(\.title)
+
+    XCTAssertEqual(titles, ["link work"])
+  }
+
+  private func makeRecord(
+    id: UUID,
+    title: String,
+    primaryType: ClipboardContentType = .text,
+    lastCopiedAt: TimeInterval,
+    groupIds: [String] = []
+  ) -> ClipboardRecord {
     ClipboardRecord(
       id: id,
       contentHash: title,
-      primaryType: .text,
+      primaryType: primaryType,
       title: title,
       plainTextPreview: title,
       sourceAppBundleId: nil,
@@ -76,7 +113,7 @@ final class QuickPanelViewModelTests: XCTestCase {
       copyCount: 1,
       isPinned: false,
       isFavorite: false,
-      groupIds: [],
+      groupIds: groupIds,
       retentionExempt: false,
       metadata: nil,
       pasteboardTypes: ["public.utf8-plain-text"]

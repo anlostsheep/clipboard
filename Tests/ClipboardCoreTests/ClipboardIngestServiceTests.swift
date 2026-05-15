@@ -52,6 +52,25 @@ final class ClipboardIngestServiceTests: XCTestCase {
     XCTAssertEqual(records.count, 1)
   }
 
+  func testIngestClassifiesHTTPURLTextAsLink() async throws {
+    let store = InMemoryHistoryStore()
+    let service = ClipboardIngestService(store: store, privacyPolicy: .standard, largeTextPolicy: .default)
+    let capture = ClipboardCapture(
+      payload: .text("https://example.com/path?q=1"),
+      pasteboardTypes: ["public.utf8-plain-text"],
+      sourceAppBundleId: "com.apple.Safari",
+      sourceAppName: "Safari",
+      capturedAt: Date(timeIntervalSince1970: 12)
+    )
+
+    let ingestedRecord = try await service.ingest(capture)
+    let record = try XCTUnwrap(ingestedRecord)
+
+    XCTAssertEqual(record.primaryType, .link)
+    XCTAssertEqual(record.title, "https://example.com/path?q=1")
+    XCTAssertEqual(record.plainTextPreview, "https://example.com/path?q=1")
+  }
+
   func testPayloadStoreSavesAndLoadsPayloadByRecordID() async throws {
     let store = InMemoryPayloadStore()
     let id = UUID(uuidString: "00000000-0000-0000-0000-000000000060")!

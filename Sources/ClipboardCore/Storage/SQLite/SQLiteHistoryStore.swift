@@ -102,14 +102,9 @@ public actor SQLiteHistoryStore: HistoryStore {
     indexByHash.values.sorted { $0.lastCopiedAt > $1.lastCopiedAt }
   }
 
-  public func fetchPage(query: String, limit: Int) async throws -> [ClipboardRecord] {
-    let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  public func fetchPage(_ query: HistoryQuery, limit: Int) async throws -> [ClipboardRecord] {
     let all = try await fetchAll()
-    let filtered = normalized.isEmpty ? all : all.filter { record in
-      record.title.lowercased().contains(normalized) ||
-        (record.plainTextPreview?.lowercased().contains(normalized) ?? false) ||
-        (record.sourceAppName?.lowercased().contains(normalized) ?? false)
-    }
+    let filtered = all.filter { query.matches($0) }
     return Array(filtered.prefix(max(0, limit)))
   }
 
