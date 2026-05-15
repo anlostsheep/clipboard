@@ -51,6 +51,20 @@ struct QuickPanelView: View {
       .textFieldStyle(.plain)
       .focused($isSearchFocused)
 
+      Picker(
+        "Type",
+        selection: Binding(
+          get: { state.contentFilter },
+          set: { state.updateContentFilter($0) }
+        )
+      ) {
+        ForEach(QuickPanelContentFilter.allCases) { filter in
+          Text(filter.title).tag(filter)
+        }
+      }
+      .pickerStyle(.segmented)
+      .frame(width: 260)
+
       Button {
         AppDelegate.shared.openSettings()
       } label: {

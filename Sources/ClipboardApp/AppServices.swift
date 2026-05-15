@@ -156,6 +156,22 @@ final class AppServices: ObservableObject {
     }
   }
 
+  func updateRetentionPolicyFromSettings() async {
+    guard let updating = store as? any RetentionPolicyUpdating else {
+      return
+    }
+    let policy = RetentionPolicy(
+      maxCount: ClipboardAppSettings.storageMaxHistoryCount(),
+      maxAgeDays: ClipboardAppSettings.storageMaxAgeDays()
+    )
+    do {
+      try await updating.updateRetentionPolicy(policy)
+      storageHealth = .ok
+    } catch {
+      storageHealth = .failing(reason: error.localizedDescription)
+    }
+  }
+
   /// Attempts to construct SQLite-backed storage; returns InMemory + .disabled on failure.
   /// When the user chooses "重试" in the startup failure dialog, the loop retries.
   private static func makeStorage(bundleId: String) -> (any HistoryStore, any ClipboardPayloadStore, StorageHealth) {
@@ -171,8 +187,9 @@ final class AppServices: ObservableObject {
           databaseFile: paths.databaseFile,
           retentionPolicy: policy
         )
-        let healing = SelfHealingHistoryStore(underlying: sqliteStore)
         let payloads = try SQLitePayloadStore(payloadsDirectory: paths.payloadsDirectory)
+        let healing = SelfHealingHistoryStore(underlying: sqliteStore)
+        let cleaning = PayloadCleaningHistoryStore(underlying: healing, payloadStore: payloads)
         logger.info("storage initialized at \(paths.baseDirectory.path)")
 
         // Schedule orphan payload file scan 5s after launch (spec §6).
@@ -193,7 +210,7 @@ final class AppServices: ObservableObject {
           }
         }
 
-        return (healing, payloads, .ok)
+        return (cleaning, payloads, .ok)
       } catch {
         logger.error("storage init failed: \(String(describing: error))")
         let reason = "无法访问存储位置：\(error.localizedDescription)"

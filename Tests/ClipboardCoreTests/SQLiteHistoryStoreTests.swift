@@ -64,6 +64,21 @@ final class SQLiteHistoryStoreTests: XCTestCase {
     XCTAssertEqual(count, 3)
   }
 
+  func testUpdateRetentionPolicyAppliesToRunningStore() async throws {
+    let store = try SQLiteHistoryStore(
+      databaseFile: tempDir.appendingPathComponent("test.sqlite"),
+      retentionPolicy: RetentionPolicy(maxCount: 10, maxAgeDays: 365)
+    )
+    for i in 1...5 {
+      _ = try await store.upsert(makeRecord(hash: "h\(i)", title: "t\(i)"))
+    }
+
+    try await store.updateRetentionPolicy(RetentionPolicy(maxCount: 2, maxAgeDays: 365))
+
+    let count = try await store.count()
+    XCTAssertEqual(count, 2)
+  }
+
   func testEvictOldestReturnsCount() async throws {
     let store = try SQLiteHistoryStore(databaseFile: tempDir.appendingPathComponent("test.sqlite"))
     for i in 1...10 {

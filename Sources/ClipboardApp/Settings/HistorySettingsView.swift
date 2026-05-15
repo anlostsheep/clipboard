@@ -37,7 +37,7 @@ struct HistorySettingsView: View {
                         value: $maxHistoryCount, in: 200...50000, step: 100)
                 Stepper("超过 \(maxAgeDays) 天的记录自动删除（pinned / 收藏除外）",
                         value: $maxAgeDays, in: 7...365, step: 1)
-                Text("修改后，下次新复制内容时生效。")
+                Text("修改后会立即应用到当前历史记录。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -77,6 +77,8 @@ struct HistorySettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear { refreshCount() }
+        .onChange(of: maxHistoryCount) { _, _ in applyRetentionPolicyChange() }
+        .onChange(of: maxAgeDays) { _, _ in applyRetentionPolicyChange() }
         .confirmationDialog(
             "确定要清除所有剪贴板历史吗？此操作无法撤销。",
             isPresented: $showClearConfirmation,
@@ -108,5 +110,12 @@ struct HistorySettingsView: View {
 
     private func refreshCount() {
         Task { recordCount = (try? await store.count()) ?? 0 }
+    }
+
+    private func applyRetentionPolicyChange() {
+        Task {
+            await services.updateRetentionPolicyFromSettings()
+            refreshCount()
+        }
     }
 }

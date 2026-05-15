@@ -4,7 +4,7 @@ import Foundation
 /// triggers `evictOldest` to free space, retrying up to `maxRounds` times.
 /// Decouples self-healing logic from the SQLite implementation for testability
 /// and allows wrapping any conforming `HistoryStore`.
-public actor SelfHealingHistoryStore: HistoryStore {
+public actor SelfHealingHistoryStore: HistoryStore, RetentionPolicyUpdating {
   private let underlying: any HistoryStore
   private let maxRounds: Int
   private let evictPercent: Double
@@ -49,5 +49,10 @@ public actor SelfHealingHistoryStore: HistoryStore {
 
   public func evictOldest(percent: Double) async throws -> Int {
     try await underlying.evictOldest(percent: percent)
+  }
+
+  public func updateRetentionPolicy(_ policy: RetentionPolicy) async throws {
+    guard let updating = underlying as? any RetentionPolicyUpdating else { return }
+    try await updating.updateRetentionPolicy(policy)
   }
 }

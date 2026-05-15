@@ -13,9 +13,9 @@ public struct RetentionPolicy: Sendable {
   }
 }
 
-public actor SQLiteHistoryStore: HistoryStore {
+public actor SQLiteHistoryStore: HistoryStore, RetentionPolicyUpdating {
   private let connection: SQLiteConnection
-  private let retentionPolicy: RetentionPolicy
+  private var retentionPolicy: RetentionPolicy
   private var indexByHash: [String: ClipboardRecord] = [:]
   /// True while upsert holds an explicit BEGIN IMMEDIATE transaction, so that
   /// deleteRecords called from enforceRetention can reuse the outer transaction.
@@ -133,6 +133,11 @@ public actor SQLiteHistoryStore: HistoryStore {
     }
     try connection.exec("PRAGMA incremental_vacuum")
     return toRemove.count
+  }
+
+  public func updateRetentionPolicy(_ policy: RetentionPolicy) async throws {
+    retentionPolicy = policy
+    try enforceRetention()
   }
 
   // MARK: - Internal

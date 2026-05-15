@@ -63,6 +63,28 @@ final class PasteControllerTests: XCTestCase {
     XCTAssertEqual(poster.postCount, 1)
   }
 
+  func testTargetFocusLostIsReported() async {
+    let pasteboard = FakePasteboardWriter(writeResult: true)
+    let poster = FakePasteEventPoster(accessibilityTrusted: true, postResult: true, eventResult: .targetAppFocusLost)
+    let controller = PasteController(pasteboard: pasteboard, eventPoster: poster)
+    let record = Self.record(text: "hello")
+
+    let transaction = await controller.paste(record: record, payload: .text("hello"), autoPaste: true)
+
+    XCTAssertEqual(transaction.state, .failed(.targetAppFocusLost))
+  }
+
+  func testTargetRejectedPasteIsReported() async {
+    let pasteboard = FakePasteboardWriter(writeResult: true)
+    let poster = FakePasteEventPoster(accessibilityTrusted: true, postResult: true, eventResult: .targetAppRejectedPaste)
+    let controller = PasteController(pasteboard: pasteboard, eventPoster: poster)
+    let record = Self.record(text: "hello")
+
+    let transaction = await controller.paste(record: record, payload: .text("hello"), autoPaste: true)
+
+    XCTAssertEqual(transaction.state, .failed(.targetAppRejectedPaste))
+  }
+
   private static func record(text: String) -> ClipboardRecord {
     ClipboardRecord(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
@@ -109,11 +131,13 @@ private final class FakePasteboardWriter: PasteboardWriting, @unchecked Sendable
 private final class FakePasteEventPoster: PasteEventPosting, @unchecked Sendable {
   let accessibilityTrusted: Bool
   let postResult: Bool
+  let eventResult: PasteEventResult?
   private(set) var postCount = 0
 
-  init(accessibilityTrusted: Bool, postResult: Bool) {
+  init(accessibilityTrusted: Bool, postResult: Bool, eventResult: PasteEventResult? = nil) {
     self.accessibilityTrusted = accessibilityTrusted
     self.postResult = postResult
+    self.eventResult = eventResult
   }
 
   func isAccessibilityTrusted() -> Bool {
@@ -123,5 +147,10 @@ private final class FakePasteEventPoster: PasteEventPosting, @unchecked Sendable
   func postCommandV() async -> Bool {
     postCount += 1
     return postResult
+  }
+
+  func postCommandV(marker: String, pasteboard: any PasteboardWriting) async -> PasteEventResult {
+    postCount += 1
+    return eventResult ?? (postResult ? .posted : .postFailed)
   }
 }

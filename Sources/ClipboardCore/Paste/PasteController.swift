@@ -38,8 +38,19 @@ public struct PasteController: Sendable {
       return complete(&transaction, with: .completed)
     }
 
-    guard await eventPoster.postCommandV() else {
-      return complete(&transaction, with: .failed(.pasteEventFailed))
+    let pasteEventResult = await eventPoster.postCommandV(marker: marker, pasteboard: pasteboard)
+    guard pasteEventResult == .posted else {
+      let failure: PasteFailureReason = switch pasteEventResult {
+      case .posted:
+        .pasteEventFailed
+      case .postFailed:
+        .pasteEventFailed
+      case .targetAppFocusLost:
+        .targetAppFocusLost
+      case .targetAppRejectedPaste:
+        .targetAppRejectedPaste
+      }
+      return complete(&transaction, with: .failed(failure))
     }
 
     transaction.state = .pasteEventPosted

@@ -72,13 +72,25 @@ final class SelfHealingHistoryStoreTests: XCTestCase {
     let evictCount = await fake.evictCallCount
     XCTAssertEqual(evictCount, 0)
   }
+
+  func testUpdateRetentionPolicyForwardsToUnderlyingStore() async throws {
+    let fake = FakeHistoryStore()
+    let store = SelfHealingHistoryStore(underlying: fake, maxRounds: 3, evictPercent: 0.10)
+
+    try await store.updateRetentionPolicy(RetentionPolicy(maxCount: 25, maxAgeDays: 30))
+
+    let policy = await fake.lastRetentionPolicy
+    XCTAssertEqual(policy?.maxCount, 25)
+    XCTAssertEqual(policy?.maxAgeDays, 30)
+  }
 }
 
-actor FakeHistoryStore: HistoryStore {
+actor FakeHistoryStore: HistoryStore, RetentionPolicyUpdating {
   private var upsertScript: [Result<Void, Error>] = []
   private var evictReturn: Int = 0
   private(set) var upsertCallCount = 0
   private(set) var evictCallCount = 0
+  private(set) var lastRetentionPolicy: RetentionPolicy?
   private var stored: [String: ClipboardRecord] = [:]
 
   func scheduleUpsertResults(_ results: [Result<Void, Error>]) { upsertScript = results }
@@ -103,6 +115,10 @@ actor FakeHistoryStore: HistoryStore {
   func evictOldest(percent: Double) async throws -> Int {
     evictCallCount += 1
     return evictReturn
+  }
+
+  func updateRetentionPolicy(_ policy: RetentionPolicy) async throws {
+    lastRetentionPolicy = policy
   }
 }
 

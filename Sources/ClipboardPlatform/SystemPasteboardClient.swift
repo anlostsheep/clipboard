@@ -172,6 +172,26 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
     return keyDown != nil && keyUp != nil
   }
 
+  public func postCommandV(marker: String, pasteboard: any PasteboardWriting) async -> PasteEventResult {
+    let targetApp = NSWorkspace.shared.frontmostApplication
+    guard await postCommandV() else {
+      return .postFailed
+    }
+
+    try? await Task.sleep(nanoseconds: 120_000_000)
+    guard let targetBundleId = targetApp?.bundleIdentifier,
+          let currentBundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else {
+      return .posted
+    }
+
+    if currentBundleId != targetBundleId,
+       currentBundleId != Bundle.main.bundleIdentifier {
+      return .targetAppFocusLost
+    }
+
+    return .posted
+  }
+
   private func makePasteboardItems(payload: ClipboardPayload, marker: String) -> [NSPasteboardItem]? {
     switch payload {
     case let .text(text):

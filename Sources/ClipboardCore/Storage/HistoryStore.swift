@@ -50,6 +50,10 @@ public protocol HistoryStore: Sendable {
   func evictOldest(percent: Double) async throws -> Int
 }
 
+public protocol RetentionPolicyUpdating: Sendable {
+  func updateRetentionPolicy(_ policy: RetentionPolicy) async throws
+}
+
 public extension HistoryStore {
   func fetchPage(query text: String, limit: Int) async throws -> [ClipboardRecord] {
     try await fetchPage(HistoryQuery(text: text), limit: limit)
