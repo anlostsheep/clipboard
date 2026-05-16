@@ -1,0 +1,201 @@
+import XCTest
+@testable import ClipboardApp
+@testable import ClipboardCore
+
+@MainActor
+final class QuickPanelStateFilterTests: XCTestCase {
+  func testSelectItemUpdatesSelectedIndex() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "second", title: "Second", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectItem(at: 1)
+
+    XCTAssertEqual(state.selectedIndex, 1)
+  }
+
+  func testSelectCurrentUsesMouseSelectedItem() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let pasteboard = AppTestPasteboardWriter()
+    let first = makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 1)
+    let second = makePanelRecord(hash: "second", title: "Second", type: .text, lastCopiedAt: 2)
+    _ = try await store.upsert(first)
+    _ = try await store.upsert(second)
+    try await payloadStore.save(.text("first payload"), for: first.id)
+    try await payloadStore.save(.text("second payload"), for: second.id)
+    let state = makeState(store: store, payloadStore: payloadStore, pasteboard: pasteboard)
+
+    await state.refresh()
+    state.selectItem(at: 1)
+    await state.selectCurrent(autoPaste: false)
+
+    XCTAssertEqual(pasteboard.lastText, "first payload")
+  }
+
+
+  func testContentTypeFilterRefreshesVisibleItems() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "text", title: "Text", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "image", title: "Image", type: .image, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.updateContentFilter(.image)
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["Image"])
+  }
+
+  func testAuthorizationFooterStatusSurvivesBackgroundRefresh() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "text", title: "Text", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.reportAutoPasteRequiresAccessibilityPermission()
+    await state.refresh()
+
+    XCTAssertEqual(state.footerStatus, "自动粘贴需要辅助功能权限，请在设置中授权")
+  }
+
+  func testAuthorizationReportShowsActionPromptUntilPresentationResets() async throws {
+    let store = InMemoryHistoryStore()
+    let state = makeState(store: store)
+
+    state.reportAutoPasteRequiresAccessibilityPermission()
+
+    XCTAssertEqual(state.actionPrompt, .autoPasteRequiresAccessibilityPermission)
+
+    state.prepareForPresentation()
+
+    XCTAssertNil(state.actionPrompt)
+  }
+
+  func testPrepareForPresentationAllowsRefreshStatusAgain() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "text", title: "Text", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    state.reportAutoPasteRequiresAccessibilityPermission()
+    state.prepareForPresentation()
+    await state.refresh()
+
+    XCTAssertEqual(state.footerStatus, "1 item")
+  }
+
+  func testPrepareForPresentationCanSelectLatestRecordOnNextRefresh() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "older", title: "Older", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "newer", title: "Newer", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectItem(at: 1)
+    state.prepareForPresentation(openSelectionBehavior: .latestRecord)
+    await state.refresh()
+
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items.first?.title, "Newer")
+  }
+
+  func testPrepareForPresentationCanPreservePreviousSelectionOnNextRefresh() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "older", title: "Older", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "newer", title: "Newer", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectItem(at: 1)
+    state.prepareForPresentation(openSelectionBehavior: .previousSelection)
+    await state.refresh()
+
+    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Older")
+  }
+
+  func testUnchangedQueryDoesNotClearUserActionFooterStatus() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "text", title: "Text", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    state.reportAutoPasteRequiresAccessibilityPermission()
+    state.updateQuery("")
+    await state.refresh()
+
+    XCTAssertEqual(state.footerStatus, "自动粘贴需要辅助功能权限，请在设置中授权")
+  }
+
+  func testChangingQueryClearsAuthorizationActionPrompt() async throws {
+    let store = InMemoryHistoryStore()
+    let state = makeState(store: store)
+
+    state.reportAutoPasteRequiresAccessibilityPermission()
+    state.updateQuery("new")
+
+    XCTAssertNil(state.actionPrompt)
+  }
+}
+
+@MainActor
+private func makeState(
+  store: InMemoryHistoryStore,
+  payloadStore: InMemoryPayloadStore = InMemoryPayloadStore(),
+  pasteboard: AppTestPasteboardWriter = AppTestPasteboardWriter()
+) -> QuickPanelState {
+  QuickPanelState(
+    viewModel: QuickPanelViewModel(store: store, pageLimit: 20),
+    payloadStore: payloadStore,
+    pasteController: PasteController(
+      pasteboard: pasteboard,
+      eventPoster: AppTestPasteEventPoster()
+    )
+  )
+}
+
+private func makePanelRecord(
+  hash: String,
+  title: String,
+  type: ClipboardContentType,
+  lastCopiedAt: TimeInterval
+) -> ClipboardRecord {
+  ClipboardRecord(
+    id: UUID(),
+    contentHash: hash,
+    primaryType: type,
+    title: title,
+    plainTextPreview: title,
+    sourceAppBundleId: nil,
+    sourceAppName: "App",
+    sourceDeviceHint: .local,
+    createdAt: Date(timeIntervalSince1970: lastCopiedAt),
+    lastCopiedAt: Date(timeIntervalSince1970: lastCopiedAt),
+    copyCount: 1,
+    isPinned: false,
+    isFavorite: false,
+    groupIds: [],
+    retentionExempt: false,
+    metadata: nil,
+    pasteboardTypes: []
+  )
+}
+
+private final class AppTestPasteboardWriter: PasteboardWriting, @unchecked Sendable {
+  private(set) var lastText: String?
+
+  func write(payload: ClipboardPayload, marker: String) async -> Bool {
+    if case let .text(text) = payload {
+      lastText = text
+    }
+    return true
+  }
+
+  func containsMarker(_ marker: String) async -> Bool { true }
+}
+
+private final class AppTestPasteEventPoster: PasteEventPosting, @unchecked Sendable {
+  func isAccessibilityTrusted() -> Bool { true }
+  func postCommandV() async -> Bool { true }
+}

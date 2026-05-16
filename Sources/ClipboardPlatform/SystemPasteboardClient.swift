@@ -40,6 +40,16 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
       )
     }
 
+    if let richText = firstRichTextPayload(in: items) {
+      return ClipboardCapture(
+        payload: .richText(plainText: richText.plainText, rtfData: richText.rtfData),
+        pasteboardTypes: types,
+        sourceAppBundleId: app?.bundleIdentifier,
+        sourceAppName: app?.localizedName,
+        capturedAt: now
+      )
+    }
+
     if let string = item.string(forType: .string), !string.isEmpty {
       return ClipboardCapture(
         payload: .text(string),
@@ -64,6 +74,25 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
         sourceAppName: app?.localizedName,
         capturedAt: now
       )
+    }
+
+    return nil
+  }
+
+  private func firstRichTextPayload(in items: [NSPasteboardItem]) -> (plainText: String, rtfData: Data)? {
+    for item in items {
+      guard let rtfData = item.data(forType: .rtf), !rtfData.isEmpty else {
+        continue
+      }
+
+      let plainText = item.string(forType: .string)
+        ?? NSAttributedString(rtf: rtfData, documentAttributes: nil)?.string
+        ?? ""
+      guard !plainText.isEmpty else {
+        continue
+      }
+
+      return (plainText, rtfData)
     }
 
     return nil
@@ -141,6 +170,26 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
     keyDown?.post(tap: .cgSessionEventTap)
     keyUp?.post(tap: .cgSessionEventTap)
     return keyDown != nil && keyUp != nil
+  }
+
+  public func postCommandV(marker: String, pasteboard: any PasteboardWriting) async -> PasteEventResult {
+    let targetApp = NSWorkspace.shared.frontmostApplication
+    guard await postCommandV() else {
+      return .postFailed
+    }
+
+    try? await Task.sleep(nanoseconds: 120_000_000)
+    guard let targetBundleId = targetApp?.bundleIdentifier,
+          let currentBundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else {
+      return .posted
+    }
+
+    if currentBundleId != targetBundleId,
+       currentBundleId != Bundle.main.bundleIdentifier {
+      return .targetAppFocusLost
+    }
+
+    return .posted
   }
 
   private func makePasteboardItems(payload: ClipboardPayload, marker: String) -> [NSPasteboardItem]? {

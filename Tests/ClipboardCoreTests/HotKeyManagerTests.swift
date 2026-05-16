@@ -27,6 +27,14 @@ final class HotKeyManagerTests: XCTestCase {
         XCTAssertFalse(isBlacklisted, "Cmd+Shift+V should not be in the system blacklist")
     }
 
+    func testSystemBlacklist_cmdShiftX_isNotBlacklisted() {
+        let isBlacklisted = HotKeyConflictDetector.isSystemBlacklisted(
+            keyCode: UInt32(kVK_ANSI_X),
+            modifiers: UInt32(cmdKey | shiftKey)
+        )
+        XCTAssertFalse(isBlacklisted, "Cmd+Shift+X should not be in the system blacklist")
+    }
+
     func testSystemBlacklist_cmdW_isBlacklisted() {
         let isBlacklisted = HotKeyConflictDetector.isSystemBlacklisted(
             keyCode: UInt32(kVK_ANSI_W),

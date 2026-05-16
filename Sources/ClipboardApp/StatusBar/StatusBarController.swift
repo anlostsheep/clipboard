@@ -2,9 +2,15 @@ import AppKit
 
 @MainActor
 final class StatusBarController {
+    enum ClickAction {
+        case openPanel
+        case showMenu
+    }
+
     private var statusItem: NSStatusItem?
     private let onLeftClick: (NSPoint) -> Void
     private let onQuit: () -> Void
+    private var storageHealth: AppServices.StorageHealth = .ok
 
     init(onLeftClick: @escaping (NSPoint) -> Void, onQuit: @escaping () -> Void) {
         self.onLeftClick = onLeftClick
@@ -19,6 +25,30 @@ final class StatusBarController {
         item.button?.action = #selector(handleClick(_:))
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
+        refreshIcon()
+    }
+
+    // MARK: - Storage Health Badge
+
+    /// Updates the status bar icon tint to reflect storage health state.
+    /// - ok: default tint (nil)
+    /// - disabled: orange tint
+    /// - failing: red tint
+    func updateStorageHealth(_ health: AppServices.StorageHealth) {
+        storageHealth = health
+        refreshIcon()
+    }
+
+    private func refreshIcon() {
+        guard let button = statusItem?.button else { return }
+        switch storageHealth {
+        case .ok:
+            button.contentTintColor = nil
+        case .disabled:
+            button.contentTintColor = .systemOrange
+        case .failing:
+            button.contentTintColor = .systemRed
+        }
     }
 
     var iconOrigin: NSPoint {
@@ -26,12 +56,20 @@ final class StatusBarController {
     }
 
     @MainActor @objc private func handleClick(_ sender: NSStatusBarButton) {
-        guard let event = NSApp.currentEvent else { return }
-        if event.type == .rightMouseUp {
-            showContextMenu()
-        } else {
+        let currentEvent = NSApp.currentEvent
+        switch Self.clickAction(for: currentEvent?.type) {
+        case .openPanel:
             onLeftClick(iconOrigin)
+        case .showMenu:
+            showContextMenu()
         }
+    }
+
+    nonisolated static func clickAction(for eventType: NSEvent.EventType?) -> ClickAction {
+        guard let eventType else {
+            return .openPanel
+        }
+        return eventType == .rightMouseUp ? .showMenu : .openPanel
     }
 
     private func showContextMenu() {

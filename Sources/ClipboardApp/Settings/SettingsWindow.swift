@@ -1,4 +1,20 @@
+import AppKit
+import ClipboardCore
 import SwiftUI
+
+final class ClipboardSettingsWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if event.type == .keyDown,
+           modifiers == .command,
+           event.charactersIgnoringModifiers?.lowercased() == "w" {
+            performClose(nil)
+            return true
+        }
+
+        return super.performKeyEquivalent(with: event)
+    }
+}
 
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general = "通用"
@@ -36,7 +52,12 @@ struct SettingsRootView: View {
             case .privacy:
                 PrivacySettingsView()
             case .history:
-                HistorySettingsView(store: services.store)
+                HistorySettingsView(
+                    services: services,
+                    baseDirectory: try? ApplicationSupportPaths(
+                        bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.local.clipboard-manager"
+                    ).baseDirectory
+                )
             case nil:
                 GeneralSettingsView(hotKeyManager: hotKeyManager)
             }

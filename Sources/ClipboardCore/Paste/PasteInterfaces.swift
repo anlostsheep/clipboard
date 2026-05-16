@@ -8,6 +8,20 @@ public protocol PasteboardWriting: AnyObject, Sendable {
 public protocol PasteEventPosting: AnyObject, Sendable {
   func isAccessibilityTrusted() -> Bool
   func postCommandV() async -> Bool
+  func postCommandV(marker: String, pasteboard: any PasteboardWriting) async -> PasteEventResult
+}
+
+public extension PasteEventPosting {
+  func postCommandV(marker: String, pasteboard: any PasteboardWriting) async -> PasteEventResult {
+    await postCommandV() ? .posted : .postFailed
+  }
+}
+
+public enum PasteEventResult: Equatable, Sendable {
+  case posted
+  case postFailed
+  case targetAppFocusLost
+  case targetAppRejectedPaste
 }
 
 public enum PasteTransactionState: Equatable, Sendable {

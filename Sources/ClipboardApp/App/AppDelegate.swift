@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import ClipboardCore
 import ClipboardPlatform
@@ -14,12 +15,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var welcomeWindowController: NSWindowController?
     private var settingsWindowController: NSWindowController?
     private var settingsWindow: NSWindow?
+    private var healthSubscriber: AnyCancellable?
 
     // Explicit entry point: Swift's default `@main` synthesis on an
     // NSApplicationDelegate class does not set this instance as the application
     // delegate, so `applicationDidFinishLaunching` would never fire. We wire it
     // up manually here before starting the run loop.
     nonisolated static func main() {
+        if CommandLine.arguments.contains(AccessibilityAuthorizationProbe.checkArgument) {
+            let trusted = AccessibilityAuthorizationProbe.currentProcessTrusted()
+            print(trusted ? "true" : "false")
+            exit(0)
+        }
+
         MainActor.assumeIsolated {
             let delegate = AppDelegate()
             NSApplication.shared.delegate = delegate
@@ -54,6 +62,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
         statusBarController.setup()
+        statusBarController.updateStorageHealth(services.storageHealth)
+
+        // Keep the status bar icon in sync with runtime health changes.
+        healthSubscriber = services.$storageHealth.sink { [weak self] health in
+            self?.statusBarController.updateStorageHealth(health)
+        }
     }
 
     // MARK: - Hot Key
@@ -130,13 +144,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let settingsView = SettingsRootView(services: services, hotKeyManager: hotKeyManager)
         let hostingController = NSHostingController(rootView: settingsView)
-        let window = NSWindow(contentViewController: hostingController)
+        let window = ClipboardSettingsWindow(contentViewController: hostingController)
         window.title = "设置"
         window.styleMask = NSWindow.StyleMask([.titled, .closable, .resizable])
         window.setFrame(NSRect(x: 0, y: 0, width: 660, height: 480), display: true)
         window.minSize = NSSize(width: 560, height: 380)
         window.center()
         window.isReleasedWhenClosed = false
+        window.delegate = self
         settingsWindow = window
         let wc = NSWindowController(window: window)
         wc.showWindow(nil as AnyObject?)
@@ -148,5 +163,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate {
     static var shared: AppDelegate {
         NSApp.delegate as! AppDelegate
+    }
+}
+
+extension AppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === settingsWindow else { return }
+        settingsWindow = nil
+        settingsWindowController = nil
     }
 }

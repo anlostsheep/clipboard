@@ -4,6 +4,7 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     let hotKeyManager: HotKeyManager
+    private let accessibilityRefreshTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     @AppStorage(ClipboardAppSettings.hotkeyKeyCodeKey)
     private var storedKeyCode: Int = Int(kVK_ANSI_V)
@@ -14,6 +15,9 @@ struct GeneralSettingsView: View {
     @AppStorage(ClipboardAppSettings.panelPositionModeKey)
     private var positionModeRaw: String = PanelPositionMode.center.rawValue
 
+    @AppStorage(ClipboardAppSettings.quickPanelOpenSelectionBehaviorKey)
+    private var openSelectionBehaviorRaw: String = QuickPanelOpenSelectionBehavior.latestRecord.rawValue
+
     @AppStorage(ClipboardAppSettings.quickPanelReturnCopiesOnlyKey)
     private var returnCopiesOnly: Bool = false
 
@@ -21,7 +25,7 @@ struct GeneralSettingsView: View {
     private var appearanceModeRaw: String = AppearanceMode.system.rawValue
 
     @State private var conflictMessage: String = ""
-    @State private var isAuthorized: Bool = false
+    @StateObject private var accessibilityPermission = AccessibilityPermissionState()
 
     private var positionMode: Binding<PanelPositionMode> {
         Binding(
@@ -34,6 +38,20 @@ struct GeneralSettingsView: View {
         Binding(
             get: { AppearanceMode(rawValue: appearanceModeRaw) ?? .system },
             set: { appearanceModeRaw = $0.rawValue }
+        )
+    }
+
+    private var openSelectionBehavior: Binding<QuickPanelOpenSelectionBehavior> {
+        Binding(
+            get: { QuickPanelOpenSelectionBehavior(rawValue: openSelectionBehaviorRaw) ?? .latestRecord },
+            set: { openSelectionBehaviorRaw = $0.rawValue }
+        )
+    }
+
+    private var selectionBehavior: Binding<QuickPanelSelectionBehavior> {
+        Binding(
+            get: { QuickPanelSelectionBehavior(returnCopiesOnly: returnCopiesOnly) },
+            set: { returnCopiesOnly = $0.returnCopiesOnly }
         )
     }
 
@@ -54,7 +72,7 @@ struct GeneralSettingsView: View {
 
             Section("辅助功能权限") {
                 HStack {
-                    if isAuthorized {
+                    if accessibilityPermission.isAuthorized {
                         Label("已授权", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
@@ -62,10 +80,13 @@ struct GeneralSettingsView: View {
                             .foregroundStyle(.orange)
                         Spacer()
                         Button("授权辅助功能") {
-                            requestAccessibilityPermission()
+                            accessibilityPermission.requestAuthorizationPrompt()
                         }
                     }
                 }
+                Text("辅助功能权限只用于自动粘贴。仅复制模式不需要此权限。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("全局快捷键") {
@@ -100,25 +121,49 @@ struct GeneralSettingsView: View {
                 Text("通过菜单栏图标点击时，面板始终在图标下方显示。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
 
-            Section("粘贴行为") {
-                Toggle("Return 仅复制，不自动粘贴", isOn: $returnCopiesOnly)
-                Text("开启后，选择历史记录只写入剪贴板，需手动按 Command+V 粘贴。")
+                Picker("打开时默认选中", selection: openSelectionBehavior) {
+                    ForEach(QuickPanelOpenSelectionBehavior.allCases) { behavior in
+                        Text(behavior.title).tag(behavior)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text((QuickPanelOpenSelectionBehavior(rawValue: openSelectionBehaviorRaw) ?? .latestRecord).settingsDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("粘贴行为") {
+                Picker("选择历史项后的行为", selection: selectionBehavior) {
+                    ForEach(QuickPanelSelectionBehavior.allCases) { behavior in
+                        Text(behavior.title).tag(behavior)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(QuickPanelSelectionBehavior(returnCopiesOnly: returnCopiesOnly).settingsDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if !returnCopiesOnly && !accessibilityPermission.isAuthorized {
+                    HStack {
+                        Label("自动粘贴当前不可用：请授权辅助功能，或切换为仅复制。", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("授权辅助功能") {
+                            accessibilityPermission.requestAuthorizationPrompt()
+                        }
+                    }
+                    .font(.caption)
+                }
+            }
         }
         .formStyle(.grouped)
-        .onAppear { isAuthorized = AXIsProcessTrusted() }
-    }
-
-    /// Triggers the macOS native accessibility prompt. The system dialog's
-    /// "Open System Settings" button pre-populates this app in the Accessibility
-    /// list — no manual "+" step required.
-    private func requestAccessibilityPermission() {
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+        .onAppear { accessibilityPermission.refresh() }
+        .onReceive(accessibilityRefreshTimer) { _ in
+            accessibilityPermission.refresh()
+        }
     }
 
     private func reRegisterHotKey(keyCode: UInt32, modifiers: UInt32) {

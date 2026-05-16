@@ -2,6 +2,64 @@ import AppKit
 import Foundation
 import Carbon
 
+enum QuickPanelSelectionBehavior: String, CaseIterable, Identifiable {
+    case autoPaste
+    case copyOnly
+
+    var id: String { rawValue }
+
+    init(returnCopiesOnly: Bool) {
+        self = returnCopiesOnly ? .copyOnly : .autoPaste
+    }
+
+    var returnCopiesOnly: Bool {
+        self == .copyOnly
+    }
+
+    var title: String {
+        switch self {
+        case .autoPaste:
+            return "自动粘贴"
+        case .copyOnly:
+            return "仅复制"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .autoPaste:
+            return "选择历史项后，写入剪贴板并自动发送 Command+V。需要辅助功能权限。"
+        case .copyOnly:
+            return "选择历史项后只写入剪贴板，由你手动按 Command+V 粘贴。"
+        }
+    }
+}
+
+enum QuickPanelOpenSelectionBehavior: String, CaseIterable, Identifiable {
+    case latestRecord
+    case previousSelection
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .latestRecord:
+            return "最新记录"
+        case .previousSelection:
+            return "上次选中项"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .latestRecord:
+            return "每次打开快捷面板时，默认选中最新复制的记录。"
+        case .previousSelection:
+            return "每次打开快捷面板时，保留上次用键盘或鼠标选中的记录位置。"
+        }
+    }
+}
+
 enum ClipboardAppSettings {
     // MARK: - Existing
     static let quickPanelReturnCopiesOnlyKey = "quickPanel.returnCopiesOnly"
@@ -35,6 +93,7 @@ enum ClipboardAppSettings {
 
     // MARK: - Panel Position
     static let panelPositionModeKey = "quickPanel.positionMode"
+    static let quickPanelOpenSelectionBehaviorKey = "quickPanel.openSelectionBehavior"
 
     static func panelPositionMode(defaults: UserDefaults = .standard) -> PanelPositionMode {
         guard let raw = defaults.string(forKey: panelPositionModeKey),
@@ -42,6 +101,14 @@ enum ClipboardAppSettings {
             return .center
         }
         return mode
+    }
+
+    static func quickPanelOpenSelectionBehavior(defaults: UserDefaults = .standard) -> QuickPanelOpenSelectionBehavior {
+        guard let raw = defaults.string(forKey: quickPanelOpenSelectionBehaviorKey),
+              let behavior = QuickPanelOpenSelectionBehavior(rawValue: raw) else {
+            return .latestRecord
+        }
+        return behavior
     }
 
     // MARK: - Launch
@@ -55,13 +122,39 @@ enum ClipboardAppSettings {
         defaults.set(true, forKey: hasLaunchedKey)
     }
 
-    // MARK: - History
-    static let maxHistoryCountKey = "history.maxCount"
-    static let defaultMaxHistoryCount = 200
+    // MARK: - Storage
 
-    static func maxHistoryCount(defaults: UserDefaults = .standard) -> Int {
-        let stored = defaults.integer(forKey: maxHistoryCountKey)
-        return stored > 0 ? stored : defaultMaxHistoryCount
+    static let maxHistoryCountStorageKey = "history.maxCount"  // 沿用旧 key，调整默认值
+    static let defaultStorageMaxHistoryCount = 5000
+
+    static func storageMaxHistoryCount(defaults: UserDefaults = .standard) -> Int {
+        let stored = defaults.integer(forKey: maxHistoryCountStorageKey)
+        return stored > 0 ? stored : defaultStorageMaxHistoryCount
+    }
+
+    static let maxAgeDaysKey = "storage.maxAgeDays"
+    static let defaultMaxAgeDays = 180
+
+    static func storageMaxAgeDays(defaults: UserDefaults = .standard) -> Int {
+        let stored = defaults.integer(forKey: maxAgeDaysKey)
+        return stored > 0 ? stored : defaultMaxAgeDays
+    }
+
+    static let failureRecoveryStrategyKey = "storage.failureRecoveryStrategy"
+
+    static func storageFailureStrategy(defaults: UserDefaults = .standard) -> StorageFailureStrategy {
+        guard let raw = defaults.string(forKey: failureRecoveryStrategyKey),
+              let strategy = StorageFailureStrategy(rawValue: raw) else {
+            return .continueEvicting
+        }
+        return strategy
+    }
+
+    static let notifyOnAutoEvictKey = "storage.notifyOnAutoEvict"
+
+    static func storageNotifyOnAutoEvict(defaults: UserDefaults = .standard) -> Bool {
+        if defaults.object(forKey: notifyOnAutoEvictKey) == nil { return true }
+        return defaults.bool(forKey: notifyOnAutoEvictKey)
     }
 
     // MARK: - Appearance
@@ -111,6 +204,22 @@ enum AppearanceMode: String, CaseIterable {
         case .system: return nil
         case .light:  return NSAppearance(named: .aqua)
         case .dark:   return NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+// MARK: - Storage Failure Strategy
+
+enum StorageFailureStrategy: String, CaseIterable {
+    case continueEvicting
+    case pauseMonitoring
+    case skipRecord
+
+    var displayName: String {
+        switch self {
+        case .continueEvicting: return "自动删除最旧记录直到能继续保存"
+        case .pauseMonitoring:  return "暂停剪贴板监控"
+        case .skipRecord:       return "跳过当前记录，不删除历史"
         }
     }
 }

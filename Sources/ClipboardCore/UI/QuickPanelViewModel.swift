@@ -22,10 +22,15 @@ public actor QuickPanelViewModel {
     self.pageLimit = pageLimit
   }
 
-  public func refresh(query: String) async {
+  public func refresh(
+    query: String,
+    contentTypes: Set<ClipboardContentType> = [],
+    groupIDs: Set<String> = []
+  ) async {
     refreshGeneration += 1
     let generation = refreshGeneration
-    let refreshedItems = await store.fetchPage(query: query, limit: pageLimit)
+    let historyQuery = HistoryQuery(text: query, contentTypes: contentTypes, groupIDs: groupIDs)
+    let refreshedItems = (try? await store.fetchPage(historyQuery, limit: pageLimit)) ?? []
 
     guard generation == refreshGeneration else {
       return
@@ -42,6 +47,13 @@ public actor QuickPanelViewModel {
     }
 
     selectedIndex = max(0, min(items.count - 1, selectedIndex + delta))
+  }
+
+  public func setSelection(index: Int) {
+    guard items.indices.contains(index) else {
+      return
+    }
+    selectedIndex = index
   }
 
   public func selectedIntent(autoPaste: Bool) -> QuickPanelSelectionIntent? {

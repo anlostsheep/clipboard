@@ -1,13 +1,30 @@
 import AppKit
+import Carbon
 import SwiftUI
 
 struct QuickPanelKeyCaptureView: NSViewRepresentable {
+  enum KeyboardAction: Equatable {
+    case cancel
+    case submit
+    case move(Int)
+    case focusSearch
+    case openSettings
+  }
+
   let onMove: (Int) -> Void
   let onSubmit: () -> Void
   let onCancel: () -> Void
+  let onFocusSearch: () -> Void
+  let onOpenSettings: () -> Void
 
   func makeCoordinator() -> Coordinator {
-    Coordinator(onMove: onMove, onSubmit: onSubmit, onCancel: onCancel)
+    Coordinator(
+      onMove: onMove,
+      onSubmit: onSubmit,
+      onCancel: onCancel,
+      onFocusSearch: onFocusSearch,
+      onOpenSettings: onOpenSettings
+    )
   }
 
   func makeNSView(context: Context) -> KeyCaptureNSView {
@@ -22,6 +39,8 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     context.coordinator.onMove = onMove
     context.coordinator.onSubmit = onSubmit
     context.coordinator.onCancel = onCancel
+    context.coordinator.onFocusSearch = onFocusSearch
+    context.coordinator.onOpenSettings = onOpenSettings
     context.coordinator.installMonitor()
   }
 
@@ -34,14 +53,24 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     var onMove: (Int) -> Void
     var onSubmit: () -> Void
     var onCancel: () -> Void
+    var onFocusSearch: () -> Void
+    var onOpenSettings: () -> Void
     weak var observedView: KeyCaptureNSView?
 
     private var monitor: Any?
 
-    init(onMove: @escaping (Int) -> Void, onSubmit: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    init(
+      onMove: @escaping (Int) -> Void,
+      onSubmit: @escaping () -> Void,
+      onCancel: @escaping () -> Void,
+      onFocusSearch: @escaping () -> Void,
+      onOpenSettings: @escaping () -> Void
+    ) {
       self.onMove = onMove
       self.onSubmit = onSubmit
       self.onCancel = onCancel
+      self.onFocusSearch = onFocusSearch
+      self.onOpenSettings = onOpenSettings
     }
 
     func installMonitor() {
@@ -72,26 +101,55 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
         return event
       }
 
-      switch event.keyCode {
-      case 53:
+      switch QuickPanelKeyCaptureView.keyboardAction(keyCode: event.keyCode, modifierFlags: event.modifierFlags) {
+      case .cancel:
         onCancel()
         return nil
-      case 36:
+      case .submit:
         onSubmit()
         return nil
-      case 125:
-        onMove(1)
+      case .move(let delta):
+        onMove(delta)
         return nil
-      case 126:
-        onMove(-1)
+      case .focusSearch:
+        onFocusSearch()
         return nil
-      default:
+      case .openSettings:
+        onOpenSettings()
+        return nil
+      case nil:
         return event
       }
     }
 
     deinit {
       removeMonitor()
+    }
+  }
+
+  static func keyboardAction(
+    keyCode: UInt16,
+    modifierFlags: NSEvent.ModifierFlags
+  ) -> KeyboardAction? {
+    let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+    if keyCode == UInt16(kVK_ANSI_F), modifiers.contains(.command) {
+      return .focusSearch
+    }
+    if keyCode == UInt16(kVK_ANSI_Comma), modifiers.contains(.command) {
+      return .openSettings
+    }
+
+    switch keyCode {
+    case UInt16(kVK_Escape):
+      return .cancel
+    case UInt16(kVK_Return), UInt16(kVK_ANSI_KeypadEnter):
+      return .submit
+    case UInt16(kVK_DownArrow):
+      return .move(1)
+    case UInt16(kVK_UpArrow):
+      return .move(-1)
+    default:
+      return nil
     }
   }
 }

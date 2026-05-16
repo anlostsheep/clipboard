@@ -63,6 +63,24 @@ final class SystemPasteboardClientTests: XCTestCase {
     XCTAssertTrue(hasMarker)
   }
 
+  func testExternalRichTextCanBeCapturedWithRTFData() async throws {
+    let pasteboard = makePasteboard()
+    let client = SystemPasteboardClient(pasteboard: pasteboard)
+    let rtf = Data("{\\rtf1\\ansi rich text}".utf8)
+    let item = NSPasteboardItem()
+
+    XCTAssertTrue(item.setString("rich text", forType: .string))
+    XCTAssertTrue(item.setData(rtf, forType: .rtf))
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+
+    let captured = await client.readCurrentCapture()
+    let capture = try XCTUnwrap(captured)
+
+    XCTAssertEqual(capture.payload, .richText(plainText: "rich text", rtfData: rtf))
+    XCTAssertTrue(capture.pasteboardTypes.contains(NSPasteboard.PasteboardType.rtf.rawValue))
+  }
+
   func testFileURLWriteCreatesOnePasteboardItemPerURL() async throws {
     let pasteboard = makePasteboard()
     let client = SystemPasteboardClient(pasteboard: pasteboard)

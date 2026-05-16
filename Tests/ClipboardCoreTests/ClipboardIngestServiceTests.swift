@@ -17,7 +17,7 @@ final class ClipboardIngestServiceTests: XCTestCase {
     )
 
     let record = try await service.ingest(capture)
-    let records = await store.fetchAll()
+    let records = try await store.fetchAll()
 
     XCTAssertNil(record)
     XCTAssertEqual(records.count, 0)
@@ -38,7 +38,7 @@ final class ClipboardIngestServiceTests: XCTestCase {
 
     let ingestedRecord = try await service.ingest(capture)
     let record = try XCTUnwrap(ingestedRecord)
-    let records = await store.fetchAll()
+    let records = try await store.fetchAll()
 
     XCTAssertTrue(record.isLargeContent)
     XCTAssertLessThanOrEqual(record.title.count, 120)
@@ -52,12 +52,31 @@ final class ClipboardIngestServiceTests: XCTestCase {
     XCTAssertEqual(records.count, 1)
   }
 
+  func testIngestClassifiesHTTPURLTextAsLink() async throws {
+    let store = InMemoryHistoryStore()
+    let service = ClipboardIngestService(store: store, privacyPolicy: .standard, largeTextPolicy: .default)
+    let capture = ClipboardCapture(
+      payload: .text("https://example.com/path?q=1"),
+      pasteboardTypes: ["public.utf8-plain-text"],
+      sourceAppBundleId: "com.apple.Safari",
+      sourceAppName: "Safari",
+      capturedAt: Date(timeIntervalSince1970: 12)
+    )
+
+    let ingestedRecord = try await service.ingest(capture)
+    let record = try XCTUnwrap(ingestedRecord)
+
+    XCTAssertEqual(record.primaryType, .link)
+    XCTAssertEqual(record.title, "https://example.com/path?q=1")
+    XCTAssertEqual(record.plainTextPreview, "https://example.com/path?q=1")
+  }
+
   func testPayloadStoreSavesAndLoadsPayloadByRecordID() async throws {
     let store = InMemoryPayloadStore()
     let id = UUID(uuidString: "00000000-0000-0000-0000-000000000060")!
 
-    await store.save(.text("hello"), for: id)
-    let payload = await store.loadPayload(for: id)
+    try await store.save(.text("hello"), for: id)
+    let payload = try await store.loadPayload(for: id)
 
     XCTAssertEqual(payload, .text("hello"))
   }
@@ -66,7 +85,7 @@ final class ClipboardIngestServiceTests: XCTestCase {
     let store = InMemoryPayloadStore()
     let id = UUID(uuidString: "00000000-0000-0000-0000-000000000061")!
 
-    let payload = await store.loadPayload(for: id)
+    let payload = try await store.loadPayload(for: id)
 
     XCTAssertNil(payload)
   }

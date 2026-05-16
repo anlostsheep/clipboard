@@ -20,7 +20,8 @@ final class ClipboardCaptureCoordinatorTests: XCTestCase {
         privacyPolicy: .standard,
         largeTextPolicy: .default
       ),
-      payloadStore: payloadStore
+      payloadStore: payloadStore,
+      failureHandler: NoopFailureHandler()
     )
 
     let record = try await coordinator.captureLatestChange()
@@ -33,9 +34,14 @@ final class ClipboardCaptureCoordinatorTests: XCTestCase {
 
     XCTAssertEqual(items.map(\.title), ["instant quick panel item"])
     let firstItem = try XCTUnwrap(items.first)
-    let payload = await payloadStore.loadPayload(for: firstItem.id)
+    let payload = try await payloadStore.loadPayload(for: firstItem.id)
     XCTAssertEqual(payload, .text("instant quick panel item"))
   }
+}
+
+private struct NoopFailureHandler: StorageFailureHandler {
+  func handleStorageFailure(_ error: StorageError, record: ClipboardRecord) async -> Bool { true }
+  func reportSuccess() async {}
 }
 
 private final class FakePasteboardReader: PasteboardReading {

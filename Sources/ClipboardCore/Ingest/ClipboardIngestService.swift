@@ -17,21 +17,30 @@ public struct ClipboardIngestService: Sendable {
   }
 
   public func ingest(_ capture: ClipboardCapture) async throws -> ClipboardRecord? {
+    guard let record = try makeRecord(from: capture) else { return nil }
+    return try await store.upsert(record)
+  }
+
+  /// Builds the record without persisting it. Returns nil if PrivacyPolicy filters this capture.
+  public func makeRecord(from capture: ClipboardCapture) throws -> ClipboardRecord? {
     guard !privacyPolicy.shouldIgnore(
       pasteboardTypes: capture.pasteboardTypes,
       sourceBundleId: capture.sourceAppBundleId
     ) else {
       return nil
     }
-
-    let record = try makeRecord(from: capture)
-    return try await store.upsert(record)
+    return try constructRecord(from: capture)
   }
 
-  private func makeRecord(from capture: ClipboardCapture) throws -> ClipboardRecord {
+  /// Persists an already-constructed record to the store.
+  public func persist(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    try await store.upsert(record)
+  }
+
+  private func constructRecord(from capture: ClipboardCapture) throws -> ClipboardRecord {
     switch capture.payload {
     case let .text(text):
-      return makeTextRecord(text: text, capture: capture)
+      return makeTextRecord(text: text, capture: capture, primaryType: primaryType(forText: text))
     case let .richText(plainText, _):
       return makeTextRecord(text: plainText, capture: capture, primaryType: .richText)
     case let .image(data, _):
@@ -93,6 +102,23 @@ public struct ClipboardIngestService: Sendable {
 
   private func hashData(_ data: Data) -> String {
     digestHex(SHA256.hash(data: data))
+  }
+
+  private func primaryType(forText text: String) -> ClipboardContentType {
+    isHTTPURLText(text) ? .link : .text
+  }
+
+  private func isHTTPURLText(_ text: String) -> Bool {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty,
+          !trimmed.unicodeScalars.contains(where: CharacterSet.whitespacesAndNewlines.contains),
+          let components = URLComponents(string: trimmed),
+          let scheme = components.scheme?.lowercased(),
+          scheme == "http" || scheme == "https",
+          components.host != nil else {
+      return false
+    }
+    return true
   }
 
   private func hashText(_ text: String) -> String {
