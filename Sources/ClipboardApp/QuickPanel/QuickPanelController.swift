@@ -20,6 +20,11 @@ enum TriggerSource {
 final class QuickPanelController {
     private let state: QuickPanelState
     private let prepareForShow: @MainActor () async -> Void
+    private let autoPasteEnabled: () -> Bool
+    private let isAutoPasteAuthorized: () -> Bool
+    private let requestAccessibilityAuthorizationAction: () -> Void
+    private let openSelectionBehavior: () -> QuickPanelOpenSelectionBehavior
+    private let activatePreviousApplication: (NSRunningApplication?) -> Void
     private var panel: NSPanel?
     private var previousApplication: NSRunningApplication?
 
@@ -29,15 +34,28 @@ final class QuickPanelController {
 
     init(
         state: QuickPanelState,
-        prepareForShow: @escaping @MainActor () async -> Void = {}
+        prepareForShow: @escaping @MainActor () async -> Void = {},
+        autoPasteEnabled: @escaping () -> Bool = { ClipboardAppSettings.quickPanelAutoPasteEnabled() },
+        isAutoPasteAuthorized: @escaping () -> Bool = { AccessibilityAuthorizationProbe.settingsTrusted() },
+        requestAccessibilityAuthorization: @escaping () -> Void = { AccessibilityAuthorizationProbe.requestAuthorizationPrompt() },
+        openSelectionBehavior: @escaping () -> QuickPanelOpenSelectionBehavior = { ClipboardAppSettings.quickPanelOpenSelectionBehavior() },
+        activatePreviousApplication: @escaping (NSRunningApplication?) -> Void = { app in
+            guard let app, !app.isTerminated else { return }
+            app.activate(options: [.activateAllWindows])
+        }
     ) {
         self.state = state
         self.prepareForShow = prepareForShow
+        self.autoPasteEnabled = autoPasteEnabled
+        self.isAutoPasteAuthorized = isAutoPasteAuthorized
+        self.requestAccessibilityAuthorizationAction = requestAccessibilityAuthorization
+        self.openSelectionBehavior = openSelectionBehavior
+        self.activatePreviousApplication = activatePreviousApplication
     }
 
     func toggle(trigger: TriggerSource = .hotkey) {
         if panel?.isVisible == true {
-            hide()
+            cancel()
         } else {
             show(trigger: trigger)
         }
@@ -48,13 +66,14 @@ final class QuickPanelController {
         let panel = panel ?? makePanel()
         self.panel = panel
 
+        state.prepareForPresentation(openSelectionBehavior: openSelectionBehavior())
         position(panel, trigger: trigger)
+        present(panel)
 
         Task { @MainActor in
             await prepareForShow()
             await state.refresh()
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
+            guard panel.isVisible else { return }
             focusSearchField(in: panel)
         }
     }
@@ -63,13 +82,20 @@ final class QuickPanelController {
         panel?.orderOut(nil)
     }
 
+    func cancel() {
+        hide()
+        activatePreviousApplication(previousApplication)
+    }
+
     // MARK: - Private
 
     private func makePanel() -> NSPanel {
         let content = QuickPanelView(
             state: state,
-            onClose: { [weak self] in self?.hide() },
-            onSubmit: { [weak self] in self?.submitSelection() }
+            onClose: { [weak self] in self?.cancel() },
+            onSubmit: { [weak self] in self?.submitSelection() },
+            onCopyOnly: { [weak self] in self?.copySelectionOnly() },
+            onRequestAccessibilityAuthorization: { [weak self] in self?.requestAccessibilityAuthorization() }
         )
         let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
@@ -133,22 +159,53 @@ final class QuickPanelController {
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
     }
 
+    private func present(_ panel: NSPanel) {
+        NSApp.activate(ignoringOtherApps: true)
+        panel.orderFrontRegardless()
+        panel.makeKeyAndOrderFront(nil)
+        focusSearchField(in: panel)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self, weak panel] in
+            guard let self, let panel, panel.isVisible else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            panel.orderFrontRegardless()
+            panel.makeKeyAndOrderFront(nil)
+            self.focusSearchField(in: panel)
+        }
+    }
+
     private func rememberPreviousApplication() {
         let front = NSWorkspace.shared.frontmostApplication
         previousApplication = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
     }
 
-    private func submitSelection() {
+    func submitSelection() {
         let targetApplication = previousApplication
-        let autoPaste = ClipboardAppSettings.quickPanelAutoPasteEnabled()
-        hide()
-        if let app = targetApplication, !app.isTerminated {
-            app.activate(options: [.activateAllWindows])
+        let autoPaste = autoPasteEnabled()
+        if autoPaste && !isAutoPasteAuthorized() {
+            state.reportAutoPasteRequiresAccessibilityPermission()
+            return
         }
+
+        hide()
+        activatePreviousApplication(targetApplication)
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 120_000_000)
             await state.selectCurrent(autoPaste: autoPaste)
         }
+    }
+
+    func copySelectionOnly() {
+        let targetApplication = previousApplication
+        hide()
+        activatePreviousApplication(targetApplication)
+        Task { @MainActor in
+            await state.selectCurrent(autoPaste: false)
+        }
+    }
+
+    func requestAccessibilityAuthorization() {
+        requestAccessibilityAuthorizationAction()
     }
 
     private func focusSearchField(in panel: NSPanel, attemptsRemaining: Int = 4) {

@@ -1,5 +1,20 @@
+import AppKit
 import ClipboardCore
 import SwiftUI
+
+final class ClipboardSettingsWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if event.type == .keyDown,
+           modifiers == .command,
+           event.charactersIgnoringModifiers?.lowercased() == "w" {
+            performClose(nil)
+            return true
+        }
+
+        return super.performKeyEquivalent(with: event)
+    }
+}
 
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general = "通用"

@@ -13,8 +13,8 @@
 
 ## 启动前置
 
-- [ ] `Scripts/verify.sh` 通过
-- [ ] `swift run ClipboardManualProbe self-check` 输出 `write: ok`
+- [x] `Scripts/verify.sh` 通过
+- [x] `swift run ClipboardManualProbe self-check` 输出 `write: ok`
 - [ ] `swift run ClipboardManualProbe accessibility` 输出 `accessibility: authorized`
 - [ ] 如果输出 `accessibility: required`，先在系统设置中授权，再重新验证
 
@@ -69,12 +69,19 @@ swift run ClipboardManualProbe read-once
 - [ ] 输入搜索关键词后，列表只保留匹配标题、摘要或来源 App 的记录
 - [ ] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
 - [ ] 按 `Escape` 关闭 QuickPanel
-- [ ] 未勾选 `Return copies only` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，选中记录后按 `Return`，记录被复制并自动粘贴
-- [ ] 勾选 `Return copies only` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，选中记录后按 `Return`，目标文本框不立即粘贴
-- [ ] 勾选 `Return copies only` 后，`Return` 选择记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
-- [ ] 勾选 `Return copies only` 后，QuickPanel footer 显示 `Return Copy  Cmd+V Paste  Esc Close`
-- [ ] 重启 app 后，`Return copies only` 勾选状态保持不变
-- [ ] 撤销辅助功能权限后，按 `Return` 不静默失败，footer 显示失败原因
+- [x] 打开过设置页后，切到其他 App 呼出 QuickPanel，再按 `Escape` 关闭，焦点保留在呼出前的 App，不重新弹出设置页
+- [x] 按 `Down` / `Up` 移动选中项后，按 `Command+F` 可重新聚焦搜索框并继续输入
+- [x] 鼠标单击某条历史记录可选择该记录，并遵循与 `Return` 相同的复制/粘贴语义
+- [x] 在 QuickPanel 中按 `Command+,` 可打开设置窗口
+- [ ] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或单击记录后，记录被复制并自动粘贴
+- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或单击记录后，目标文本框不立即粘贴
+- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，按 `Return` 或单击记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
+- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，QuickPanel footer 显示 `Return/Click Copy  Cmd+V Paste  Esc Close`
+- [ ] 重启 app 后，`选择历史项时仅复制，不自动粘贴` 勾选状态保持不变
+- [x] 未开启辅助功能权限且处于自动粘贴模式时，按 `Return` 不静默失败，QuickPanel 显示授权提示并保持打开
+- [x] 未开启辅助功能权限且处于自动粘贴模式时，鼠标单击记录不静默失败，QuickPanel 显示授权提示并保持打开
+- [x] 切换“打开快捷面板时选中：最新记录 / 上次选中项”后，重新打开 QuickPanel 的初始选中项符合设置
+- [x] QuickPanel 顶部类型过滤控件中的“类型”标签不换行、不挤压成两行
 - [ ] 复制 10MB JSON 后打开 QuickPanel，列表只显示摘要，不渲染全文
 
 ## 失败提示
@@ -150,6 +157,8 @@ CPU/内存:
 - [ ] 多次点击 ⚙️，设置窗口只有一个实例（重复点击置前）
 - [ ] 设置窗口左侧可切换通用 / 隐私 / 历史记录页
 - [ ] 修改设置后关闭窗口，重启后设置保持不变
+- [x] 设置窗口获得焦点时，按 `Command+W` 可关闭设置窗口
+- [x] 在系统设置中添加或移除 Clipboard 辅助功能授权后，设置页授权状态能刷新为当前真实状态
 
 ## 外观主题（v3 新增）
 
@@ -184,13 +193,13 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 
 ### 基础持久化
 - [ ] 首次启动 → 复制 5 条不同内容 → 退出应用 → 重启 → QuickPanel 应显示全部 5 条
-- [ ] 退出后查看 `~/Library/Application Support/<bundle-id>/clipboard.sqlite` 文件存在
+- [x] 退出后查看 `~/Library/Application Support/<bundle-id>/clipboard.sqlite` 文件存在
 - [ ] 复制图片 → 退出 → 重启 → 选择该图片粘贴成功
 
 ### 双堡垒淘汰
-- [ ] 设置 maxCount = 50 → 复制 60 条 → 重启 → count 应为 50（前 10 条最旧的被删）
-- [ ] pin 一条 → 复制大量记录直至超 maxCount → pin 项保留
-- [ ] 调整系统时间或 maxAgeDays = 1 → 复制内容 → 等 25 小时 / 改时间 → 该条应被删（除非 pinned）
+- [x] 设置 maxCount = 50 → 复制 60 条 → 重启 → count 应为 50（前 10 条最旧的被删）
+- [x] pin 一条 → 复制大量记录直至超 maxCount → pin 项保留
+- [x] 调整系统时间或 maxAgeDays = 1 → 复制内容 → 等 25 小时 / 改时间 → 该条应被删（除非 pinned）
 
 ### 启动失败降级
 - [ ] 把 `~/Library/Application Support/<bundle-id>/` 目录权限改为 0444 → 启动应弹"无法持久化"alert
@@ -210,5 +219,69 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 
 ### 性能
 - [ ] 持续重度复制 24 小时（>1000 条），观察 `du -sh` 应保持合理增长（每条平均 < 5KB 元数据）
-- [ ] 27K 条记录场景下，QuickPanel 打开延迟 < 500ms（用 swift run ClipboardManualProbe 加压数据后实测）
-- [ ] 单次复制 → 写入完成的端到端延迟 < 50ms 中位数（用 os_signpost 观察）
+- [x] 27K 条记录场景下，QuickPanel 打开延迟 < 500ms（用 swift run ClipboardManualProbe 加压数据后实测）
+- [x] 单次复制 → 写入完成的端到端延迟 < 50ms 中位数（用 os_signpost 观察）
+
+### 验收记录（2026-05-15）
+
+```text
+日期: 2026-05-15
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: 持久化存储自动化验收，使用隔离 bundle id com.local.clipboard-manager.acceptance.20260515232926
+命令:
+  - Scripts/verify.sh
+  - swift run ClipboardManualProbe self-check
+  - swift run ClipboardManualProbe accessibility
+  - CONFIGURATION=debug BUNDLE_IDENTIFIER=<acceptance-bundle-id> Scripts/build-app-bundle.sh
+  - SQLiteHistoryStore 验收探针：retention.count50.after60 / retention.pinnedExempt / retention.maxAgeDays1 / performance.singleUpsertMedian
+  - SQLite 27K 造数 + SQLiteHistoryStore 冷启动 fetchPage 性能探针
+  - 损坏库替换后重启 app，检查 clipboard.corrupt.<ts>.sqlite
+结果:
+  - verify.sh 通过
+  - self-check 输出 write: ok / marker: present
+  - swift run ClipboardManualProbe accessibility 输出 accessibility: required；系统设置中 ClipboardApp.app 辅助功能权限为 on，但该权限绑定 .app，非 swift run 探针二进制
+  - clipboard.sqlite / payloads 目录在隔离 Application Support 下存在
+  - 手工造数 5 条 text + 1 条 image 后 SQLite quick_check=ok，records=count 6，payload 文件存在
+  - retention.count50.after60: pass count=50
+  - retention.pinnedExempt: pass count=2
+  - retention.maxAgeDays1: pass count=1
+  - performance.singleUpsertMedian: pass medianMs=0.20 samples=100
+  - performance.load27K: pass initMs=137.89 count=27000
+  - performance.fetchPage27K: pass elapsedMs=140.27 page=50
+  - 损坏库启动后生成 clipboard.corrupt.20260515T155039.sqlite
+问题:
+  - Computer Use 可操作普通窗口和系统设置，但当前 app 是菜单栏 accessory app；未能稳定定位/点击系统状态栏 item。
+  - Command+Shift+V 在当前环境没有被验收 app 接管，按键落到前台应用；已撤销误输入。
+  - 因无法稳定打开 QuickPanel / Settings 窗口，QuickPanel 视觉项、Settings UI 项、状态栏颜色项、清除全部历史按钮项未勾选。
+  - maxAgeDays UI Stepper 代码范围是 7...365，本轮 maxAgeDays=1 只通过 store 层策略验证，未通过 UI 设置验证。
+  - 27K 性能通过批量 schema 造数后冷启动 store + fetchPage 验证；逐条真实 upsert 生成 27K 超出合理验收时间，未作为手工流程采用。
+截图/录屏: 未采集；以命令输出、SQLite 文件和系统设置可访问性列表作为证据。
+结论: PARTIAL PASS，存储核心行为与性能通过；菜单栏/QuickPanel/Settings 交互项 BLOCKED。
+```
+
+## 分支收尾验收记录（2026-05-16）
+
+```text
+日期: 2026-05-16
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: feature/persistent-storage 分支最终物理验收，覆盖 QuickPanel、Settings、辅助功能权限、复制/粘贴语义与 macOS 标准快捷键
+命令:
+  - swift test
+  - Scripts/verify.sh
+  - git diff --check
+  - CODE_SIGN_IDENTITY=- CONFIGURATION=debug BUNDLE_IDENTIFIER=com.local.clipboard-manager Scripts/build-app-bundle.sh
+结果:
+  - 自动化测试通过：115 tests, 0 failures
+  - verify.sh 通过
+  - git diff --check 通过
+  - debug app bundle 构建并启动成功
+  - 用户物理验证通过：QuickPanel 首次呼出、搜索焦点恢复、鼠标点击选择、Return/Click 复制或自动粘贴语义、辅助功能授权新增/移除状态刷新、无权限自动粘贴提示、打开时选中策略、Command+, 打开设置、Command+W 关闭设置、Escape 关闭后回到原 App
+问题:
+  - 当前 debug 包使用 ad-hoc signing；macOS 可能在代码变化后要求重新确认辅助功能授权。
+截图/录屏: 用户侧实际操作验证；自动化命令输出作为构建与测试证据。
+结论: PASS，分支功能开发与交互验收完成。
+```

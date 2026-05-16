@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Complete background capture, rich/link content recognition, and practical search filters for the clipboard manager.
+**Goal:** Complete background capture, rich/link content recognition, practical search filters, and the QuickPanel interaction polish required for a lightweight Maccy-style daily workflow.
 
 **Architecture:** Add a small capture loop around the existing coordinator, preserve pasteboard payload contracts, and extend the store query API with typed filters. Keep SQLite's current in-memory hot index and avoid schema migration.
 
@@ -60,3 +60,61 @@
 - [x] Run `swift test`.
 - [x] Run `Scripts/verify.sh`.
 - [x] Inspect `git diff --stat` and `git status --short`.
+
+### Task 5: QuickPanel and Settings Interaction Polish
+
+**Files:**
+- Modify: `Sources/ClipboardApp/AppSettings.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelController.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelKeyCaptureView.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelState.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelView.swift`
+- Modify: `Sources/ClipboardApp/Settings/GeneralSettingsView.swift`
+- Modify: `Sources/ClipboardApp/Settings/SettingsWindow.swift`
+- Modify: `Sources/ClipboardApp/StatusBar/StatusBarController.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelControllerPresentationTests.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelKeyCaptureTests.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelStateFilterTests.swift`
+- Test: `Tests/ClipboardAppTests/SettingsWindowShortcutTests.swift`
+- Test: `Tests/ClipboardAppTests/StatusBarControllerTests.swift`
+
+- [x] Make hot-key and status-bar invocations present QuickPanel on the first trigger across common foreground apps.
+- [x] Support `Command+F` to return focus to the QuickPanel search field after keyboard navigation.
+- [x] Make mouse row selection use the same select action as `Return`.
+- [x] Clarify copy-only versus auto-paste labels and footer hints.
+- [x] Add `Command+,` handling from QuickPanel to open Settings.
+- [x] Add `Command+W` handling for the Settings window.
+- [x] Make `Escape` cancellation restore the previously frontmost app instead of surfacing an already-open Settings window.
+- [x] Add a setting for QuickPanel open selection behavior: latest record or previous selection.
+- [x] Keep the type-filter control compact so the "类型" label does not wrap.
+
+### Task 6: Accessibility Permission UX
+
+**Files:**
+- Create: `Sources/ClipboardApp/Settings/AccessibilityPermissionState.swift`
+- Modify: `Sources/ClipboardApp/App/AppDelegate.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelController.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelState.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelView.swift`
+- Modify: `Sources/ClipboardApp/Settings/GeneralSettingsView.swift`
+- Test: `Tests/ClipboardAppTests/AccessibilityPermissionStateTests.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelControllerPresentationTests.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelStateFilterTests.swift`
+
+- [x] Resolve Accessibility authorization with a fresh helper-process check so add/remove in System Settings updates the Settings page.
+- [x] Block auto-paste when Accessibility is missing and keep QuickPanel open with a visible action prompt.
+- [x] Show the same permission prompt for both mouse click and keyboard `Return`.
+- [x] Keep copy-only mode independent of Accessibility permission.
+
+### Task 7: Branch Completion
+
+**Files:**
+- Modify: `docs/manual-acceptance-checklist.md`
+- Modify: `docs/superpowers/plans/2026-05-16-clipboard-completion.md`
+- Modify: `CLAUDE.md`
+
+- [x] Record the completed feature set and physical validation coverage.
+- [x] Run `swift test`.
+- [x] Run `Scripts/verify.sh`.
+- [x] Run `git diff --check`.
+- [x] Build and launch `.build/app-bundles/debug/ClipboardApp.app` for final manual verification.

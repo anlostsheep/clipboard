@@ -32,3 +32,30 @@ final class ClipboardAppSettingsAppearanceTests: XCTestCase {
         XCTAssertEqual(ClipboardAppSettings.appearanceMode(defaults: defaults), .dark)
     }
 }
+
+final class ClipboardAppSettingsSelectionBehaviorTests: XCTestCase {
+    func testSelectionBehaviorMapsToLegacyCopyOnlyStorage() {
+        XCTAssertEqual(QuickPanelSelectionBehavior(returnCopiesOnly: false), .autoPaste)
+        XCTAssertEqual(QuickPanelSelectionBehavior(returnCopiesOnly: true), .copyOnly)
+        XCTAssertFalse(QuickPanelSelectionBehavior.autoPaste.returnCopiesOnly)
+        XCTAssertTrue(QuickPanelSelectionBehavior.copyOnly.returnCopiesOnly)
+    }
+}
+
+final class ClipboardAppSettingsOpenSelectionBehaviorTests: XCTestCase {
+    func testOpenSelectionBehaviorDefaultsToLatestRecord() {
+        let defaults = UserDefaults(suiteName: "test-open-selection-\(UUID().uuidString)")!
+
+        XCTAssertEqual(ClipboardAppSettings.quickPanelOpenSelectionBehavior(defaults: defaults), .latestRecord)
+    }
+
+    func testOpenSelectionBehaviorRoundTripsStoredRawValue() {
+        let defaults = UserDefaults(suiteName: "test-open-selection-\(UUID().uuidString)")!
+        defaults.set(
+            QuickPanelOpenSelectionBehavior.previousSelection.rawValue,
+            forKey: ClipboardAppSettings.quickPanelOpenSelectionBehaviorKey
+        )
+
+        XCTAssertEqual(ClipboardAppSettings.quickPanelOpenSelectionBehavior(defaults: defaults), .previousSelection)
+    }
+}

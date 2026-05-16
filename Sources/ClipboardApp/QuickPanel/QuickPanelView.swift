@@ -6,6 +6,8 @@ struct QuickPanelView: View {
   @ObservedObject var state: QuickPanelState
   let onClose: () -> Void
   let onSubmit: () -> Void
+  let onCopyOnly: () -> Void
+  let onRequestAccessibilityAuthorization: () -> Void
   @FocusState private var isSearchFocused: Bool
   @State private var scrollCoordinator = QuickPanelScrollCoordinator()
   @State private var sourceAppIconProvider = SourceAppIconProvider()
@@ -20,6 +22,11 @@ struct QuickPanelView: View {
 
       results
 
+      if let actionPrompt = state.actionPrompt {
+        Divider()
+        promptView(for: actionPrompt)
+      }
+
       Divider()
 
       footer
@@ -32,6 +39,13 @@ struct QuickPanelView: View {
     }
     .task {
       await state.refresh()
+      isSearchFocused = true
+    }
+  }
+
+  private func focusSearch() {
+    isSearchFocused = false
+    DispatchQueue.main.async {
       isSearchFocused = true
     }
   }
@@ -51,6 +65,12 @@ struct QuickPanelView: View {
       .textFieldStyle(.plain)
       .focused($isSearchFocused)
 
+      Text("类型")
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .frame(width: 36, alignment: .trailing)
+
       Picker(
         "Type",
         selection: Binding(
@@ -63,6 +83,7 @@ struct QuickPanelView: View {
         }
       }
       .pickerStyle(.segmented)
+      .labelsHidden()
       .frame(width: 260)
 
       Button {
@@ -99,6 +120,11 @@ struct QuickPanelView: View {
             }
           )
           .id(record.id)
+          .contentShape(Rectangle())
+          .onTapGesture {
+            state.selectItem(at: index)
+            onSubmit()
+          }
           .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
         }
         .listStyle(.plain)
@@ -143,7 +169,62 @@ struct QuickPanelView: View {
   }
 
   private var shortcutHint: String {
-    quickPanelReturnCopiesOnly ? "Return Copy  Cmd+V Paste  Esc Close" : "Return Paste  Esc Close"
+    if quickPanelReturnCopiesOnly {
+      return "Return/Click 复制  Cmd+V 粘贴  Esc 关闭"
+    }
+
+    if state.actionPrompt == .autoPasteRequiresAccessibilityPermission {
+      return "Return/Click 需要授权  Cmd+V 手动粘贴"
+    }
+
+    return "Return/Click 自动粘贴  Esc 关闭"
+  }
+
+  @ViewBuilder
+  private func promptView(for prompt: QuickPanelActionPrompt) -> some View {
+    switch prompt {
+    case .autoPasteRequiresAccessibilityPermission:
+      VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
+          Image(systemName: "hand.raised.fill")
+            .font(.title3)
+            .foregroundStyle(.orange)
+            .frame(width: 28, height: 28)
+
+          VStack(alignment: .leading, spacing: 4) {
+            Text("需要辅助功能权限才能自动粘贴")
+              .font(.callout.weight(.semibold))
+            Text("Clipboard 需要 macOS 辅助功能权限，才能把选中的内容粘贴到当前 App。")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+
+          Spacer(minLength: 0)
+        }
+
+        HStack(spacing: 8) {
+          Button("去授权") {
+            onRequestAccessibilityAuthorization()
+          }
+          .buttonStyle(.borderedProminent)
+
+          Button("仅复制本次") {
+            onCopyOnly()
+          }
+          .buttonStyle(.bordered)
+
+          Button("默认仅复制") {
+            quickPanelReturnCopiesOnly = true
+            state.reportCopyOnlyModeEnabled()
+          }
+          .buttonStyle(.bordered)
+        }
+        .padding(.leading, 40)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+      .background(Color.orange.opacity(0.10))
+    }
   }
 
   private var footer: some View {
@@ -163,9 +244,14 @@ struct QuickPanelView: View {
     QuickPanelKeyCaptureView(
       onMove: { delta in
         state.moveSelection(delta: delta)
+        focusSearch()
       },
       onSubmit: onSubmit,
-      onCancel: onClose
+      onCancel: onClose,
+      onFocusSearch: focusSearch,
+      onOpenSettings: {
+        AppDelegate.shared.openSettings()
+      }
     )
   }
 }

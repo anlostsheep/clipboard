@@ -2,6 +2,11 @@ import AppKit
 
 @MainActor
 final class StatusBarController {
+    enum ClickAction {
+        case openPanel
+        case showMenu
+    }
+
     private var statusItem: NSStatusItem?
     private let onLeftClick: (NSPoint) -> Void
     private let onQuit: () -> Void
@@ -51,12 +56,20 @@ final class StatusBarController {
     }
 
     @MainActor @objc private func handleClick(_ sender: NSStatusBarButton) {
-        guard let event = NSApp.currentEvent else { return }
-        if event.type == .rightMouseUp {
-            showContextMenu()
-        } else {
+        let currentEvent = NSApp.currentEvent
+        switch Self.clickAction(for: currentEvent?.type) {
+        case .openPanel:
             onLeftClick(iconOrigin)
+        case .showMenu:
+            showContextMenu()
         }
+    }
+
+    nonisolated static func clickAction(for eventType: NSEvent.EventType?) -> ClickAction {
+        guard let eventType else {
+            return .openPanel
+        }
+        return eventType == .rightMouseUp ? .showMenu : .openPanel
     }
 
     private func showContextMenu() {

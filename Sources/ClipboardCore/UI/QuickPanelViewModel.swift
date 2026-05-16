@@ -49,6 +49,13 @@ public actor QuickPanelViewModel {
     selectedIndex = max(0, min(items.count - 1, selectedIndex + delta))
   }
 
+  public func setSelection(index: Int) {
+    guard items.indices.contains(index) else {
+      return
+    }
+    selectedIndex = index
+  }
+
   public func selectedIntent(autoPaste: Bool) -> QuickPanelSelectionIntent? {
     guard items.indices.contains(selectedIndex) else {
       return nil

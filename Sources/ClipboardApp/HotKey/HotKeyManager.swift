@@ -2,6 +2,7 @@ import AppKit
 import Carbon
 import ClipboardCore
 import Foundation
+import OSLog
 
 // MARK: - Error
 
@@ -35,6 +36,7 @@ final class HotKeyManager {
     private static let signature = OSType(0x434C4950)
     private static let hotKeyID  = UInt32(1)
     private static let notHandled = OSStatus(eventNotHandledErr)
+    private static let logger = Logger(subsystem: "clipboard.app", category: "HotKey")
 
     private var eventHandlerRef: EventHandlerRef?
     private var hotKeyRef: EventHotKeyRef?
@@ -59,6 +61,7 @@ final class HotKeyManager {
         }
 
         // Install the Carbon event handler that receives kEventHotKeyPressed.
+        let eventTarget = GetEventDispatcherTarget()
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -67,7 +70,7 @@ final class HotKeyManager {
         var installedRef: EventHandlerRef?
 
         let handlerStatus = InstallEventHandler(
-            GetApplicationEventTarget(),
+            eventTarget,
             { _, event, userData -> OSStatus in
                 guard let event, let userData else {
                     return HotKeyManager.notHandled
@@ -88,7 +91,10 @@ final class HotKeyManager {
                     return HotKeyManager.notHandled
                 }
                 let manager = Unmanaged<HotKeyManager>.fromOpaque(userData).takeUnretainedValue()
-                Task { @MainActor in manager.action?() }
+                Task { @MainActor in
+                    HotKeyManager.logger.info("hotkey fired id=\(hkID.id)")
+                    manager.action?()
+                }
                 return noErr
             },
             1, &eventType, selfPtr, &installedRef
@@ -103,7 +109,7 @@ final class HotKeyManager {
         var registeredRef: EventHotKeyRef?
         let hotKeyStatus = RegisterEventHotKey(
             keyCode, modifiers, hkID,
-            GetApplicationEventTarget(), 0, &registeredRef
+            eventTarget, 0, &registeredRef
         )
 
         guard hotKeyStatus == noErr, let registeredRef else {
@@ -114,6 +120,7 @@ final class HotKeyManager {
         self.eventHandlerRef = installedRef
         self.hotKeyRef = registeredRef
         self.action = action
+        Self.logger.info("registered hotkey keyCode=\(keyCode) modifiers=\(modifiers)")
     }
 
     /// Unregisters the current hotkey and removes the event handler. Safe to call

@@ -73,3 +73,31 @@
 - [x] Run `swift test`.
 - [x] Run `Scripts/verify.sh`.
 - [x] Commit scoped changes and push `feature/persistent-storage`.
+
+### Task 6: Post-Verification Interaction Fixes
+
+**Files:**
+- Modify: `Sources/ClipboardApp/AppSettings.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelController.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelKeyCaptureView.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelState.swift`
+- Modify: `Sources/ClipboardApp/QuickPanel/QuickPanelView.swift`
+- Modify: `Sources/ClipboardApp/Settings/GeneralSettingsView.swift`
+- Modify: `Sources/ClipboardApp/Settings/SettingsWindow.swift`
+- Modify: `Sources/ClipboardApp/StatusBar/StatusBarController.swift`
+- Test: `Tests/ClipboardAppTests/AccessibilityPermissionStateTests.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelControllerPresentationTests.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelKeyCaptureTests.swift`
+- Test: `Tests/ClipboardAppTests/QuickPanelStateFilterTests.swift`
+- Test: `Tests/ClipboardAppTests/SettingsWindowShortcutTests.swift`
+- Test: `Tests/ClipboardAppTests/StatusBarControllerTests.swift`
+
+- [x] Fix first-trigger QuickPanel presentation from hot key and status-bar icon.
+- [x] Preserve search recovery via `Command+F` after arrow-key selection.
+- [x] Enable mouse click selection with the same copy/paste semantics as `Return`.
+- [x] Add actionable Accessibility permission prompts when auto-paste cannot run.
+- [x] Add live Accessibility authorization refresh after System Settings changes.
+- [x] Add QuickPanel open-selection preference: latest record or previous selection.
+- [x] Add macOS-standard `Command+,` for Settings and `Command+W` for closing Settings.
+- [x] Make `Escape` cancellation restore the originating app rather than reactivating an existing Settings window.
+- [x] Run full automated verification and user physical acceptance.
