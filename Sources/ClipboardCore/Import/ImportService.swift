@@ -123,8 +123,17 @@ public actor ImportService {
             do {
               _ = try await historyStore.importRecord(replacement)
             } catch {
-              try? await restorePayload(oldPayload, for: replacement.id)
-              throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
+              let historyError = error
+              do {
+                try await restorePayload(oldPayload, for: replacement.id)
+              } catch {
+                let rollbackError = error
+                let combined = StorageError.underlying(
+                  "history import failed: \(String(describing: historyError)); rollback failed: \(String(describing: rollbackError))"
+                )
+                throw ImportBatchError.operationFailed(failure(for: imported, error: combined), combined)
+              }
+              throw ImportBatchError.operationFailed(failure(for: imported, error: historyError), historyError)
             }
             report.replacedByNewest += 1
             appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
@@ -201,6 +210,9 @@ public actor ImportService {
     merged.groupIds = orderedUnion(existing.groupIds, candidate.groupIds)
     merged.isPinned = existing.isPinned || candidate.isPinned
     merged.isFavorite = existing.isFavorite || candidate.isFavorite
+    if existing.sourceDeviceHint == .universalClipboard || candidate.sourceDeviceHint == .universalClipboard {
+      merged.sourceDeviceHint = .universalClipboard
+    }
     merged.retentionExempt = existing.retentionExempt || candidate.retentionExempt ||
       merged.isPinned || merged.isFavorite
     merged.pasteboardTypes = existing.pasteboardTypes.union(candidate.pasteboardTypes)

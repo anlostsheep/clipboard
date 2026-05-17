@@ -189,6 +189,64 @@ final class ImportServiceTests: XCTestCase {
     }
   }
 
+  func testReplacementHistoryFailureReportsRollbackFailureWhenOldPayloadRestoreFails() async throws {
+    let builder = ImportRecordBuilder()
+    let existing = try builder.buildRecord(
+      from: .fixture(text: "same", lastCopiedAt: 10),
+      groupIDs: ["current"]
+    )
+    let store = FailingImportHistoryStore(existing: existing)
+    let payloads = FailingRestorePayloadStore(recordID: existing.id, oldPayload: .text("old payload"))
+
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+
+    do {
+      _ = try await service.importRecords([
+        .fixture(text: "same", lastCopiedAt: 20, sourceRecordID: "rollback-fails")
+      ], batchSize: 1)
+      XCTFail("Expected replacement history import failure to throw")
+    } catch {
+      let payload = try await payloads.loadPayload(for: existing.id)
+      XCTAssertEqual(payload, .text("same"))
+      let written = try await readOnlyReport()
+      XCTAssertEqual(written.status, .failed)
+      XCTAssertEqual(written.failed, 1)
+      XCTAssertEqual(written.failures.first?.sourceRecordID, "rollback-fails")
+      let reason = written.failures.first?.reason ?? ""
+      XCTAssertTrue(reason.contains("history import unavailable"))
+      XCTAssertTrue(reason.contains("rollback payload unavailable"))
+    }
+  }
+
+  func testOlderImportedDuplicateMergesUniversalClipboardHintWithoutReplacingPayload() async throws {
+    let store = InMemoryHistoryStore()
+    let payloads = InMemoryPayloadStore()
+    let builder = ImportRecordBuilder()
+    let newer = try builder.buildRecord(
+      from: .fixture(text: "same", lastCopiedAt: 20),
+      groupIDs: []
+    )
+    _ = try await store.importRecord(newer)
+    try await payloads.save(.text("current payload"), for: newer.id)
+
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+    let report = try await service.importRecords([
+      .fixture(
+        text: "same",
+        lastCopiedAt: 10,
+        sourceDeviceHint: .universalClipboard
+      )
+    ], batchSize: 1)
+
+    XCTAssertEqual(report.merged, 1)
+    let records = try await store.fetchAll()
+    let record = try XCTUnwrap(records.first)
+    XCTAssertEqual(record.id, newer.id)
+    XCTAssertEqual(record.sourceDeviceHint, .universalClipboard)
+    let payload = try await payloads.loadPayload(for: newer.id)
+    XCTAssertEqual(payload, .text("current payload"))
+  }
+
   func testNewestImportReplacesOlderExistingAndMergesMetadataPreservingID() async throws {
     let store = InMemoryHistoryStore()
     let payloads = InMemoryPayloadStore()
@@ -482,6 +540,37 @@ private actor FailingImportHistoryStore: ImportWritableHistoryStore {
   }
 }
 
+private actor FailingRestorePayloadStore: ClipboardPayloadStore {
+  private let recordID: UUID
+  private var payload: ClipboardPayload
+  private var saveCount = 0
+
+  init(recordID: UUID, oldPayload: ClipboardPayload) {
+    self.recordID = recordID
+    self.payload = oldPayload
+  }
+
+  func save(_ payload: ClipboardPayload, for recordID: UUID) async throws {
+    guard recordID == self.recordID else { return }
+    saveCount += 1
+    if saveCount == 1 {
+      self.payload = payload
+    } else {
+      throw StorageError.underlying("rollback payload unavailable")
+    }
+  }
+
+  func loadPayload(for recordID: UUID) async throws -> ClipboardPayload? {
+    recordID == self.recordID ? payload : nil
+  }
+
+  func delete(for recordID: UUID) async throws {
+    if recordID == self.recordID {
+      throw StorageError.underlying("rollback payload unavailable")
+    }
+  }
+}
+
 private extension Array where Element == URL {
   var singleJSONReport: URL? {
     filter { $0.pathExtension == "json" }.first
@@ -498,6 +587,7 @@ private extension ImportedRecord {
     groupNames: [String] = ["Clipaste Import"],
     pinned: Bool = false,
     favorite: Bool = false,
+    sourceDeviceHint: ClipboardSourceDeviceHint = .imported,
     pasteboardTypes: Set<String> = ["public.utf8-plain-text"],
     warnings: [String] = []
   ) -> ImportedRecord {
@@ -517,7 +607,7 @@ private extension ImportedRecord {
       isPinned: pinned,
       isFavorite: favorite,
       groupNames: groupNames,
-      sourceDeviceHint: .imported,
+      sourceDeviceHint: sourceDeviceHint,
       externalContentHash: nil,
       warnings: warnings
     )

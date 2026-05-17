@@ -33,7 +33,7 @@ public actor SQLitePayloadStore: ClipboardPayloadStore {
     }
 
     let prefix = recordID.uuidString
-    let entries = try fm.contentsOfDirectory(atPath: payloadsDirectory.path)
+    let entries = (try? fm.contentsOfDirectory(atPath: payloadsDirectory.path)) ?? []
     for entry in entries
       where entry.hasPrefix(prefix) && !entry.hasSuffix(".tmp") && entry != url.lastPathComponent {
       try? fm.removeItem(at: payloadsDirectory.appendingPathComponent(entry))
