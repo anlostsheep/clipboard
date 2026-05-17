@@ -185,7 +185,7 @@ final class ClipasteImporterTests: XCTestCase {
 
     let record = try XCTUnwrap(ClipasteImporter(source: .clipasteCloud).importRecords(from: databaseURL).first)
 
-    XCTAssertEqual(record.groupNames, ["Work", "Personal"])
+    XCTAssertEqual(record.groupNames, ["Work", "Personal", "Archive"])
   }
 
   func testSkipsRowsWithUnsupportedOrMissingRequiredPayload() throws {

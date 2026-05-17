@@ -212,8 +212,9 @@ private func groupNames(
     seen.insert(name)
   }
 
-  if names.isEmpty, let groupID, let name = groups[groupID] {
+  if let groupID, let name = groups[groupID], !seen.contains(name) {
     names.append(name)
+    seen.insert(name)
   }
 
   return names.isEmpty ? ["Clipaste Import"] : names
