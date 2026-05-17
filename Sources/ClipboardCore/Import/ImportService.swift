@@ -16,6 +16,10 @@ public struct ImportProgress: Equatable, Sendable {
   }
 }
 
+private enum ImportBatchError: Error {
+  case payloadSaveFailed(ImportFailure, Error)
+}
+
 public actor ImportService {
   private let historyStore: any ImportWritableHistoryStore
   private let payloadStore: any ClipboardPayloadStore
@@ -84,6 +88,10 @@ public actor ImportService {
       return report
     } catch {
       report.status = .failed
+      if case let ImportBatchError.payloadSaveFailed(failure, _) = error {
+        report.failed += 1
+        report.failures.append(failure)
+      }
       report.duration = Date().timeIntervalSince(start)
       try? writeReport(report)
       throw error
@@ -98,37 +106,43 @@ public actor ImportService {
         let candidate = try builder.buildRecord(from: imported, groupIDs: groupIDs)
 
         if var existing = try await historyStore.record(forContentHash: candidate.contentHash) {
+          let existingGroupIDs = existing.groupIds
           if candidate.lastCopiedAt >= existing.lastCopiedAt {
             let replacement = newestImportedRecord(
               imported: imported,
               candidate: candidate,
               existing: existing
             )
+            do {
+              try await payloadStore.save(imported.payload, for: replacement.id)
+            } catch {
+              throw ImportBatchError.payloadSaveFailed(failure(for: imported, error: error), error)
+            }
             _ = try await historyStore.importRecord(replacement)
-            try await payloadStore.save(imported.payload, for: replacement.id)
             report.replacedByNewest += 1
+            appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
           } else {
             existing = existingRecordAfterMetadataMerge(existing: existing, candidate: candidate)
             _ = try await historyStore.importRecord(existing)
             report.merged += 1
+            appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
           }
         } else {
+          do {
+            try await payloadStore.save(imported.payload, for: candidate.id)
+          } catch {
+            throw ImportBatchError.payloadSaveFailed(failure(for: imported, error: error), error)
+          }
           _ = try await historyStore.importRecord(candidate)
-          try await payloadStore.save(imported.payload, for: candidate.id)
           report.imported += 1
-        }
-
-        for groupID in groupIDs where !report.createdGroupIDs.contains(groupID) {
-          report.createdGroupIDs.append(groupID)
+          appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: [], report: &report)
         }
       } catch {
+        if case ImportBatchError.payloadSaveFailed = error {
+          throw error
+        }
         report.failed += 1
-        report.failures.append(ImportFailure(
-          source: imported.source,
-          sourceRecordID: imported.sourceRecordID,
-          titleOrPreview: imported.title.isEmpty ? imported.plainTextPreview : imported.title,
-          reason: String(describing: error)
-        ))
+        report.failures.append(failure(for: imported, error: error))
       }
     }
 
@@ -183,6 +197,26 @@ public actor ImportService {
       committedBatchCount: report.committedBatchCount,
       lastProcessedSourceRecordID: report.lastProcessedSourceRecordID
     )
+  }
+
+  private func failure(for imported: ImportedRecord, error: Error) -> ImportFailure {
+    ImportFailure(
+      source: imported.source,
+      sourceRecordID: imported.sourceRecordID,
+      titleOrPreview: imported.title.isEmpty ? imported.plainTextPreview : imported.title,
+      reason: String(describing: error)
+    )
+  }
+
+  private func appendIntroducedGroupIDs(
+    _ candidateGroupIDs: [String],
+    existingGroupIDs: [String],
+    report: inout ImportReport
+  ) {
+    for groupID in candidateGroupIDs
+      where !existingGroupIDs.contains(groupID) && !report.createdGroupIDs.contains(groupID) {
+      report.createdGroupIDs.append(groupID)
+    }
   }
 
   private func normalizedGroupID(_ name: String) -> String {

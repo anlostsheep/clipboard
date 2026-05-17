@@ -40,6 +40,21 @@ final class SQLitePayloadStoreTests: XCTestCase {
     XCTAssertEqual(loaded, .richText(plainText: "plain", rtfData: rtf))
   }
 
+  func testSaveReplacingPayloadKindRemovesStaleFilesForRecordID() async throws {
+    let store = try SQLitePayloadStore(payloadsDirectory: tempDir)
+    let id = UUID()
+    let rtf = Data([1, 2, 3])
+
+    try await store.save(.text("same"), for: id)
+    try await store.save(.richText(plainText: "same", rtfData: rtf), for: id)
+
+    let loaded = try await store.loadPayload(for: id)
+    XCTAssertEqual(loaded, .richText(plainText: "same", rtfData: rtf))
+    let files = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+      .filter { $0.hasPrefix(id.uuidString) && !$0.hasSuffix(".tmp") }
+    XCTAssertEqual(files, ["\(id.uuidString).rtf"])
+  }
+
   func testRoundTripFileURLs() async throws {
     let store = try SQLitePayloadStore(payloadsDirectory: tempDir)
     let id = UUID()

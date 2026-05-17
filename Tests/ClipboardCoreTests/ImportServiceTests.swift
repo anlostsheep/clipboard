@@ -39,6 +39,23 @@ final class ImportServiceTests: XCTestCase {
     XCTAssertTrue(savedPayloads.contains(.text("two")))
   }
 
+  func testPayloadSaveFailureThrowsLeavesHistoryEmptyAndWritesFailedReport() async throws {
+    let store = InMemoryHistoryStore()
+    let payloads = FailingPayloadStore()
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+
+    do {
+      _ = try await service.importRecords([.fixture(text: "fails", lastCopiedAt: 1)], batchSize: 1)
+      XCTFail("Expected payload save failure to throw")
+    } catch {
+      let count = try await store.count()
+      XCTAssertEqual(count, 0)
+      let written = try await readOnlyReport()
+      XCTAssertEqual(written.status, .failed)
+      XCTAssertEqual(written.committedBatchCount, 0)
+    }
+  }
+
   func testNewestImportReplacesOlderExistingAndMergesMetadataPreservingID() async throws {
     let store = InMemoryHistoryStore()
     let payloads = InMemoryPayloadStore()
@@ -123,6 +140,26 @@ final class ImportServiceTests: XCTestCase {
     XCTAssertEqual(savedPayload, .text("current payload"))
   }
 
+  func testCreatedGroupIDsForDuplicateOnlyIncludesGroupsIntroducedByImport() async throws {
+    let store = InMemoryHistoryStore()
+    let payloads = InMemoryPayloadStore()
+    let builder = ImportRecordBuilder()
+    let existing = try builder.buildRecord(
+      from: .fixture(text: "same", lastCopiedAt: 20, groupNames: ["Current"]),
+      groupIDs: ["current"]
+    )
+    _ = try await store.importRecord(existing)
+    try await payloads.save(.text("current payload"), for: existing.id)
+
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+    let report = try await service.importRecords([
+      .fixture(text: "same", lastCopiedAt: 10, groupNames: ["Current", "New Group"])
+    ])
+
+    XCTAssertEqual(report.merged, 1)
+    XCTAssertEqual(report.createdGroupIDs, ["new-group"])
+  }
+
   func testCancellationKeepsCommittedBatchDropsCurrentBatchAndWritesCancelledReport() async throws {
     let store = InMemoryHistoryStore()
     let payloads = InMemoryPayloadStore()
@@ -202,6 +239,18 @@ final class ImportServiceTests: XCTestCase {
     decoder.dateDecodingStrategy = .iso8601
     return try decoder.decode(ImportReport.self, from: Data(contentsOf: json))
   }
+}
+
+private struct FailingPayloadStore: ClipboardPayloadStore {
+  func save(_ payload: ClipboardPayload, for recordID: UUID) async throws {
+    throw StorageError.underlying("payload unavailable")
+  }
+
+  func loadPayload(for recordID: UUID) async throws -> ClipboardPayload? {
+    nil
+  }
+
+  func delete(for recordID: UUID) async throws {}
 }
 
 private extension Array where Element == URL {

@@ -26,8 +26,10 @@ public actor SQLitePayloadStore: ClipboardPayloadStore {
     // Atomic write to temp file first
     try data.write(to: tmpURL, options: .atomic)
     let fm = FileManager.default
-    if fm.fileExists(atPath: url.path) {
-      try fm.removeItem(at: url)
+    let prefix = recordID.uuidString
+    let entries = try fm.contentsOfDirectory(atPath: payloadsDirectory.path)
+    for entry in entries where entry.hasPrefix(prefix) && !entry.hasSuffix(".tmp") {
+      try fm.removeItem(at: payloadsDirectory.appendingPathComponent(entry))
     }
     try fm.moveItem(at: tmpURL, to: url)
   }
