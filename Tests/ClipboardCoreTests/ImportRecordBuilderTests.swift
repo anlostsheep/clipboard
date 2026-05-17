@@ -56,6 +56,17 @@ final class ImportRecordBuilderTests: XCTestCase {
 
     XCTAssertEqual(a.contentHash, b.contentHash)
   }
+
+  func testRichTextHashMatchesPlainTextHashForSamePlainText() {
+    let builder = ImportRecordBuilder()
+
+    let textHash = builder.contentHash(for: .text("same"))
+    let richTextHash = builder.contentHash(
+      for: .richText(plainText: "same", rtfData: Data([9, 8, 7]))
+    )
+
+    XCTAssertEqual(richTextHash, textHash)
+  }
 }
 
 private extension ImportedRecord {

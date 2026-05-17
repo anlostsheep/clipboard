@@ -30,12 +30,8 @@ public struct ImportRecordBuilder: Sendable {
     switch payload {
     case let .text(text):
       return hash(Data(text.utf8))
-    case let .richText(plainText, rtfData):
-      var data = Data("richText\0".utf8)
-      data.append(Data(plainText.utf8))
-      data.append(0)
-      data.append(rtfData)
-      return hash(data)
+    case let .richText(plainText, _):
+      return hash(Data(plainText.utf8))
     case let .image(data, _):
       return hash(data)
     case let .fileURLs(urls):
