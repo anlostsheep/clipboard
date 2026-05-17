@@ -11,9 +11,10 @@ final class SQLiteConnection {
     to: sqlite3_destructor_type.self
   )
 
-  init(path: String) throws {
+  init(path: String, readOnly: Bool = false) throws {
     var handle: OpaquePointer?
-    let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
+    let flags = (readOnly ? SQLITE_OPEN_READONLY : (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE))
+      | SQLITE_OPEN_FULLMUTEX
     let rc = sqlite3_open_v2(path, &handle, flags, nil)
     guard rc == SQLITE_OK, let handle else {
       if let handle { sqlite3_close(handle) }
@@ -131,6 +132,14 @@ final class Statement {
   func columnText(_ index: Int32) -> String? {
     guard let cstr = sqlite3_column_text(handle, index) else { return nil }
     return String(cString: cstr)
+  }
+
+  func columnData(_ index: Int32) -> Data? {
+    guard !columnIsNull(index) else { return nil }
+    let byteCount = Int(sqlite3_column_bytes(handle, index))
+    guard byteCount > 0 else { return Data() }
+    guard let bytes = sqlite3_column_blob(handle, index) else { return nil }
+    return Data(bytes: bytes, count: byteCount)
   }
 
   func columnInt(_ index: Int32) -> Int {
