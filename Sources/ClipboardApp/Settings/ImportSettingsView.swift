@@ -42,7 +42,7 @@ struct ImportSettingsView: View {
                                     .foregroundStyle(candidate.schemaKind == .unknown ? .orange : .secondary)
                             }
                         }
-                        .disabled(isRunning)
+                        .disabled(isRunning || candidate.schemaKind == .unknown)
                     }
                 }
             }
@@ -98,7 +98,9 @@ struct ImportSettingsView: View {
     }
 
     private var canStartImport: Bool {
-        !isRunning && services.importService != nil && candidates.contains { selectedIDs.contains($0.id) }
+        !isRunning
+            && services.importService != nil
+            && !Self.importableCandidates(from: candidates, selectedIDs: selectedIDs).isEmpty
     }
 
     private func binding(for id: String) -> Binding<Bool> {
@@ -118,7 +120,6 @@ struct ImportSettingsView: View {
         let discovered = discovery.discoverAutomaticSources()
         candidates = discovered
         selectedIDs = Set(discovered.filter(\.isDefaultSelected).map(\.id))
-        latestReport = nil
         statusText = discovered.isEmpty ? "未发现可导入来源" : "发现 \(discovered.count) 个来源"
     }
 
@@ -136,6 +137,7 @@ struct ImportSettingsView: View {
             let candidate = try discovery.classifyManualDatabase(url)
             upsertCandidate(candidate)
             if candidate.schemaKind == .unknown {
+                selectedIDs.remove(candidate.id)
                 statusText = "无法识别数据库结构：\(url.lastPathComponent)"
             } else {
                 selectedIDs.insert(candidate.id)
@@ -152,15 +154,17 @@ struct ImportSettingsView: View {
             return
         }
 
-        let selected = candidates.filter { selectedIDs.contains($0.id) }
+        let selected = Self.importableCandidates(from: candidates, selectedIDs: selectedIDs)
         guard !selected.isEmpty else {
-            statusText = "请选择至少一个来源"
+            statusText = candidates.contains { selectedIDs.contains($0.id) && $0.schemaKind == .unknown }
+                ? "所选来源的数据库结构不受支持"
+                : "请选择至少一个来源"
             return
         }
 
         isRunning = true
-        latestReport = nil
         statusText = "正在导入"
+        let reportsDirectory = services.importReportsDirectory
 
         Task.detached(priority: .userInitiated) {
             do {
@@ -172,12 +176,44 @@ struct ImportSettingsView: View {
                     isRunning = false
                 }
             } catch {
+                let failedReport = reportsDirectory.flatMap { Self.newestReport(in: $0) }
                 await MainActor.run {
+                    if let failedReport {
+                        latestReport = failedReport
+                    }
                     statusText = "导入失败：\(error.localizedDescription)"
                     isRunning = false
                 }
             }
         }
+    }
+
+    nonisolated static func importableCandidates(
+        from candidates: [ImportSourceCandidate],
+        selectedIDs: Set<String>
+    ) -> [ImportSourceCandidate] {
+        candidates.filter { selectedIDs.contains($0.id) && $0.schemaKind != .unknown }
+    }
+
+    nonisolated static func newestReport(in reportsDirectory: URL) -> ImportReport? {
+        let fileManager = FileManager.default
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: reportsDirectory,
+            includingPropertiesForKeys: nil
+        ) else {
+            return nil
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        return urls
+            .filter { $0.pathExtension == "json" }
+            .compactMap { url -> ImportReport? in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                return try? decoder.decode(ImportReport.self, from: data)
+            }
+            .max { $0.createdAt < $1.createdAt }
     }
 
     nonisolated private static func importRecords(from candidates: [ImportSourceCandidate]) throws -> [ImportedRecord] {

@@ -37,6 +37,16 @@ final class ImportSnapshotServiceTests: XCTestCase {
     )
   }
 
+  func testSnapshotRemovesTemporaryDirectoryWhenCopyFailsAfterCreation() throws {
+    let before = clipboardImportTemporaryDirectories()
+    let missingSource = tempDir.appendingPathComponent("missing.sqlite")
+
+    XCTAssertThrowsError(try ImportSnapshotService().snapshot(databaseURL: missingSource))
+
+    let after = clipboardImportTemporaryDirectories()
+    XCTAssertEqual(after, before)
+  }
+
   func testExternalSQLiteDatabaseDetectsFixtureSchemaAndReadsCount() throws {
     let source = tempDir.appendingPathComponent("fixture.sqlite")
     try createFixtureDatabase(at: source)
@@ -93,5 +103,15 @@ final class ImportSnapshotServiceTests: XCTestCase {
       sqlite3_free(error)
       XCTFail(message)
     }
+  }
+
+  private func clipboardImportTemporaryDirectories() -> Set<String> {
+    let temporaryDirectory = FileManager.default.temporaryDirectory
+    let urls = (try? FileManager.default.contentsOfDirectory(
+      at: temporaryDirectory,
+      includingPropertiesForKeys: nil
+    )) ?? []
+
+    return Set(urls.map(\.lastPathComponent).filter { $0.hasPrefix("clipboard-import-") })
   }
 }

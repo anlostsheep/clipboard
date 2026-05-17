@@ -19,17 +19,22 @@ public struct ImportSnapshotService: Sendable {
       .appendingPathComponent("clipboard-import-\(UUID().uuidString)", isDirectory: true)
     try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
 
-    let snapshotDatabaseURL = directoryURL.appendingPathComponent(databaseURL.lastPathComponent)
-    try fileManager.copyItem(at: databaseURL, to: snapshotDatabaseURL)
+    do {
+      let snapshotDatabaseURL = directoryURL.appendingPathComponent(databaseURL.lastPathComponent)
+      try fileManager.copyItem(at: databaseURL, to: snapshotDatabaseURL)
 
-    for suffix in ["-wal", "-shm"] {
-      let sourceSidecarURL = URL(fileURLWithPath: databaseURL.path + suffix)
-      guard fileManager.fileExists(atPath: sourceSidecarURL.path) else { continue }
+      for suffix in ["-wal", "-shm"] {
+        let sourceSidecarURL = URL(fileURLWithPath: databaseURL.path + suffix)
+        guard fileManager.fileExists(atPath: sourceSidecarURL.path) else { continue }
 
-      let destinationSidecarURL = directoryURL.appendingPathComponent(databaseURL.lastPathComponent + suffix)
-      try fileManager.copyItem(at: sourceSidecarURL, to: destinationSidecarURL)
+        let destinationSidecarURL = directoryURL.appendingPathComponent(databaseURL.lastPathComponent + suffix)
+        try fileManager.copyItem(at: sourceSidecarURL, to: destinationSidecarURL)
+      }
+
+      return ImportSnapshot(databaseURL: snapshotDatabaseURL, directoryURL: directoryURL)
+    } catch {
+      try? fileManager.removeItem(at: directoryURL)
+      throw error
     }
-
-    return ImportSnapshot(databaseURL: snapshotDatabaseURL, directoryURL: directoryURL)
   }
 }
