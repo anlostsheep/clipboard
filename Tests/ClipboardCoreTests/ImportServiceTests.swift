@@ -89,6 +89,27 @@ final class ImportServiceTests: XCTestCase {
     }
   }
 
+  func testNewRecordHistoryFailureReportsDeleteRollbackFailureWhenPayloadDeleteFails() async throws {
+    let store = FailingImportHistoryStore()
+    let payloads = FailingDeletePayloadStore()
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+
+    do {
+      _ = try await service.importRecords([
+        .fixture(text: "delete-fails", lastCopiedAt: 1, sourceRecordID: "new-delete-fails")
+      ], batchSize: 1)
+      XCTFail("Expected history import failure to throw")
+    } catch {
+      let written = try await readOnlyReport()
+      XCTAssertEqual(written.status, .failed)
+      XCTAssertEqual(written.failed, 1)
+      XCTAssertEqual(written.failures.first?.sourceRecordID, "new-delete-fails")
+      let reason = written.failures.first?.reason ?? ""
+      XCTAssertTrue(reason.contains("history import unavailable"))
+      XCTAssertTrue(reason.contains("payload delete unavailable"))
+    }
+  }
+
   func testReplacementPayloadSaveFailureLeavesExistingRecordUnchangedAndWritesFailedReport() async throws {
     let store = InMemoryHistoryStore()
     let payloads = FailingPayloadStore()
@@ -487,6 +508,22 @@ private struct FailingPayloadStore: ClipboardPayloadStore {
   }
 
   func delete(for recordID: UUID) async throws {}
+}
+
+private actor FailingDeletePayloadStore: ClipboardPayloadStore {
+  private var payloadsByRecordID: [UUID: ClipboardPayload] = [:]
+
+  func save(_ payload: ClipboardPayload, for recordID: UUID) async throws {
+    payloadsByRecordID[recordID] = payload
+  }
+
+  func loadPayload(for recordID: UUID) async throws -> ClipboardPayload? {
+    payloadsByRecordID[recordID]
+  }
+
+  func delete(for recordID: UUID) async throws {
+    throw StorageError.underlying("payload delete unavailable")
+  }
 }
 
 private actor FailingImportHistoryStore: ImportWritableHistoryStore {

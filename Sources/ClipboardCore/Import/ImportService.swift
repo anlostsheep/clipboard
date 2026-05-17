@@ -156,8 +156,17 @@ public actor ImportService {
           do {
             _ = try await historyStore.importRecord(candidate)
           } catch {
-            try? await payloadStore.delete(for: candidate.id)
-            throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
+            let historyError = error
+            do {
+              try await payloadStore.delete(for: candidate.id)
+            } catch {
+              let rollbackError = error
+              let combined = StorageError.underlying(
+                "history import failed: \(String(describing: historyError)); rollback failed: \(String(describing: rollbackError))"
+              )
+              throw ImportBatchError.operationFailed(failure(for: imported, error: combined), combined)
+            }
+            throw ImportBatchError.operationFailed(failure(for: imported, error: historyError), historyError)
           }
           report.imported += 1
           appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: [], report: &report)
