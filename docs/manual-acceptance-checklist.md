@@ -222,6 +222,19 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [x] 27K 条记录场景下，QuickPanel 打开延迟 < 500ms（用 swift run ClipboardManualProbe 加压数据后实测）
 - [x] 单次复制 → 写入完成的端到端延迟 < 50ms 中位数（用 os_signpost 观察）
 
+## Maccy and Clipaste Import
+
+- [ ] Settings → 导入 显示 Maccy / Clipaste 自动来源，并默认选中可识别来源
+- [ ] 手动选择 Maccy SQLite 数据库后显示 schema 为 OK，未知 schema 不可导入
+- [ ] 手动选择 Clipaste `clipboard-cloud.store` 后显示 schema 为 OK，未知 schema 不可导入
+- [ ] 导入 Maccy 文本、链接、富文本、图片和文件 URL 记录后 QuickPanel 可搜索/复制
+- [ ] 导入 Clipaste 文本、链接、代码、富文本、图片和文件 URL 记录后 QuickPanel 可搜索/复制
+- [ ] Reimport does not create duplicate history records
+- [ ] Duplicate content keeps the record with newest `lastCopiedAt` and merges copy count, pin/favorite, groups, pasteboard types, and Universal Clipboard marker
+- [ ] Cancelled import keeps committed batches and writes a cancelled report
+- [ ] Import failure writes a failed report that remains visible in Settings → 导入 and can be copied as JSON
+- [ ] Import report JSON is written under Application Support `imports/reports`
+
 ### 验收记录（2026-05-15）
 
 ```text
@@ -284,4 +297,28 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
   - 当前 debug 包使用 ad-hoc signing；macOS 可能在代码变化后要求重新确认辅助功能授权。
 截图/录屏: 用户侧实际操作验证；自动化命令输出作为构建与测试证据。
 结论: PASS，分支功能开发与交互验收完成。
+```
+
+## Maccy/Clipaste 导入验收记录（2026-05-17）
+
+```text
+日期: 2026-05-17
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64e
+场景: codex/maccy-clipaste-import 分支自动化验收，覆盖导入解析、去重合并、失败报告、设置页入口和 app bundle 构建
+命令:
+  - swift test
+  - Scripts/verify.sh
+  - CODE_SIGN_IDENTITY=- Scripts/build-app-bundle.sh
+结果:
+  - swift test 通过：174 tests, 0 failures
+  - Scripts/verify.sh 通过，包含 swift test、swift build、Scripts/test-automation.sh、ClipboardApp/ClipboardManualProbe build
+  - release app bundle 构建成功：.build/app-bundles/release/ClipboardApp.app
+  - 默认本机签名身份 ClipboardApp Local Code Signing 的 codesign 阶段阻塞；已改用脚本支持的 ad-hoc signing 完成验证
+问题:
+  - 本轮未执行真实 UI 物理导入；Maccy / Clipaste 实际数据库导入仍需按上方清单手工验收
+  - ad-hoc signing 后 macOS 可能要求重新确认辅助功能授权
+截图/录屏: 未采集；以自动化测试、verify 脚本和 app bundle 构建输出作为证据
+结论: AUTO PASS，代码级能力覆盖与构建验证完成；真实来源数据库导入为剩余手工验收项
 ```
