@@ -51,8 +51,8 @@ final class MaccyImporterTests: XCTestCase {
     XCTAssertEqual(record.plainTextPreview, "https://example.com/a")
     XCTAssertEqual(record.sourceAppBundleId, "com.apple.Safari")
     XCTAssertEqual(record.sourceAppName, "Safari")
-    XCTAssertEqual(record.createdAt, Date(timeIntervalSince1970: 10))
-    XCTAssertEqual(record.lastCopiedAt, Date(timeIntervalSince1970: 20))
+    XCTAssertEqual(record.createdAt, Date(timeIntervalSinceReferenceDate: 10))
+    XCTAssertEqual(record.lastCopiedAt, Date(timeIntervalSinceReferenceDate: 20))
     XCTAssertEqual(record.copyCount, 3)
     XCTAssertTrue(record.isPinned)
     XCTAssertFalse(record.isFavorite)
@@ -99,6 +99,51 @@ final class MaccyImporterTests: XCTestCase {
     XCTAssertEqual(record.plainTextPreview, "Styled body")
     XCTAssertEqual(record.sourceAppName, "TextEdit")
     XCTAssertEqual(record.copyCount, 1)
+  }
+
+  func testConvertsMaccyCoreDataReferenceDates() throws {
+    let databaseURL = tempDir.appendingPathComponent("maccy.sqlite")
+    try makeDatabase(
+      at: databaseURL,
+      items: [
+        item(
+          id: 6,
+          firstCopiedAt: 0,
+          lastCopiedAt: 60,
+          title: nil,
+          contents: [
+            content(type: "public.utf8-plain-text", value: "date check")
+          ]
+        )
+      ]
+    )
+
+    let record = try XCTUnwrap(MaccyImporter(source: .maccy).importRecords(from: databaseURL).first)
+
+    XCTAssertEqual(record.createdAt, Date(timeIntervalSinceReferenceDate: 0))
+    XCTAssertEqual(record.lastCopiedAt, Date(timeIntervalSinceReferenceDate: 60))
+  }
+
+  func testUsesApplicationBundleIDWhenPasteboardSourceIsAbsent() throws {
+    let databaseURL = tempDir.appendingPathComponent("maccy.sqlite")
+    try makeDatabase(
+      at: databaseURL,
+      items: [
+        item(
+          id: 7,
+          application: "com.google.Chrome",
+          title: nil,
+          contents: [
+            content(type: "public.utf8-plain-text", value: "chrome copy")
+          ]
+        )
+      ]
+    )
+
+    let record = try XCTUnwrap(MaccyImporter(source: .maccy).importRecords(from: databaseURL).first)
+
+    XCTAssertEqual(record.sourceAppBundleId, "com.google.Chrome")
+    XCTAssertNil(record.sourceAppName)
   }
 
   func testParsesFileURLs() throws {

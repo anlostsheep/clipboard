@@ -28,6 +28,10 @@ public struct MaccyImporter: Sendable {
         payload: payload.payload,
         plainText: plainText
       )
+      let sourceApplication = sourceApplication(
+        pasteboardSourceBundleID: sourceBundleID(in: contents),
+        application: item.columnText(4)
+      )
 
       records.append(ImportedRecord(
         source: source,
@@ -37,10 +41,10 @@ public struct MaccyImporter: Sendable {
         pasteboardTypes: Set(contents.map(\.type)),
         title: title,
         plainTextPreview: plainTextPreview(payload: payload.payload, plainText: plainText),
-        sourceAppBundleId: sourceBundleID(in: contents),
-        sourceAppName: item.columnText(4),
-        createdAt: Date(timeIntervalSince1970: item.columnDouble(1)),
-        lastCopiedAt: Date(timeIntervalSince1970: item.columnDouble(2)),
+        sourceAppBundleId: sourceApplication.bundleID,
+        sourceAppName: sourceApplication.name,
+        createdAt: maccyDate(from: item.columnDouble(1)),
+        lastCopiedAt: maccyDate(from: item.columnDouble(2)),
         copyCount: max(1, item.columnInt(3)),
         isPinned: !(item.columnText(5) ?? "").isEmpty,
         isFavorite: false,
@@ -168,6 +172,33 @@ private func sourceBundleID(in contents: [MaccyContent]) -> String? {
     .first { $0.type == "org.nspasteboard.source" }
     .flatMap { stringValue($0.data) }
     .flatMap(nonEmptyString)
+}
+
+private func sourceApplication(
+  pasteboardSourceBundleID: String?,
+  application: String?
+) -> (bundleID: String?, name: String?) {
+  if let pasteboardSourceBundleID {
+    return (pasteboardSourceBundleID, application.flatMap(nonEmptyString))
+  }
+
+  guard let application = nonEmptyString(application) else {
+    return (nil, nil)
+  }
+
+  if looksLikeBundleIdentifier(application) {
+    return (application, nil)
+  }
+
+  return (nil, application)
+}
+
+private func looksLikeBundleIdentifier(_ value: String) -> Bool {
+  value.contains(".") && !value.contains { $0.isWhitespace || $0.isNewline }
+}
+
+private func maccyDate(from value: Double) -> Date {
+  Date(timeIntervalSinceReferenceDate: value)
 }
 
 private func isUniversalClipboard(_ contents: [MaccyContent]) -> Bool {
