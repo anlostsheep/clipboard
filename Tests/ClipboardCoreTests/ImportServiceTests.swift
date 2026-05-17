@@ -161,6 +161,50 @@ final class ImportServiceTests: XCTestCase {
     XCTAssertEqual(savedPayload, .text("same"))
   }
 
+  func testNewestImportReplacementPreservesExistingCreatedAtWhenImportedCreatedAtIsEarlier() async throws {
+    let store = InMemoryHistoryStore()
+    let payloads = InMemoryPayloadStore()
+    let builder = ImportRecordBuilder()
+    let existingCreatedAt = Date(timeIntervalSince1970: 50)
+    let older = try builder.buildRecord(
+      from: .fixture(
+        text: "same",
+        createdAt: 50,
+        lastCopiedAt: 100,
+        copyCount: 2,
+        groupNames: ["Current"]
+      ),
+      groupIDs: ["current"]
+    )
+    _ = try await store.importRecord(older)
+    try await payloads.save(.text("old payload"), for: older.id)
+
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+    let report = try await service.importRecords([
+      .fixture(
+        text: "same",
+        createdAt: 10,
+        lastCopiedAt: 200,
+        sourceRecordID: "newer-import",
+        copyCount: 3,
+        groupNames: ["Imported Group"],
+        pinned: true
+      )
+    ], batchSize: 1)
+
+    XCTAssertEqual(report.replacedByNewest, 1)
+    let records = try await store.fetchAll()
+    XCTAssertEqual(records.count, 1)
+    let record = try XCTUnwrap(records.first)
+    XCTAssertEqual(record.id, older.id)
+    XCTAssertEqual(record.createdAt, existingCreatedAt)
+    XCTAssertEqual(record.lastCopiedAt, Date(timeIntervalSince1970: 200))
+    XCTAssertEqual(record.title, "same")
+    XCTAssertTrue(record.isPinned)
+    let savedPayload = try await payloads.loadPayload(for: older.id)
+    XCTAssertEqual(savedPayload, .text("same"))
+  }
+
   func testOlderImportedDuplicateMergesMetadataWithoutReplacingPayload() async throws {
     let store = InMemoryHistoryStore()
     let payloads = InMemoryPayloadStore()
@@ -320,6 +364,7 @@ private extension Array where Element == URL {
 private extension ImportedRecord {
   static func fixture(
     text: String,
+    createdAt: TimeInterval? = nil,
     lastCopiedAt: TimeInterval,
     sourceRecordID: String? = nil,
     copyCount: Int = 1,
@@ -339,7 +384,7 @@ private extension ImportedRecord {
       plainTextPreview: text,
       sourceAppBundleId: nil,
       sourceAppName: nil,
-      createdAt: Date(timeIntervalSince1970: lastCopiedAt),
+      createdAt: Date(timeIntervalSince1970: createdAt ?? lastCopiedAt),
       lastCopiedAt: Date(timeIntervalSince1970: lastCopiedAt),
       copyCount: copyCount,
       isPinned: pinned,

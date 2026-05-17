@@ -163,7 +163,7 @@ public actor ImportService {
       sourceAppBundleId: candidate.sourceAppBundleId,
       sourceAppName: candidate.sourceAppName,
       sourceDeviceHint: candidate.sourceDeviceHint,
-      createdAt: min(existing.createdAt, candidate.createdAt),
+      createdAt: existing.createdAt,
       lastCopiedAt: candidate.lastCopiedAt,
       copyCount: boundedCopyCount(existing.copyCount + candidate.copyCount),
       isPinned: existing.isPinned || candidate.isPinned,
