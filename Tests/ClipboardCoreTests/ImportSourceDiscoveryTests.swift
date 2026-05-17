@@ -60,6 +60,22 @@ final class ImportSourceDiscoveryTests: XCTestCase {
     XCTAssertFalse(candidate.isDefaultSelected)
   }
 
+  func testRejectsClipasteSchemaMissingImporterRequiredColumns() throws {
+    let db = tempDir.appendingPathComponent("partial-clipaste.store")
+    try createDB(at: db, sql: """
+      CREATE TABLE ZCLIPBOARDRECORD (
+        Z_PK INTEGER PRIMARY KEY,
+        ZTYPERAWVALUE TEXT
+      );
+      """)
+
+    let candidate = try ImportSourceDiscovery(homeDirectory: tempDir).classifyManualDatabase(db)
+
+    XCTAssertEqual(candidate.schemaKind, .unknown)
+    XCTAssertEqual(candidate.schemaStatus, "Unsupported schema")
+    XCTAssertFalse(candidate.isDefaultSelected)
+  }
+
   func testDiscoversAutomaticSourcesFromInjectedHomeDirectory() throws {
     let maccy = standardMaccyURL()
     let cloud = standardClipasteCloudURL()
@@ -162,12 +178,19 @@ final class ImportSourceDiscoveryTests: XCTestCase {
         Z_PK INTEGER PRIMARY KEY,
         ZID TEXT,
         ZTIMESTAMP REAL,
-        ZTYPERAWVALUE TEXT,
-        ZPLAINTEXT TEXT,
+        ZAPPBUNDLEID TEXT,
+        ZAPPLOCALIZEDNAME TEXT,
         ZCONTENTHASH TEXT,
-        ZISPINNED INTEGER,
+        ZCUSTOMTITLE TEXT,
         ZGROUPID TEXT,
-        ZGROUPIDSRAW TEXT
+        ZGROUPIDSRAW TEXT,
+        ZIMAGEUTTYPE TEXT,
+        ZLINKTITLE TEXT,
+        ZPLAINTEXT TEXT,
+        ZTYPERAWVALUE TEXT,
+        ZISPINNED INTEGER,
+        ZIMAGEDATA BLOB,
+        ZRTFDATA BLOB
       );
       CREATE TABLE ZCLIPBOARDGROUPMODEL (
         Z_PK INTEGER PRIMARY KEY,

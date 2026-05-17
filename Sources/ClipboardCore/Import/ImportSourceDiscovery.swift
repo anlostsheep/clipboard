@@ -198,7 +198,21 @@ public struct ImportSourceDiscovery {
       && database.hasColumns(
         [
           "Z_PK",
-          "ZTYPERAWVALUE"
+          "ZID",
+          "ZTIMESTAMP",
+          "ZAPPBUNDLEID",
+          "ZAPPLOCALIZEDNAME",
+          "ZCONTENTHASH",
+          "ZCUSTOMTITLE",
+          "ZGROUPID",
+          "ZGROUPIDSRAW",
+          "ZIMAGEUTTYPE",
+          "ZLINKTITLE",
+          "ZPLAINTEXT",
+          "ZTYPERAWVALUE",
+          "ZISPINNED",
+          "ZIMAGEDATA",
+          "ZRTFDATA"
         ],
         in: "ZCLIPBOARDRECORD"
       )
