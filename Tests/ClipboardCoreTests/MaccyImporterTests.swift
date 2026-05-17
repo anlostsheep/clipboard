@@ -146,6 +146,29 @@ final class MaccyImporterTests: XCTestCase {
     XCTAssertNil(record.sourceAppName)
   }
 
+  func testDoesNotUseApplicationBundleIDAsNameWhenPasteboardSourceExists() throws {
+    let databaseURL = tempDir.appendingPathComponent("maccy.sqlite")
+    try makeDatabase(
+      at: databaseURL,
+      items: [
+        item(
+          id: 8,
+          application: "com.google.Chrome",
+          title: nil,
+          contents: [
+            content(type: "public.utf8-plain-text", value: "chrome source"),
+            content(type: "org.nspasteboard.source", value: "com.google.Chrome")
+          ]
+        )
+      ]
+    )
+
+    let record = try XCTUnwrap(MaccyImporter(source: .maccy).importRecords(from: databaseURL).first)
+
+    XCTAssertEqual(record.sourceAppBundleId, "com.google.Chrome")
+    XCTAssertNil(record.sourceAppName)
+  }
+
   func testParsesFileURLs() throws {
     let databaseURL = tempDir.appendingPathComponent("maccy.sqlite")
     try makeDatabase(
@@ -218,6 +241,30 @@ final class MaccyImporterTests: XCTestCase {
     XCTAssertEqual(record.primaryType, .image)
     XCTAssertEqual(record.title, "Screenshot")
     XCTAssertEqual(record.plainTextPreview, "text fallback")
+  }
+
+  func testImportsHEICImagePayload() throws {
+    let databaseURL = tempDir.appendingPathComponent("maccy.sqlite")
+    let imageData = Data([0x00, 0x00, 0x00, 0x18])
+    try makeDatabase(
+      at: databaseURL,
+      items: [
+        item(
+          id: 9,
+          title: "HEIC Image",
+          contents: [
+            content(type: "public.heic", data: imageData)
+          ]
+        )
+      ]
+    )
+
+    let record = try XCTUnwrap(MaccyImporter(source: .maccy).importRecords(from: databaseURL).first)
+
+    XCTAssertEqual(record.payload, .image(data: imageData, uti: "public.heic"))
+    XCTAssertEqual(record.primaryType, .image)
+    XCTAssertEqual(record.pasteboardTypes, ["public.heic"])
+    XCTAssertEqual(record.warnings, [])
   }
 
   private struct Item {

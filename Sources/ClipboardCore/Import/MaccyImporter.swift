@@ -89,6 +89,7 @@ private struct MaccyPayload {
 }
 
 private let imageTypes: Set<String> = [
+  "public.heic",
   "public.png",
   "public.jpeg",
   "public.tiff"
@@ -178,8 +179,10 @@ private func sourceApplication(
   pasteboardSourceBundleID: String?,
   application: String?
 ) -> (bundleID: String?, name: String?) {
+  let applicationName = application.flatMap(nonEmptyApplicationName)
+
   if let pasteboardSourceBundleID {
-    return (pasteboardSourceBundleID, application.flatMap(nonEmptyString))
+    return (pasteboardSourceBundleID, applicationName)
   }
 
   guard let application = nonEmptyString(application) else {
@@ -191,6 +194,14 @@ private func sourceApplication(
   }
 
   return (nil, application)
+}
+
+private func nonEmptyApplicationName(_ value: String?) -> String? {
+  guard let value = nonEmptyString(value),
+        !looksLikeBundleIdentifier(value) else {
+    return nil
+  }
+  return value
 }
 
 private func looksLikeBundleIdentifier(_ value: String) -> Bool {
