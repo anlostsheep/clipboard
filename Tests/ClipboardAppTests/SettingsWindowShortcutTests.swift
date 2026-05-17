@@ -41,4 +41,19 @@ final class SettingsWindowShortcutTests: XCTestCase {
         XCTAssertTrue(didClose)
         XCTAssertFalse(window.isVisible)
     }
+
+    func testRestoreAfterExternalAuthorizationPromptReopensSettingsWindow() {
+        let window = ClipboardSettingsWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.orderOut(nil)
+
+        ClipboardSettingsWindow.restoreAfterExternalAuthorizationPrompt(window)
+
+        XCTAssertTrue(window.isVisible)
+    }
 }

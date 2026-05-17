@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Security
 
 enum AccessibilityAuthorizationProbe {
     static let checkArgument = "--check-accessibility-trust"
@@ -64,14 +65,60 @@ enum AccessibilityAuthorizationProbe {
     }
 }
 
+enum CodeSignatureDiagnostics {
+    private static let adHocSignatureFlag: UInt32 = 0x0002
+
+    static func isCurrentProcessAdHocSigned() -> Bool {
+        guard let flags = currentProcessSignatureFlags() else {
+            return false
+        }
+        return isAdHocSigned(signatureFlags: flags)
+    }
+
+    static func isAdHocSigned(signatureFlags: UInt32) -> Bool {
+        (signatureFlags & adHocSignatureFlag) != 0
+    }
+
+    private static func currentProcessSignatureFlags() -> UInt32? {
+        var code: SecCode?
+        guard SecCodeCopySelf(SecCSFlags(), &code) == errSecSuccess,
+              let code else {
+            return nil
+        }
+        var staticCode: SecStaticCode?
+        guard SecCodeCopyStaticCode(code, SecCSFlags(), &staticCode) == errSecSuccess,
+              let staticCode else {
+            return nil
+        }
+
+        var information: CFDictionary?
+        guard SecCodeCopySigningInformation(
+            staticCode,
+            SecCSFlags(rawValue: kSecCSSigningInformation),
+            &information
+        ) == errSecSuccess,
+              let signingInformation = information as? [String: Any],
+              let flags = signingInformation[kSecCodeInfoFlags as String] as? UInt32 else {
+            return nil
+        }
+
+        return flags
+    }
+}
+
 @MainActor
 final class AccessibilityPermissionState: ObservableObject {
     @Published private(set) var isAuthorized: Bool
+    let usesAdHocSignature: Bool
 
     private let checkAuthorization: () -> Bool
 
-    init(checkAuthorization: @escaping () -> Bool = { AccessibilityAuthorizationProbe.settingsTrusted() }) {
+    init(
+        checkAuthorization: @escaping () -> Bool = { AccessibilityAuthorizationProbe.settingsTrusted() },
+        checkAdHocSignature: () -> Bool = { CodeSignatureDiagnostics.isCurrentProcessAdHocSigned() }
+    ) {
         self.checkAuthorization = checkAuthorization
+        self.usesAdHocSignature = checkAdHocSignature()
         self.isAuthorized = checkAuthorization()
     }
 

@@ -32,4 +32,29 @@ final class AccessibilityPermissionStateTests: XCTestCase {
 
         XCTAssertTrue(state.isAuthorized)
     }
+
+    func testCodeSignatureDiagnosticsDetectsAdHocFlag() {
+        XCTAssertTrue(
+            CodeSignatureDiagnostics.isAdHocSigned(
+                signatureFlags: 0x0002
+            )
+        )
+    }
+
+    func testCodeSignatureDiagnosticsIgnoresNonAdHocFlags() {
+        XCTAssertFalse(
+            CodeSignatureDiagnostics.isAdHocSigned(
+                signatureFlags: 0x10000
+            )
+        )
+    }
+
+    func testAccessibilityStateCapturesAdHocSignatureDiagnostic() {
+        let state = AccessibilityPermissionState(
+            checkAuthorization: { false },
+            checkAdHocSignature: { true }
+        )
+
+        XCTAssertTrue(state.usesAdHocSignature)
+    }
 }

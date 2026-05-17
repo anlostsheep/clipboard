@@ -37,6 +37,16 @@ Scripts/build-app-bundle.sh
 # - BUNDLE_IDENTIFIER (默认 com.local.clipboard-manager)
 # - VERSION (默认 0.1.0)
 # - CODE_SIGN_IDENTITY (默认自动检测)
+# - CODE_SIGN_KEYCHAIN (指定自签名证书所在 keychain)
+# - REQUIRE_STABLE_CODE_SIGNING=1 (禁止自动降级到 ad-hoc)
+
+# 一次性创建本机自签名发布证书
+Scripts/setup-self-signed-signing.sh
+
+# 使用自签名证书构建稳定发布包
+CODE_SIGN_KEYCHAIN="$HOME/Library/Keychains/clipboard-signing.keychain-db" \
+REQUIRE_STABLE_CODE_SIGNING=1 \
+Scripts/build-app-bundle.sh
 ```
 
 ### 手工测试工具

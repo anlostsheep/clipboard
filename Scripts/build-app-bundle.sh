@@ -11,10 +11,25 @@ icon_source="$PWD/Assets/AppIcon.png"
 icon_name="AppIcon"
 local_code_sign_identity="${LOCAL_CODE_SIGN_IDENTITY:-ClipboardApp Local Code Signing}"
 code_sign_identity="${CODE_SIGN_IDENTITY:-}"
+code_sign_keychain="${CODE_SIGN_KEYCHAIN:-}"
+code_sign_timeout_seconds="${CODESIGN_TIMEOUT_SECONDS:-120}"
+require_stable_code_signing="${REQUIRE_STABLE_CODE_SIGNING:-0}"
 
 if [[ -z "$code_sign_identity" ]]; then
-  if security find-identity -v -p codesigning | grep -Fq "\"$local_code_sign_identity\""; then
+  find_identity_args=(-v -p codesigning)
+  if [[ -n "$code_sign_keychain" ]]; then
+    find_identity_args+=("$code_sign_keychain")
+  fi
+
+  if security find-identity "${find_identity_args[@]}" | grep -Fq "\"$local_code_sign_identity\""; then
     code_sign_identity="$local_code_sign_identity"
+  elif [[ "$require_stable_code_signing" == "1" ]]; then
+    echo "error: stable code signing required but identity '$local_code_sign_identity' was not found" >&2
+    if [[ -n "$code_sign_keychain" ]]; then
+      echo "error: searched keychain: $code_sign_keychain" >&2
+    fi
+    echo "error: run Scripts/setup-self-signed-signing.sh or set CODE_SIGN_IDENTITY to an available identity" >&2
+    exit 1
   else
     code_sign_identity="-"
   fi
@@ -111,6 +126,64 @@ if [[ "$code_sign_identity" == "-" ]]; then
 else
   echo "signing with identity: $code_sign_identity" >&2
 fi
-codesign --force --deep --sign "$code_sign_identity" "$app_path" >/dev/null
+
+run_codesign() {
+  local identity="$1"
+  local codesign_args=(--force --deep --sign "$identity")
+  if [[ -n "$code_sign_keychain" ]]; then
+    codesign_args+=(--keychain "$code_sign_keychain")
+  fi
+  codesign_args+=("$app_path")
+
+  if [[ "$code_sign_timeout_seconds" == "0" ]]; then
+    codesign "${codesign_args[@]}" >/dev/null
+    return
+  fi
+
+  codesign "${codesign_args[@]}" >/dev/null &
+  local pid="$!"
+  local elapsed=0
+
+  while kill -0 "$pid" 2>/dev/null; do
+    if (( elapsed >= code_sign_timeout_seconds )); then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  wait "$pid"
+}
+
+sign_status=0
+run_codesign "$code_sign_identity" || sign_status=$?
+
+if (( sign_status != 0 )); then
+  if [[ "$code_sign_identity" == "-" ]]; then
+    echo "error: ad-hoc codesign failed with status $sign_status" >&2
+    exit "$sign_status"
+  fi
+
+  if (( sign_status == 124 )); then
+    echo "warning: codesign with '$code_sign_identity' timed out after ${code_sign_timeout_seconds}s" >&2
+  else
+    echo "warning: codesign with '$code_sign_identity' failed with status $sign_status" >&2
+  fi
+
+  if [[ "$require_stable_code_signing" == "1" ]]; then
+    echo "error: stable code signing required; set CODE_SIGN_IDENTITY=- to allow ad-hoc signing explicitly" >&2
+    exit "$sign_status"
+  fi
+
+  echo "warning: falling back to ad-hoc signing; macOS Accessibility permission may need to be re-granted after code changes" >&2
+  code_sign_identity="-"
+  run_codesign "$code_sign_identity" || {
+    sign_status=$?
+    echo "error: fallback ad-hoc codesign failed with status $sign_status" >&2
+    exit "$sign_status"
+  }
+fi
 
 echo "$app_path"

@@ -87,6 +87,11 @@ struct GeneralSettingsView: View {
                 Text("辅助功能权限只用于自动粘贴。仅复制模式不需要此权限。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if !accessibilityPermission.isAuthorized && accessibilityPermission.usesAdHocSignature {
+                    Text("当前运行的是临时签名构建。系统设置里同名 ClipboardApp.app 可能指向旧构建；重新构建后请移除旧条目并重新授权当前 App，或使用稳定签名重新构建。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("全局快捷键") {

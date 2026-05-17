@@ -3,6 +3,20 @@ import ClipboardCore
 import SwiftUI
 
 final class ClipboardSettingsWindow: NSWindow {
+    @MainActor
+    static func restoreAfterExternalAuthorizationPrompt(_ window: NSWindow?) {
+        guard let window else { return }
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        DispatchQueue.main.async { [weak window] in
+            guard let window else { return }
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if event.type == .keyDown,
