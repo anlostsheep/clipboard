@@ -231,7 +231,7 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [ ] 导入 Clipaste 文本、链接、代码、富文本、图片和文件 URL 记录后 QuickPanel 可搜索/复制
 - [ ] Reimport does not create duplicate history records
 - [ ] Duplicate content keeps the record with newest `lastCopiedAt` and merges copy count, pin/favorite, groups, pasteboard types, and Universal Clipboard marker
-- [ ] Cancelled import keeps committed batches and writes a cancelled report
+- [x] Automated coverage: cancelled import keeps committed batches and writes a cancelled report (`ImportServiceTests`)
 - [ ] Import failure writes a failed report that remains visible in Settings → 导入 and can be copied as JSON
 - [ ] Import report JSON is written under Application Support `imports/reports`
 

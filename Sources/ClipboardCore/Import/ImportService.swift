@@ -135,8 +135,12 @@ public actor ImportService {
               }
               throw ImportBatchError.operationFailed(failure(for: imported, error: historyError), historyError)
             }
-            report.replacedByNewest += 1
-            appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
+            if try await recordStillRetained(replacement) {
+              report.replacedByNewest += 1
+              appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
+            } else {
+              try await reportRetentionSkip(imported: imported, recordID: replacement.id, report: &report)
+            }
           } else {
             existing = existingRecordAfterMetadataMerge(existing: existing, candidate: candidate)
             do {
@@ -144,8 +148,12 @@ public actor ImportService {
             } catch {
               throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
             }
-            report.merged += 1
-            appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
+            if try await recordStillRetained(existing) {
+              report.merged += 1
+              appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
+            } else {
+              try await reportRetentionSkip(imported: imported, recordID: existing.id, report: &report)
+            }
           }
         } else {
           do {
@@ -168,8 +176,12 @@ public actor ImportService {
             }
             throw ImportBatchError.operationFailed(failure(for: imported, error: historyError), historyError)
           }
-          report.imported += 1
-          appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: [], report: &report)
+          if try await recordStillRetained(candidate) {
+            report.imported += 1
+            appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: [], report: &report)
+          } else {
+            try await reportRetentionSkip(imported: imported, recordID: candidate.id, report: &report)
+          }
         }
       } catch {
         if case ImportBatchError.operationFailed = error {
@@ -181,6 +193,30 @@ public actor ImportService {
     }
 
     report.committedBatchCount += 1
+  }
+
+  private func recordStillRetained(_ record: ClipboardRecord) async throws -> Bool {
+    guard let retained = try await historyStore.record(forContentHash: record.contentHash) else {
+      return false
+    }
+    return retained.id == record.id
+  }
+
+  private func reportRetentionSkip(
+    imported: ImportedRecord,
+    recordID: UUID,
+    report: inout ImportReport
+  ) async throws {
+    do {
+      try await payloadStore.delete(for: recordID)
+    } catch {
+      throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
+    }
+
+    report.skipped += 1
+    report.warnings.append(
+      "Skipped imported record \(imported.sourceRecordID) because the active retention policy immediately evicted it."
+    )
   }
 
   private func newestImportedRecord(

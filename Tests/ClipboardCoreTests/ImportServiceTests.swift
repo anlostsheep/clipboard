@@ -39,6 +39,32 @@ final class ImportServiceTests: XCTestCase {
     XCTAssertTrue(savedPayloads.contains(.text("two")))
   }
 
+  func testImportedRecordEvictedByRetentionIsSkippedAndPayloadCleaned() async throws {
+    let databaseURL = tempDir.appendingPathComponent("retention.sqlite")
+    let payloadDirectory = tempDir.appendingPathComponent("payloads", isDirectory: true)
+    let sqlite = try SQLiteHistoryStore(
+      databaseFile: databaseURL,
+      retentionPolicy: RetentionPolicy(maxCount: 5000, maxAgeDays: 1)
+    )
+    let payloads = try SQLitePayloadStore(payloadsDirectory: payloadDirectory)
+    let store = PayloadCleaningHistoryStore(underlying: sqlite, payloadStore: payloads)
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+    let overAgeTimestamp = Date().addingTimeInterval(-2 * 86_400).timeIntervalSince1970
+
+    let report = try await service.importRecords([
+      .fixture(text: "too old", lastCopiedAt: overAgeTimestamp, sourceRecordID: "retention-skip")
+    ], batchSize: 1)
+
+    XCTAssertEqual(report.status, .completed)
+    XCTAssertEqual(report.imported, 0)
+    XCTAssertEqual(report.skipped, 1)
+    XCTAssertTrue(report.warnings.contains { $0.contains("retention policy immediately evicted") })
+    let retainedCount = try await store.count()
+    let payloadFiles = try await payloads.listAllFilenames()
+    XCTAssertEqual(retainedCount, 0)
+    XCTAssertEqual(payloadFiles, [])
+  }
+
   func testPayloadSaveFailureThrowsLeavesHistoryEmptyAndWritesFailedReport() async throws {
     let store = InMemoryHistoryStore()
     let payloads = FailingPayloadStore()
