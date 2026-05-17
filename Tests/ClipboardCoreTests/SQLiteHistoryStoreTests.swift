@@ -38,6 +38,65 @@ final class SQLiteHistoryStoreTests: XCTestCase {
     XCTAssertEqual(countAfter, 1)
   }
 
+  func testImportRecordReplacesFullRecordWithoutIncrementingCopyCount() async throws {
+    let store = try makeStore()
+    let original = makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
+      hash: "same",
+      title: "original",
+      copyCount: 7,
+      lastCopiedAt: 10
+    )
+    let replacement = makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
+      hash: "same",
+      title: "replacement",
+      copyCount: 2,
+      lastCopiedAt: 20
+    )
+
+    _ = try await store.importRecord(original)
+    let imported = try await store.importRecord(replacement)
+
+    XCTAssertEqual(imported.id, replacement.id)
+    XCTAssertEqual(imported.title, "replacement")
+    XCTAssertEqual(imported.copyCount, 2)
+    XCTAssertEqual(imported.lastCopiedAt, replacement.lastCopiedAt)
+
+    await store.close()
+    let reopened = try makeStore()
+    let records = try await reopened.fetchAll()
+    XCTAssertEqual(records.count, 1)
+    XCTAssertEqual(records.first?.id, replacement.id)
+    XCTAssertEqual(records.first?.copyCount, 2)
+    XCTAssertEqual(records.first?.title, "replacement")
+  }
+
+  func testRecordForContentHashLooksUpImportedRecord() async throws {
+    let store = try makeStore()
+    let record = makeRecord(hash: "lookup", title: "lookup title")
+
+    _ = try await store.importRecord(record)
+
+    let found = try await store.record(forContentHash: "lookup")
+    let missing = try await store.record(forContentHash: "missing")
+    XCTAssertEqual(found?.id, record.id)
+    XCTAssertEqual(found?.title, "lookup title")
+    XCTAssertNil(missing)
+  }
+
+  func testDuplicateUpsertStillIncrementsCopyCount() async throws {
+    let store = try makeStore()
+    let first = makeRecord(hash: "duplicate", copyCount: 1, lastCopiedAt: 10)
+    let second = makeRecord(hash: "duplicate", copyCount: 1, lastCopiedAt: 20)
+
+    _ = try await store.upsert(first)
+    let updated = try await store.upsert(second)
+
+    XCTAssertEqual(updated.copyCount, 2)
+    XCTAssertEqual(updated.lastCopiedAt, second.lastCopiedAt)
+  }
+
   func testEnforceRetentionTrimsByCount() async throws {
     let store = try SQLiteHistoryStore(
       databaseFile: tempDir.appendingPathComponent("test.sqlite"),
@@ -115,13 +174,17 @@ final class SQLiteHistoryStoreTests: XCTestCase {
 }
 
 private func makeRecord(
+  id: UUID = UUID(),
   hash: String,
   title: String = "title",
+  copyCount: Int = 1,
+  lastCopiedAt: TimeInterval? = nil,
   isPinned: Bool = false,
   isFavorite: Bool = false
 ) -> ClipboardRecord {
-  ClipboardRecord(
-    id: UUID(),
+  let copiedAt = Date(timeIntervalSinceNow: -(lastCopiedAt ?? TimeInterval(abs(hash.hashValue) % 10000)))
+  return ClipboardRecord(
+    id: id,
     contentHash: hash,
     primaryType: .text,
     title: title,
@@ -130,8 +193,8 @@ private func makeRecord(
     sourceAppName: "App",
     sourceDeviceHint: .local,
     createdAt: Date(timeIntervalSince1970: 0),
-    lastCopiedAt: Date(timeIntervalSinceNow: -TimeInterval(abs(hash.hashValue) % 10000)),
-    copyCount: 1,
+    lastCopiedAt: copiedAt,
+    copyCount: copyCount,
     isPinned: isPinned,
     isFavorite: isFavorite,
     groupIds: [],

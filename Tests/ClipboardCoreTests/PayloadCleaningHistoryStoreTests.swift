@@ -40,6 +40,22 @@ final class PayloadCleaningHistoryStoreTests: XCTestCase {
     XCTAssertNil(oldPayload)
     XCTAssertEqual(newPayload, .text("new"))
   }
+
+  func testWrappedStoreChainSupportsImportWritableHistoryStore() async throws {
+    let history = InMemoryHistoryStore()
+    let healing = SelfHealingHistoryStore(underlying: history)
+    let payloads = InMemoryPayloadStore()
+    let store = PayloadCleaningHistoryStore(underlying: healing, payloadStore: payloads)
+    let importing = store as any ImportWritableHistoryStore
+    let record = makeCleaningRecord(id: UUID(), hash: "imported", lastCopiedAt: 3)
+
+    let imported = try await importing.importRecord(record)
+    let found = try await importing.record(forContentHash: "imported")
+
+    XCTAssertEqual(imported.id, record.id)
+    XCTAssertEqual(found?.id, record.id)
+    XCTAssertEqual(found?.contentHash, "imported")
+  }
 }
 
 private func makeCleaningRecord(id: UUID, hash: String, lastCopiedAt: TimeInterval) -> ClipboardRecord {

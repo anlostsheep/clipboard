@@ -13,7 +13,7 @@ public struct RetentionPolicy: Sendable {
   }
 }
 
-public actor SQLiteHistoryStore: HistoryStore, RetentionPolicyUpdating {
+public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating {
   private let connection: SQLiteConnection
   private var retentionPolicy: RetentionPolicy
   private var indexByHash: [String: ClipboardRecord] = [:]
@@ -98,6 +98,27 @@ public actor SQLiteHistoryStore: HistoryStore, RetentionPolicyUpdating {
     }
   }
 
+  public func record(forContentHash hash: String) async throws -> ClipboardRecord? {
+    indexByHash[hash]
+  }
+
+  public func importRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    try connection.exec("BEGIN IMMEDIATE")
+    inExplicitTransaction = true
+    defer { inExplicitTransaction = false }
+
+    do {
+      try writeRecordForImport(record)
+      indexByHash[record.contentHash] = record
+      try enforceRetention()
+      try connection.exec("COMMIT")
+      return record
+    } catch {
+      try? connection.exec("ROLLBACK")
+      throw error
+    }
+  }
+
   public func fetchAll() async throws -> [ClipboardRecord] {
     indexByHash.values.sorted { $0.lastCopiedAt > $1.lastCopiedAt }
   }
@@ -175,6 +196,57 @@ public actor SQLiteHistoryStore: HistoryStore, RetentionPolicyUpdating {
     stmt.bindText(16, try Self.encodeJSONOptional(r.metadata))
     stmt.bindText(17, try Self.encodeJSON(Array(r.pasteboardTypes)))
     stmt.bindText(18, nil)  // payload_ref handled separately by PayloadStore
+    _ = try stmt.step()
+  }
+
+  private func writeRecordForImport(_ r: ClipboardRecord) throws {
+    let sql = """
+      INSERT INTO records (
+        id, content_hash, primary_type, title, plain_preview,
+        source_bundle, source_app, source_device,
+        created_at, last_copied_at, copy_count,
+        is_pinned, is_favorite, group_ids_json, retention_exempt,
+        metadata_json, pasteboard_types_json, payload_ref
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(content_hash) DO UPDATE SET
+        id = excluded.id,
+        primary_type = excluded.primary_type,
+        title = excluded.title,
+        plain_preview = excluded.plain_preview,
+        source_bundle = excluded.source_bundle,
+        source_app = excluded.source_app,
+        source_device = excluded.source_device,
+        created_at = excluded.created_at,
+        last_copied_at = excluded.last_copied_at,
+        copy_count = excluded.copy_count,
+        is_pinned = excluded.is_pinned,
+        is_favorite = excluded.is_favorite,
+        group_ids_json = excluded.group_ids_json,
+        retention_exempt = excluded.retention_exempt,
+        metadata_json = excluded.metadata_json,
+        pasteboard_types_json = excluded.pasteboard_types_json,
+        payload_ref = excluded.payload_ref
+    """
+    let stmt = try connection.prepare(sql)
+    defer { stmt.finalize() }
+    stmt.bindText(1, r.id.uuidString)
+    stmt.bindText(2, r.contentHash)
+    stmt.bindText(3, r.primaryType.rawValue)
+    stmt.bindText(4, r.title)
+    stmt.bindText(5, r.plainTextPreview)
+    stmt.bindText(6, r.sourceAppBundleId)
+    stmt.bindText(7, r.sourceAppName)
+    stmt.bindText(8, r.sourceDeviceHint.rawValue)
+    stmt.bindDouble(9, r.createdAt.timeIntervalSince1970)
+    stmt.bindDouble(10, r.lastCopiedAt.timeIntervalSince1970)
+    stmt.bindInt(11, r.copyCount)
+    stmt.bindBool(12, r.isPinned)
+    stmt.bindBool(13, r.isFavorite)
+    stmt.bindText(14, try Self.encodeJSON(r.groupIds))
+    stmt.bindBool(15, r.retentionExempt)
+    stmt.bindText(16, try Self.encodeJSONOptional(r.metadata))
+    stmt.bindText(17, try Self.encodeJSON(Array(r.pasteboardTypes)))
+    stmt.bindText(18, nil)
     _ = try stmt.step()
   }
 

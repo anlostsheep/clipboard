@@ -1,6 +1,6 @@
 import Foundation
 
-public actor PayloadCleaningHistoryStore: HistoryStore, RetentionPolicyUpdating {
+public actor PayloadCleaningHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating {
   private let underlying: any HistoryStore
   private let payloadStore: any ClipboardPayloadStore
 
@@ -12,6 +12,23 @@ public actor PayloadCleaningHistoryStore: HistoryStore, RetentionPolicyUpdating 
   public func upsert(_ record: ClipboardRecord) async throws -> ClipboardRecord {
     let before = try await underlying.fetchAll()
     let result = try await underlying.upsert(record)
+    try await deletePayloadsForRecordsRemoved(from: before)
+    return result
+  }
+
+  public func record(forContentHash hash: String) async throws -> ClipboardRecord? {
+    guard let importing = underlying as? any ImportWritableHistoryStore else { return nil }
+    return try await importing.record(forContentHash: hash)
+  }
+
+  public func importRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    let before = try await underlying.fetchAll()
+    let result: ClipboardRecord
+    if let importing = underlying as? any ImportWritableHistoryStore {
+      result = try await importing.importRecord(record)
+    } else {
+      result = try await underlying.upsert(record)
+    }
     try await deletePayloadsForRecordsRemoved(from: before)
     return result
   }

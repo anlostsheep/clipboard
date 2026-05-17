@@ -50,6 +50,11 @@ public protocol HistoryStore: Sendable {
   func evictOldest(percent: Double) async throws -> Int
 }
 
+public protocol ImportWritableHistoryStore: HistoryStore {
+  func record(forContentHash hash: String) async throws -> ClipboardRecord?
+  func importRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord
+}
+
 public protocol RetentionPolicyUpdating: Sendable {
   func updateRetentionPolicy(_ policy: RetentionPolicy) async throws
 }
@@ -60,7 +65,7 @@ public extension HistoryStore {
   }
 }
 
-public actor InMemoryHistoryStore: HistoryStore {
+public actor InMemoryHistoryStore: ImportWritableHistoryStore {
   private var recordsByHash: [String: ClipboardRecord] = [:]
 
   public init() {}
@@ -73,6 +78,15 @@ public actor InMemoryHistoryStore: HistoryStore {
       return existing
     }
 
+    recordsByHash[record.contentHash] = record
+    return record
+  }
+
+  public func record(forContentHash hash: String) async throws -> ClipboardRecord? {
+    recordsByHash[hash]
+  }
+
+  public func importRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
     recordsByHash[record.contentHash] = record
     return record
   }
