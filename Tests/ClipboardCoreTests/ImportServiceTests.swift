@@ -52,7 +52,65 @@ final class ImportServiceTests: XCTestCase {
       XCTAssertEqual(count, 0)
       let written = try await readOnlyReport()
       XCTAssertEqual(written.status, .failed)
+      XCTAssertEqual(written.failed, 1)
       XCTAssertEqual(written.committedBatchCount, 0)
+      XCTAssertEqual(written.failures.count, 1)
+      XCTAssertEqual(written.failures.first?.sourceRecordID, "fails")
+      XCTAssertEqual(written.failures.first?.source, .clipasteCloud)
+      XCTAssertTrue(written.failures.first?.reason.contains("payload unavailable") ?? false)
+    }
+  }
+
+  func testReplacementPayloadSaveFailureLeavesExistingRecordUnchangedAndWritesFailedReport() async throws {
+    let store = InMemoryHistoryStore()
+    let payloads = FailingPayloadStore()
+    let builder = ImportRecordBuilder()
+    let existing = try builder.buildRecord(
+      from: .fixture(
+        text: "same",
+        lastCopiedAt: 10,
+        copyCount: 2,
+        groupNames: ["Current"],
+        pasteboardTypes: ["existing.type"]
+      ),
+      groupIDs: ["current"]
+    )
+    _ = try await store.importRecord(existing)
+
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+
+    do {
+      _ = try await service.importRecords([
+        .fixture(
+          text: "same",
+          lastCopiedAt: 20,
+          sourceRecordID: "replacement-fails",
+          copyCount: 5,
+          groupNames: ["Imported Group"],
+          pinned: true,
+          pasteboardTypes: ["imported.type"]
+        )
+      ], batchSize: 1)
+      XCTFail("Expected replacement payload save failure to throw")
+    } catch {
+      let records = try await store.fetchAll()
+      XCTAssertEqual(records.count, 1)
+      let record = try XCTUnwrap(records.first)
+      XCTAssertEqual(record.id, existing.id)
+      XCTAssertEqual(record.lastCopiedAt, existing.lastCopiedAt)
+      XCTAssertEqual(record.copyCount, existing.copyCount)
+      XCTAssertEqual(record.groupIds, ["current"])
+      XCTAssertEqual(record.pasteboardTypes, ["existing.type"])
+      XCTAssertFalse(record.isPinned)
+
+      let written = try await readOnlyReport()
+      XCTAssertEqual(written.status, .failed)
+      XCTAssertEqual(written.failed, 1)
+      XCTAssertEqual(written.committedBatchCount, 0)
+      XCTAssertEqual(written.failures.count, 1)
+      XCTAssertEqual(written.failures.first?.sourceRecordID, "replacement-fails")
+      XCTAssertEqual(written.failures.first?.source, .clipasteCloud)
+      XCTAssertTrue(written.failures.first?.reason.contains("payload unavailable") ?? false)
     }
   }
 
