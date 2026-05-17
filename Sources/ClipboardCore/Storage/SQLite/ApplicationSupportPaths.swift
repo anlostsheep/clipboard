@@ -5,6 +5,7 @@ public struct ApplicationSupportPaths: Sendable {
   public let baseDirectory: URL
   public let databaseFile: URL
   public let payloadsDirectory: URL
+  public let importReportsDirectory: URL
 
   public init(bundleIdentifier: String, customBase: URL? = nil) throws {
     let base: URL
@@ -22,6 +23,7 @@ public struct ApplicationSupportPaths: Sendable {
     self.baseDirectory = base
     self.databaseFile = base.appendingPathComponent("clipboard.sqlite", isDirectory: false)
     self.payloadsDirectory = base.appendingPathComponent("payloads", isDirectory: true)
+    self.importReportsDirectory = base.appendingPathComponent("imports/reports", isDirectory: true)
   }
 
   /// Ensures baseDirectory and payloadsDirectory exist; throws if not writable.
@@ -32,6 +34,9 @@ public struct ApplicationSupportPaths: Sendable {
     }
     if !fm.fileExists(atPath: payloadsDirectory.path) {
       try fm.createDirectory(at: payloadsDirectory, withIntermediateDirectories: true)
+    }
+    if !fm.fileExists(atPath: importReportsDirectory.path) {
+      try fm.createDirectory(at: importReportsDirectory, withIntermediateDirectories: true)
     }
     // Probe writability
     let probe = baseDirectory.appendingPathComponent(".write-probe", isDirectory: false)
