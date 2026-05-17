@@ -92,6 +92,8 @@ final class AppServices: ObservableObject {
   let captureCoordinator: ClipboardCaptureCoordinator
   let captureLoop: ClipboardCaptureLoop
   let pasteController: PasteController
+  let importService: ImportService?
+  let importReportsDirectory: URL?
   @Published private(set) var storageHealth: StorageHealth = .ok
 
   let storageNotifier = StorageHealthNotifier()
@@ -112,10 +114,21 @@ final class AppServices: ObservableObject {
 
   init() {
     let bundleId = Bundle.main.bundleIdentifier ?? "com.local.clipboard-manager"
-    let (storeImpl, payloadImpl, health) = AppServices.makeStorage(bundleId: bundleId)
+    let (storeImpl, payloadImpl, health, paths) = AppServices.makeStorage(bundleId: bundleId)
     self.store = storeImpl
     self.payloadStore = payloadImpl
     self.storageHealth = health
+    self.importReportsDirectory = paths?.importReportsDirectory
+    if let importingStore = storeImpl as? any ImportWritableHistoryStore,
+       let reports = paths?.importReportsDirectory {
+      self.importService = ImportService(
+        historyStore: importingStore,
+        payloadStore: payloadImpl,
+        reportsDirectory: reports
+      )
+    } else {
+      self.importService = nil
+    }
     self.systemClient = SystemPasteboardClient()
     self.ingestService = ClipboardIngestService(
       store: storeImpl,
@@ -174,7 +187,9 @@ final class AppServices: ObservableObject {
 
   /// Attempts to construct SQLite-backed storage; returns InMemory + .disabled on failure.
   /// When the user chooses "重试" in the startup failure dialog, the loop retries.
-  private static func makeStorage(bundleId: String) -> (any HistoryStore, any ClipboardPayloadStore, StorageHealth) {
+  private static func makeStorage(
+    bundleId: String
+  ) -> (any HistoryStore, any ClipboardPayloadStore, StorageHealth, ApplicationSupportPaths?) {
     while true {
       do {
         let paths = try ApplicationSupportPaths(bundleIdentifier: bundleId)
@@ -210,13 +225,13 @@ final class AppServices: ObservableObject {
           }
         }
 
-        return (cleaning, payloads, .ok)
+        return (cleaning, payloads, .ok, paths)
       } catch {
         logger.error("storage init failed: \(String(describing: error))")
         let reason = "无法访问存储位置：\(error.localizedDescription)"
         let shouldRetry = AppServices.presentStartupFailure(reason: reason)
         if !shouldRetry {
-          return (InMemoryHistoryStore(), InMemoryPayloadStore(), .disabled(reason: reason))
+          return (InMemoryHistoryStore(), InMemoryPayloadStore(), .disabled(reason: reason), nil)
         }
         // shouldRetry == true → loop continues and retries storage init
       }

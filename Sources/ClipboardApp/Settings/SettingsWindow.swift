@@ -20,6 +20,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case general = "通用"
     case privacy = "隐私"
     case history = "历史记录"
+    case importData = "导入"
 
     var id: String { rawValue }
 
@@ -28,6 +29,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: return "gear"
         case .privacy: return "hand.raised"
         case .history: return "clock"
+        case .importData: return "square.and.arrow.down"
         }
     }
 }
@@ -58,6 +60,8 @@ struct SettingsRootView: View {
                         bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.local.clipboard-manager"
                     ).baseDirectory
                 )
+            case .importData:
+                ImportSettingsView(services: services)
             case nil:
                 GeneralSettingsView(hotKeyManager: hotKeyManager)
             }
