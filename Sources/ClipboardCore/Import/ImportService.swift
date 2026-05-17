@@ -17,7 +17,7 @@ public struct ImportProgress: Equatable, Sendable {
 }
 
 private enum ImportBatchError: Error {
-  case payloadSaveFailed(ImportFailure, Error)
+  case operationFailed(ImportFailure, Error)
 }
 
 public actor ImportService {
@@ -88,7 +88,7 @@ public actor ImportService {
       return report
     } catch {
       report.status = .failed
-      if case let ImportBatchError.payloadSaveFailed(failure, _) = error {
+      if case let ImportBatchError.operationFailed(failure, _) = error {
         report.failed += 1
         report.failures.append(failure)
       }
@@ -113,17 +113,28 @@ public actor ImportService {
               candidate: candidate,
               existing: existing
             )
+            let oldPayload: ClipboardPayload?
             do {
+              oldPayload = try await payloadStore.loadPayload(for: replacement.id)
               try await payloadStore.save(imported.payload, for: replacement.id)
             } catch {
-              throw ImportBatchError.payloadSaveFailed(failure(for: imported, error: error), error)
+              throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
             }
-            _ = try await historyStore.importRecord(replacement)
+            do {
+              _ = try await historyStore.importRecord(replacement)
+            } catch {
+              try? await restorePayload(oldPayload, for: replacement.id)
+              throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
+            }
             report.replacedByNewest += 1
             appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
           } else {
             existing = existingRecordAfterMetadataMerge(existing: existing, candidate: candidate)
-            _ = try await historyStore.importRecord(existing)
+            do {
+              _ = try await historyStore.importRecord(existing)
+            } catch {
+              throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
+            }
             report.merged += 1
             appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: existingGroupIDs, report: &report)
           }
@@ -131,14 +142,19 @@ public actor ImportService {
           do {
             try await payloadStore.save(imported.payload, for: candidate.id)
           } catch {
-            throw ImportBatchError.payloadSaveFailed(failure(for: imported, error: error), error)
+            throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
           }
-          _ = try await historyStore.importRecord(candidate)
+          do {
+            _ = try await historyStore.importRecord(candidate)
+          } catch {
+            try? await payloadStore.delete(for: candidate.id)
+            throw ImportBatchError.operationFailed(failure(for: imported, error: error), error)
+          }
           report.imported += 1
           appendIntroducedGroupIDs(candidate.groupIds, existingGroupIDs: [], report: &report)
         }
       } catch {
-        if case ImportBatchError.payloadSaveFailed = error {
+        if case ImportBatchError.operationFailed = error {
           throw error
         }
         report.failed += 1
@@ -197,6 +213,14 @@ public actor ImportService {
       committedBatchCount: report.committedBatchCount,
       lastProcessedSourceRecordID: report.lastProcessedSourceRecordID
     )
+  }
+
+  private func restorePayload(_ payload: ClipboardPayload?, for recordID: UUID) async throws {
+    if let payload {
+      try await payloadStore.save(payload, for: recordID)
+    } else {
+      try await payloadStore.delete(for: recordID)
+    }
   }
 
   private func failure(for imported: ImportedRecord, error: Error) -> ImportFailure {

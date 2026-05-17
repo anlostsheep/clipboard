@@ -26,27 +26,42 @@ public actor SQLitePayloadStore: ClipboardPayloadStore {
     // Atomic write to temp file first
     try data.write(to: tmpURL, options: .atomic)
     let fm = FileManager.default
+    if fm.fileExists(atPath: url.path) {
+      _ = try fm.replaceItemAt(url, withItemAt: tmpURL, backupItemName: nil)
+    } else {
+      try fm.moveItem(at: tmpURL, to: url)
+    }
+
     let prefix = recordID.uuidString
     let entries = try fm.contentsOfDirectory(atPath: payloadsDirectory.path)
-    for entry in entries where entry.hasPrefix(prefix) && !entry.hasSuffix(".tmp") {
-      try fm.removeItem(at: payloadsDirectory.appendingPathComponent(entry))
+    for entry in entries
+      where entry.hasPrefix(prefix) && !entry.hasSuffix(".tmp") && entry != url.lastPathComponent {
+      try? fm.removeItem(at: payloadsDirectory.appendingPathComponent(entry))
     }
-    try fm.moveItem(at: tmpURL, to: url)
   }
 
   public func loadPayload(for recordID: UUID) async throws -> ClipboardPayload? {
     let fm = FileManager.default
-    let candidates: [String]
+    let candidates: [URL]
     do {
-      candidates = try fm.contentsOfDirectory(atPath: payloadsDirectory.path)
-        .filter { $0.hasPrefix(recordID.uuidString) && !$0.hasSuffix(".tmp") }
+      candidates = try fm.contentsOfDirectory(
+        at: payloadsDirectory,
+        includingPropertiesForKeys: [.contentModificationDateKey]
+      )
+      .filter { $0.lastPathComponent.hasPrefix(recordID.uuidString) && !$0.lastPathComponent.hasSuffix(".tmp") }
     } catch {
       return nil
     }
-    guard let name = candidates.first else { return nil }
-    let url = payloadsDirectory.appendingPathComponent(name)
+    guard let url = candidates.max(by: { lhs, rhs in
+      let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+      let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+      if lhsDate == rhsDate {
+        return lhs.lastPathComponent < rhs.lastPathComponent
+      }
+      return lhsDate < rhsDate
+    }) else { return nil }
     let data = try Data(contentsOf: url)
-    return try PayloadEnvelope.decode(data, filename: name)
+    return try PayloadEnvelope.decode(data, filename: url.lastPathComponent)
   }
 
   /// Removes all files whose name starts with `recordID.uuidString`. Idempotent.

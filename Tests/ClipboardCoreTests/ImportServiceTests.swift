@@ -61,6 +61,34 @@ final class ImportServiceTests: XCTestCase {
     }
   }
 
+  func testNewRecordHistoryFailureAfterPayloadSaveDeletesPayloadAndWritesFailedReport() async throws {
+    let store = FailingImportHistoryStore()
+    let payloads = InMemoryPayloadStore()
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+
+    do {
+      _ = try await service.importRecords([
+        .fixture(text: "history-fails", lastCopiedAt: 1, sourceRecordID: "new-history-fails")
+      ], batchSize: 1)
+      XCTFail("Expected history import failure to throw")
+    } catch {
+      let attemptedIDs = await store.attemptedImportRecordIDs()
+      XCTAssertEqual(attemptedIDs.count, 1)
+      if let attemptedID = attemptedIDs.first {
+        let payload = try await payloads.loadPayload(for: attemptedID)
+        XCTAssertNil(payload)
+      }
+      let count = try await store.count()
+      XCTAssertEqual(count, 0)
+      let written = try await readOnlyReport()
+      XCTAssertEqual(written.status, .failed)
+      XCTAssertEqual(written.failed, 1)
+      XCTAssertEqual(written.failures.count, 1)
+      XCTAssertEqual(written.failures.first?.sourceRecordID, "new-history-fails")
+      XCTAssertTrue(written.failures.first?.reason.contains("history import unavailable") ?? false)
+    }
+  }
+
   func testReplacementPayloadSaveFailureLeavesExistingRecordUnchangedAndWritesFailedReport() async throws {
     let store = InMemoryHistoryStore()
     let payloads = FailingPayloadStore()
@@ -111,6 +139,53 @@ final class ImportServiceTests: XCTestCase {
       XCTAssertEqual(written.failures.first?.sourceRecordID, "replacement-fails")
       XCTAssertEqual(written.failures.first?.source, .clipasteCloud)
       XCTAssertTrue(written.failures.first?.reason.contains("payload unavailable") ?? false)
+    }
+  }
+
+  func testReplacementHistoryFailureAfterPayloadSaveRestoresOldPayloadAndWritesFailedReport() async throws {
+    let builder = ImportRecordBuilder()
+    let existing = try builder.buildRecord(
+      from: .fixture(
+        text: "same",
+        lastCopiedAt: 10,
+        copyCount: 2,
+        groupNames: ["Current"],
+        pasteboardTypes: ["existing.type"]
+      ),
+      groupIDs: ["current"]
+    )
+    let store = FailingImportHistoryStore(existing: existing)
+    let payloads = InMemoryPayloadStore()
+    try await payloads.save(.text("old payload"), for: existing.id)
+
+    let service = ImportService(historyStore: store, payloadStore: payloads, reportsDirectory: tempDir)
+
+    do {
+      _ = try await service.importRecords([
+        .fixture(
+          text: "same",
+          lastCopiedAt: 20,
+          sourceRecordID: "replacement-history-fails",
+          copyCount: 5,
+          groupNames: ["Imported Group"],
+          pinned: true,
+          pasteboardTypes: ["imported.type"]
+        )
+      ], batchSize: 1)
+      XCTFail("Expected replacement history import failure to throw")
+    } catch {
+      let attemptedIDs = await store.attemptedImportRecordIDs()
+      XCTAssertEqual(attemptedIDs, [existing.id])
+      let records = try await store.fetchAll()
+      XCTAssertEqual(records, [existing])
+      let payload = try await payloads.loadPayload(for: existing.id)
+      XCTAssertEqual(payload, .text("old payload"))
+      let written = try await readOnlyReport()
+      XCTAssertEqual(written.status, .failed)
+      XCTAssertEqual(written.failed, 1)
+      XCTAssertEqual(written.failures.count, 1)
+      XCTAssertEqual(written.failures.first?.sourceRecordID, "replacement-history-fails")
+      XCTAssertTrue(written.failures.first?.reason.contains("history import unavailable") ?? false)
     }
   }
 
@@ -326,6 +401,7 @@ final class ImportServiceTests: XCTestCase {
 
     try paths.prepare()
 
+    XCTAssertTrue(paths.importReportsDirectory.path.hasSuffix("/imports/reports"))
     var isDirectory: ObjCBool = false
     XCTAssertTrue(FileManager.default.fileExists(atPath: paths.importReportsDirectory.path, isDirectory: &isDirectory))
     XCTAssertTrue(isDirectory.boolValue)
@@ -353,6 +429,57 @@ private struct FailingPayloadStore: ClipboardPayloadStore {
   }
 
   func delete(for recordID: UUID) async throws {}
+}
+
+private actor FailingImportHistoryStore: ImportWritableHistoryStore {
+  private var recordsByHash: [String: ClipboardRecord]
+  private var attemptedIDs: [UUID] = []
+
+  init(existing: ClipboardRecord? = nil) {
+    if let existing {
+      recordsByHash = [existing.contentHash: existing]
+    } else {
+      recordsByHash = [:]
+    }
+  }
+
+  func attemptedImportRecordIDs() -> [UUID] {
+    attemptedIDs
+  }
+
+  func record(forContentHash hash: String) async throws -> ClipboardRecord? {
+    recordsByHash[hash]
+  }
+
+  func importRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    attemptedIDs.append(record.id)
+    throw StorageError.underlying("history import unavailable")
+  }
+
+  func upsert(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    try await importRecord(record)
+  }
+
+  func fetchAll() async throws -> [ClipboardRecord] {
+    recordsByHash.values.sorted { $0.lastCopiedAt > $1.lastCopiedAt }
+  }
+
+  func fetchPage(_ query: HistoryQuery, limit: Int) async throws -> [ClipboardRecord] {
+    let all = try await fetchAll()
+    return Array(all.filter { query.matches($0) }.prefix(max(0, limit)))
+  }
+
+  func count() async throws -> Int {
+    recordsByHash.count
+  }
+
+  func removeAll() async throws {
+    recordsByHash.removeAll()
+  }
+
+  func evictOldest(percent: Double) async throws -> Int {
+    0
+  }
 }
 
 private extension Array where Element == URL {

@@ -55,6 +55,22 @@ final class SQLitePayloadStoreTests: XCTestCase {
     XCTAssertEqual(files, ["\(id.uuidString).rtf"])
   }
 
+  func testLoadPayloadPrefersNewestFileWhenStaleSameIDFileExists() async throws {
+    let store = try SQLitePayloadStore(payloadsDirectory: tempDir)
+    let id = UUID()
+    let rtf = Data([1, 2, 3])
+
+    try await store.save(.richText(plainText: "same", rtfData: rtf), for: id)
+    let staleURL = tempDir.appendingPathComponent("\(id.uuidString).txt")
+    try Data(#"{"kind":"text","textPlain":"stale"}"#.utf8).write(to: staleURL)
+    let staleDate = Date(timeIntervalSince1970: 1)
+    try FileManager.default.setAttributes([.modificationDate: staleDate], ofItemAtPath: staleURL.path)
+
+    let loaded = try await store.loadPayload(for: id)
+
+    XCTAssertEqual(loaded, .richText(plainText: "same", rtfData: rtf))
+  }
+
   func testRoundTripFileURLs() async throws {
     let store = try SQLitePayloadStore(payloadsDirectory: tempDir)
     let id = UUID()
