@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 
 public struct ClipasteImporter: Sendable {
   private let source: ImportSourceKind
@@ -47,7 +48,7 @@ public struct ClipasteImporter: Sendable {
 
   private func makeRecord(from statement: Statement, groups: [String: String]) -> ImportedRecord? {
     let primaryKey = statement.columnInt(0)
-    let sourceRecordID = nonEmptyString(statement.columnText(1)) ?? "\(primaryKey)"
+    let sourceRecordID = sourceRecordID(from: statement, primaryKey: primaryKey)
     let timestamp = statement.columnDouble(2)
     let appBundleID = nonEmptyString(statement.columnText(3))
     let appName = nonEmptyString(statement.columnText(4))
@@ -73,7 +74,7 @@ public struct ClipasteImporter: Sendable {
       return nil
     }
 
-    let date = Date(timeIntervalSince1970: timestamp)
+    let date = Date(timeIntervalSinceReferenceDate: timestamp)
     return ImportedRecord(
       source: source,
       sourceRecordID: sourceRecordID,
@@ -100,6 +101,20 @@ public struct ClipasteImporter: Sendable {
       warnings: resolved.warnings
     )
   }
+}
+
+private func sourceRecordID(from statement: Statement, primaryKey: Int) -> String {
+  if sqlite3_column_type(statement.handle, 1) == SQLITE_BLOB,
+     let data = statement.columnData(1),
+     !data.isEmpty {
+    return hexString(from: data)
+  }
+
+  return nonEmptyString(statement.columnText(1)) ?? "\(primaryKey)"
+}
+
+private func hexString(from data: Data) -> String {
+  data.map { String(format: "%02X", $0) }.joined()
 }
 
 private struct ClipastePayload {

@@ -27,7 +27,7 @@ final class ClipasteImporterTests: XCTestCase {
         record(
           primaryKey: 10,
           id: "clip-1",
-          timestamp: 1_700_000_000,
+          timestamp: 12_345,
           appBundleID: "com.apple.Safari",
           appName: "Safari",
           contentHash: "hash-1",
@@ -55,8 +55,8 @@ final class ClipasteImporterTests: XCTestCase {
     XCTAssertEqual(record.plainTextPreview, "https://example.com/article")
     XCTAssertEqual(record.sourceAppBundleId, "com.apple.Safari")
     XCTAssertEqual(record.sourceAppName, "Safari")
-    XCTAssertEqual(record.createdAt, Date(timeIntervalSince1970: 1_700_000_000))
-    XCTAssertEqual(record.lastCopiedAt, Date(timeIntervalSince1970: 1_700_000_000))
+    XCTAssertEqual(record.createdAt, Date(timeIntervalSinceReferenceDate: 12_345))
+    XCTAssertEqual(record.lastCopiedAt, Date(timeIntervalSinceReferenceDate: 12_345))
     XCTAssertTrue(record.isPinned)
     XCTAssertFalse(record.isFavorite)
     XCTAssertEqual(record.groupNames, ["Research"])
@@ -176,7 +176,7 @@ final class ClipasteImporterTests: XCTestCase {
         record(
           primaryKey: 15,
           groupID: "g3",
-          groupIDsRaw: #"["g1"; "g2", "missing"]"#,
+          groupIDsRaw: #"["g1"; "g2", "g1"; "g3", "missing"]"#,
           plainText: "multi group",
           typeRawValue: "text"
         )
@@ -186,6 +186,53 @@ final class ClipasteImporterTests: XCTestCase {
     let record = try XCTUnwrap(ClipasteImporter(source: .clipasteCloud).importRecords(from: databaseURL).first)
 
     XCTAssertEqual(record.groupNames, ["Work", "Personal", "Archive"])
+  }
+
+  func testParsesBlobSourceIDAsUppercaseHex() throws {
+    let databaseURL = tempDir.appendingPathComponent("clipaste.sqlite")
+    let idData = Data([
+      0x0C, 0xF3, 0x10, 0xA2,
+      0x7B, 0x00, 0x4E, 0x9D,
+      0x81, 0x22, 0x33, 0x44,
+      0x55, 0x66, 0x77, 0x88
+    ])
+    try makeDatabase(
+      at: databaseURL,
+      records: [
+        record(
+          primaryKey: 18,
+          idData: idData,
+          plainText: "blob id",
+          typeRawValue: "text"
+        )
+      ]
+    )
+
+    let record = try XCTUnwrap(ClipasteImporter(source: .clipasteCloud).importRecords(from: databaseURL).first)
+
+    XCTAssertEqual(record.sourceRecordID, "0CF310A27B004E9D8122334455667788")
+  }
+
+  func testValidRowWithoutGroupTableImportsIntoDefaultGroup() throws {
+    let databaseURL = tempDir.appendingPathComponent("clipaste.sqlite")
+    try makeDatabase(
+      at: databaseURL,
+      includeGroupsTable: false,
+      records: [
+        record(
+          primaryKey: 19,
+          groupID: "g1",
+          groupIDsRaw: "g1,g2",
+          plainText: "valid without groups",
+          typeRawValue: "text"
+        )
+      ]
+    )
+
+    let record = try XCTUnwrap(ClipasteImporter(source: .clipasteCloud).importRecords(from: databaseURL).first)
+
+    XCTAssertEqual(record.payload, .text("valid without groups"))
+    XCTAssertEqual(record.groupNames, ["Clipaste Import"])
   }
 
   func testSkipsRowsWithUnsupportedOrMissingRequiredPayload() throws {
@@ -212,6 +259,7 @@ final class ClipasteImporterTests: XCTestCase {
   private struct Record {
     let primaryKey: Int
     let id: String?
+    let idData: Data?
     let timestamp: Double
     let appBundleID: String?
     let appName: String?
@@ -235,6 +283,7 @@ final class ClipasteImporterTests: XCTestCase {
   private func record(
     primaryKey: Int,
     id: String? = nil,
+    idData: Data? = nil,
     timestamp: Double = 1_700_000_001,
     appBundleID: String? = nil,
     appName: String? = nil,
@@ -253,6 +302,7 @@ final class ClipasteImporterTests: XCTestCase {
     Record(
       primaryKey: primaryKey,
       id: id,
+      idData: idData,
       timestamp: timestamp,
       appBundleID: appBundleID,
       appName: appName,
@@ -356,7 +406,11 @@ final class ClipasteImporterTests: XCTestCase {
     defer { sqlite3_finalize(statement) }
 
     sqlite3_bind_int64(statement, 1, Int64(record.primaryKey))
-    bindText(statement, 2, record.id)
+    if let idData = record.idData {
+      bindData(statement, 2, idData)
+    } else {
+      bindText(statement, 2, record.id)
+    }
     sqlite3_bind_double(statement, 3, record.timestamp)
     bindText(statement, 4, record.appBundleID)
     bindText(statement, 5, record.appName)
