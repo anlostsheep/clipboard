@@ -174,9 +174,10 @@ struct QuickPanelView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {
       ScrollViewReader { proxy in
-        List {
-          ForEach(state.itemSections) { section in
-            Section {
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(state.itemSections) { section in
+              QuickPanelSectionHeader(title: section.title)
               ForEach(section.rows) { row in
                 QuickPanelRow(
                   record: row.record,
@@ -187,22 +188,23 @@ struct QuickPanelView: View {
                   }
                 )
                 .id(row.record.id)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
                 .contentShape(Rectangle())
                 .onTapGesture {
                   state.selectItem(at: row.index)
                   onSubmit()
                 }
-                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+
+                Divider()
+                  .padding(.leading, 50)
               }
-            } header: {
-              Text(section.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.vertical, 8)
         }
-        .listStyle(.plain)
         .onChange(of: state.items.map(\.id)) { _, itemIDs in
           guard let target = scrollCoordinator.targetAfterItemsChanged(
             itemIDs: itemIDs,
@@ -237,8 +239,18 @@ struct QuickPanelView: View {
     }
 
     DispatchQueue.main.async {
-      withAnimation(.easeOut(duration: 0.12)) {
+      let scrollAction = {
         proxy.scrollTo(target.recordID, anchor: anchor)
+      }
+
+      switch target.animation {
+      case .animated:
+        withAnimation(.easeOut(duration: 0.12), scrollAction)
+      case .immediate:
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        transaction.animation = nil
+        withTransaction(transaction, scrollAction)
       }
     }
   }
@@ -351,6 +363,21 @@ struct QuickPanelView: View {
         focusSearch()
       }
     )
+  }
+}
+
+private struct QuickPanelSectionHeader: View {
+  let title: String
+
+  var body: some View {
+    Text(title)
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(.secondary)
+      .textCase(.uppercase)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 14)
+      .padding(.top, 10)
+      .padding(.bottom, 6)
   }
 }
 

@@ -9,7 +9,16 @@ final class QuickPanelScrollCoordinatorTests: XCTestCase {
 
     let target = coordinator.targetAfterItemsChanged(itemIDs: [firstID, secondID], selectedIndex: 0)
 
-    XCTAssertEqual(target, QuickPanelScrollTarget(recordID: firstID, anchor: .center))
+    XCTAssertEqual(target, QuickPanelScrollTarget(recordID: firstID, anchor: .center, animation: .immediate))
+  }
+
+  func testItemsChangeScrollsImmediatelyToAvoidListMutationAnimationOverlap() {
+    var coordinator = QuickPanelScrollCoordinator()
+    let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000035")!
+
+    let target = coordinator.targetAfterItemsChanged(itemIDs: [firstID], selectedIndex: 0)
+
+    XCTAssertEqual(target?.animation, .immediate)
   }
 
   func testSelectionChangeRequestsCenteredSelectedItemScroll() {
@@ -21,5 +30,13 @@ final class QuickPanelScrollCoordinatorTests: XCTestCase {
     )
 
     XCTAssertEqual(target, QuickPanelScrollTarget(recordID: secondID, anchor: .center))
+  }
+
+  func testSelectionChangeCanAnimateToKeepKeyboardNavigationLegible() {
+    let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000036")!
+
+    let target = QuickPanelScrollCoordinator.targetForSelectionChange(itemIDs: [firstID], selectedIndex: 0)
+
+    XCTAssertEqual(target?.animation, .animated)
   }
 }
