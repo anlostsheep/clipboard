@@ -15,27 +15,48 @@ public struct ClipboardCaptureCoordinator: Sendable {
   private let ingestService: ClipboardIngestService
   private let payloadStore: any ClipboardPayloadStore
   private let failureHandler: any StorageFailureHandler
+  private let captureControl: CaptureControlService?
 
   public init(
     monitor: ClipboardMonitor,
     ingestService: ClipboardIngestService,
     payloadStore: any ClipboardPayloadStore,
-    failureHandler: any StorageFailureHandler
+    failureHandler: any StorageFailureHandler,
+    captureControl: CaptureControlService? = nil
   ) {
     self.monitor = monitor
     self.ingestService = ingestService
     self.payloadStore = payloadStore
     self.failureHandler = failureHandler
+    self.captureControl = captureControl
   }
 
   public func captureLatestChange() async throws -> ClipboardRecord? {
     guard let capture = await monitor.poll() else { return nil }
+    if let captureControl {
+      switch await captureControl.evaluate(capture) {
+      case .allow:
+        return try await ingest(capture, applyingIngestPrivacyPolicy: false)
+      case .skip:
+        return nil
+      }
+    }
     return try await ingest(capture)
   }
 
   public func ingest(_ capture: ClipboardCapture) async throws -> ClipboardRecord? {
+    try await ingest(capture, applyingIngestPrivacyPolicy: true)
+  }
+
+  private func ingest(
+    _ capture: ClipboardCapture,
+    applyingIngestPrivacyPolicy: Bool
+  ) async throws -> ClipboardRecord? {
     // Build the record first (privacy check + metadata) without touching the DB.
-    guard let record = try ingestService.makeRecord(from: capture) else { return nil }
+    guard let record = try ingestService.makeRecord(
+      from: capture,
+      applyingPrivacyPolicy: applyingIngestPrivacyPolicy
+    ) else { return nil }
 
     // Persist payload to file system before writing to DB (spec §4 ordering).
     // If payload save fails, no DB row is ever written — no orphan records.

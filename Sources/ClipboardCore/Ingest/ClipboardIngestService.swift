@@ -23,7 +23,14 @@ public struct ClipboardIngestService: Sendable {
 
   /// Builds the record without persisting it. Returns nil if PrivacyPolicy filters this capture.
   public func makeRecord(from capture: ClipboardCapture) throws -> ClipboardRecord? {
-    guard !privacyPolicy.shouldIgnore(
+    try makeRecord(from: capture, applyingPrivacyPolicy: true)
+  }
+
+  public func makeRecord(
+    from capture: ClipboardCapture,
+    applyingPrivacyPolicy: Bool
+  ) throws -> ClipboardRecord? {
+    guard !applyingPrivacyPolicy || !privacyPolicy.shouldIgnore(
       pasteboardTypes: capture.pasteboardTypes,
       sourceBundleId: capture.sourceAppBundleId
     ) else {
