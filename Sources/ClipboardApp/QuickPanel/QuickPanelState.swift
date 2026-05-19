@@ -79,6 +79,17 @@ struct QuickPanelItemSection: Identifiable, Equatable {
   }
 }
 
+struct QuickPanelItemRenderIdentity: Hashable {
+  let recordID: UUID
+  let isPinned: Bool
+
+  static func make(from items: [ClipboardRecord]) -> [QuickPanelItemRenderIdentity] {
+    items.map { record in
+      QuickPanelItemRenderIdentity(recordID: record.id, isPinned: record.isPinned)
+    }
+  }
+}
+
 @MainActor
 final class QuickPanelState: ObservableObject {
   @Published private(set) var query = ""
@@ -163,6 +174,10 @@ final class QuickPanelState: ObservableObject {
 
   var itemSections: [QuickPanelItemSection] {
     QuickPanelItemSection.make(from: items)
+  }
+
+  var itemRenderIdentities: [QuickPanelItemRenderIdentity] {
+    QuickPanelItemRenderIdentity.make(from: items)
   }
 
   func moveSelection(delta: Int) {

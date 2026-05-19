@@ -204,6 +204,11 @@ struct QuickPanelView: View {
           }
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.vertical, 8)
+          .id(state.itemRenderIdentities)
+        }
+        .transaction { transaction in
+          transaction.disablesAnimations = true
+          transaction.animation = nil
         }
         .onChange(of: state.items.map(\.id)) { _, itemIDs in
           guard let target = scrollCoordinator.targetAfterItemsChanged(

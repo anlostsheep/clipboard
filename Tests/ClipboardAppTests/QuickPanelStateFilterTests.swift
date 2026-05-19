@@ -191,6 +191,21 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.footerStatus, "Pinned item")
   }
 
+  func testItemRenderIdentityChangesWhenPinnedStateChanges() async throws {
+    let store = InMemoryHistoryStore()
+    let record = makePanelRecord(hash: "item", title: "Item", type: .text, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    let state = makeState(store: store)
+
+    await state.refresh()
+    let before = state.itemRenderIdentities
+    await state.togglePinned()
+    let after = state.itemRenderIdentities
+
+    XCTAssertEqual(before.map(\.recordID), after.map(\.recordID))
+    XCTAssertNotEqual(before, after)
+  }
+
   func testItemSectionsSeparatePinnedItemsFromHistory() async throws {
     let store = InMemoryHistoryStore()
     _ = try await store.upsert(makePanelRecord(hash: "newer", title: "Newer", type: .text, lastCopiedAt: 3))
