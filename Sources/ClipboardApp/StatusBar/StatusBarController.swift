@@ -10,6 +10,7 @@ final class StatusBarController {
     private var statusItem: NSStatusItem?
     private let onLeftClick: (NSPoint) -> Void
     private let onQuit: () -> Void
+    private let onOpenSettings: () -> Void
     private let onToggleCapture: () -> Void
     private let onIgnoreNextCopy: () -> Void
     private let isCapturePaused: () -> Bool
@@ -18,12 +19,14 @@ final class StatusBarController {
     init(
         onLeftClick: @escaping (NSPoint) -> Void,
         onQuit: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void = {},
         onToggleCapture: @escaping () -> Void = {},
         onIgnoreNextCopy: @escaping () -> Void = {},
         isCapturePaused: @escaping () -> Bool = { false }
     ) {
         self.onLeftClick = onLeftClick
         self.onQuit = onQuit
+        self.onOpenSettings = onOpenSettings
         self.onToggleCapture = onToggleCapture
         self.onIgnoreNextCopy = onIgnoreNextCopy
         self.isCapturePaused = isCapturePaused
@@ -84,7 +87,8 @@ final class StatusBarController {
         return eventType == .rightMouseUp ? .showMenu : .openPanel
     }
 
-    private func showContextMenu() {
+    @MainActor
+    func makeContextMenu() -> NSMenu {
         let menu = NSMenu()
         let pauseTitle = isCapturePaused() ? "恢复采集" : "暂停采集"
         let pauseItem = NSMenuItem(title: pauseTitle, action: #selector(toggleCapture), keyEquivalent: "")
@@ -95,15 +99,26 @@ final class StatusBarController {
         ignoreNextCopyItem.target = self
         menu.addItem(ignoreNextCopyItem)
 
+        let settingsItem = NSMenuItem(title: "设置...", action: #selector(openSettingsAction), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(title: "退出 Clipboard", action: #selector(quitAction), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
+        return menu
+    }
 
-        statusItem?.menu = menu
+    private func showContextMenu() {
+        statusItem?.menu = makeContextMenu()
         statusItem?.button?.performClick(nil)
         statusItem?.menu = nil
+    }
+
+    @MainActor @objc private func openSettingsAction() {
+        onOpenSettings()
     }
 
     @MainActor @objc private func quitAction() {

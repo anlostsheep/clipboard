@@ -4,7 +4,7 @@ import Foundation
 /// triggers `evictOldest` to free space, retrying up to `maxRounds` times.
 /// Decouples self-healing logic from the SQLite implementation for testability
 /// and allows wrapping any conforming `HistoryStore`.
-public actor SelfHealingHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating {
+public actor SelfHealingHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating, HistoryMutationStore {
   private let underlying: any HistoryStore
   private let maxRounds: Int
   private let evictPercent: Double
@@ -70,6 +70,27 @@ public actor SelfHealingHistoryStore: ImportWritableHistoryStore, RetentionPolic
 
   public func removeAll() async throws {
     try await underlying.removeAll()
+  }
+
+  public func deleteRecord(id: UUID) async throws -> ClipboardRecord? {
+    guard let mutating = underlying as? any HistoryMutationStore else {
+      return nil
+    }
+    return try await mutating.deleteRecord(id: id)
+  }
+
+  public func replaceRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    guard let mutating = underlying as? any HistoryMutationStore else {
+      throw HistoryMutationError.mutationUnsupported
+    }
+    return try await mutating.replaceRecord(record)
+  }
+
+  public func clearUnpinned() async throws -> [ClipboardRecord] {
+    guard let mutating = underlying as? any HistoryMutationStore else {
+      return []
+    }
+    return try await mutating.clearUnpinned()
   }
 
   public func evictOldest(percent: Double) async throws -> Int {

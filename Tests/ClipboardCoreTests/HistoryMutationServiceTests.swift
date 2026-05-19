@@ -21,6 +21,27 @@ final class HistoryMutationServiceTests: XCTestCase {
     XCTAssertNil(payload)
   }
 
+  func testDeleteRecordWorksThroughProductionStorageWrappers() async throws {
+    let sqliteLikeHistory = InMemoryHistoryStore()
+    let payloads = InMemoryPayloadStore()
+    let healing = SelfHealingHistoryStore(underlying: sqliteLikeHistory)
+    let cleaning = PayloadCleaningHistoryStore(underlying: healing, payloadStore: payloads)
+    let service = HistoryMutationService(store: cleaning, payloadStore: payloads)
+    let record = makeMutationRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000406")!,
+      hash: "wrapped-delete"
+    )
+    _ = try await cleaning.upsert(record)
+    try await payloads.save(.text("payload"), for: record.id)
+
+    try await service.deleteRecord(id: record.id)
+
+    let remaining = try await cleaning.fetchAll()
+    let payload = try await payloads.loadPayload(for: record.id)
+    XCTAssertTrue(remaining.isEmpty)
+    XCTAssertNil(payload)
+  }
+
   func testTogglePinnedUpdatesRetentionExempt() async throws {
     let history = InMemoryHistoryStore()
     let payloads = InMemoryPayloadStore()

@@ -50,13 +50,25 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
     }
 
-    func testOptionDeleteDeletesSelectedItem() {
-        let action = QuickPanelKeyCaptureView.keyboardAction(
-            keyCode: UInt16(kVK_Delete),
-            modifierFlags: [.option]
+    func testDeleteShortcutsAreNotCaptured() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Delete),
+                modifierFlags: [.option]
+            )
         )
-
-        XCTAssertEqual(action, .deleteSelected)
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Delete),
+                modifierFlags: [.option, .command]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Delete),
+                modifierFlags: [.shift, .option, .command]
+            )
+        )
     }
 
     func testOptionPTogglesPinnedItem() {
@@ -66,24 +78,6 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
 
         XCTAssertEqual(action, .togglePinned)
-    }
-
-    func testOptionCommandDeleteClearsUnpinnedItems() {
-        let action = QuickPanelKeyCaptureView.keyboardAction(
-            keyCode: UInt16(kVK_Delete),
-            modifierFlags: [.option, .command]
-        )
-
-        XCTAssertEqual(action, .clearUnpinned)
-    }
-
-    func testShiftOptionCommandDeleteClearsAllItems() {
-        let action = QuickPanelKeyCaptureView.keyboardAction(
-            keyCode: UInt16(kVK_Delete),
-            modifierFlags: [.shift, .option, .command]
-        )
-
-        XCTAssertEqual(action, .clearAll)
     }
 
     func testDestructiveShortcutsRequireExactModifiers() {

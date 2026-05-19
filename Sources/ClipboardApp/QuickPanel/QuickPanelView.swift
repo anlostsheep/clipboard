@@ -316,26 +316,10 @@ struct QuickPanelView: View {
       onOpenSettings: {
         AppDelegate.shared.openSettings()
       },
-      onDeleteSelected: {
-        Task {
-          await state.deleteSelected()
-        }
-        focusSearch()
-      },
       onTogglePinned: {
         Task {
           await state.togglePinned()
         }
-        focusSearch()
-      },
-      onClearUnpinned: {
-        Task {
-          await state.clearUnpinned()
-        }
-        focusSearch()
-      },
-      onClearAll: {
-        confirmsClearAll = true
         focusSearch()
       }
     )

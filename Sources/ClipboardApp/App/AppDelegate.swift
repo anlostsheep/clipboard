@@ -60,6 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onQuit: {
                 NSApp.terminate(nil)
             },
+            onOpenSettings: { [weak self] in
+                self?.openSettings()
+            },
             onToggleCapture: { [weak self] in
                 guard let self else { return }
                 if self.services.capturePaused {
