@@ -224,7 +224,8 @@ public actor ImportService {
     candidate: ClipboardRecord,
     existing: ClipboardRecord
   ) -> ClipboardRecord {
-    ClipboardRecord(
+    let isPinned = existing.isPinned || candidate.isPinned
+    return ClipboardRecord(
       id: existing.id,
       contentHash: candidate.contentHash,
       primaryType: candidate.primaryType,
@@ -236,7 +237,8 @@ public actor ImportService {
       createdAt: existing.createdAt,
       lastCopiedAt: candidate.lastCopiedAt,
       copyCount: boundedCopyCount(existing.copyCount + candidate.copyCount),
-      isPinned: existing.isPinned || candidate.isPinned,
+      isPinned: isPinned,
+      pinnedAt: isPinned ? existing.pinnedAt ?? candidate.pinnedAt : nil,
       isFavorite: existing.isFavorite || candidate.isFavorite,
       groupIds: orderedUnion(existing.groupIds, candidate.groupIds),
       retentionExempt: existing.retentionExempt || candidate.retentionExempt ||
@@ -254,6 +256,7 @@ public actor ImportService {
     merged.copyCount = boundedCopyCount(existing.copyCount + candidate.copyCount)
     merged.groupIds = orderedUnion(existing.groupIds, candidate.groupIds)
     merged.isPinned = existing.isPinned || candidate.isPinned
+    merged.pinnedAt = merged.isPinned ? existing.pinnedAt ?? candidate.pinnedAt : nil
     merged.isFavorite = existing.isFavorite || candidate.isFavorite
     if existing.sourceDeviceHint == .universalClipboard || candidate.sourceDeviceHint == .universalClipboard {
       merged.sourceDeviceHint = .universalClipboard

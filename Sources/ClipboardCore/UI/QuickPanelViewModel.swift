@@ -46,6 +46,13 @@ public actor QuickPanelViewModel {
     if lhs.isPinned != rhs.isPinned {
       return lhs.isPinned && !rhs.isPinned
     }
+    if lhs.isPinned && rhs.isPinned {
+      let lhsPinnedAt = lhs.pinnedAt ?? lhs.lastCopiedAt
+      let rhsPinnedAt = rhs.pinnedAt ?? rhs.lastCopiedAt
+      if lhsPinnedAt != rhsPinnedAt {
+        return lhsPinnedAt > rhsPinnedAt
+      }
+    }
     if lhs.lastCopiedAt != rhs.lastCopiedAt {
       return lhs.lastCopiedAt > rhs.lastCopiedAt
     }

@@ -45,7 +45,8 @@ final class HistoryMutationServiceTests: XCTestCase {
   func testTogglePinnedUpdatesRetentionExempt() async throws {
     let history = InMemoryHistoryStore()
     let payloads = InMemoryPayloadStore()
-    let service = HistoryMutationService(store: history, payloadStore: payloads)
+    let pinnedAt = Date(timeIntervalSince1970: 123)
+    let service = HistoryMutationService(store: history, payloadStore: payloads, now: { pinnedAt })
     let record = makeMutationRecord(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000402")!,
       hash: "pin",
@@ -59,10 +60,32 @@ final class HistoryMutationServiceTests: XCTestCase {
 
     XCTAssertTrue(updated.isPinned)
     XCTAssertTrue(updated.retentionExempt)
+    XCTAssertEqual(updated.pinnedAt, pinnedAt)
     let stored = try await history.fetchAll().first
     XCTAssertEqual(stored?.id, record.id)
     XCTAssertEqual(stored?.isPinned, true)
     XCTAssertEqual(stored?.retentionExempt, true)
+    XCTAssertEqual(stored?.pinnedAt, pinnedAt)
+  }
+
+  func testTogglePinnedClearsPinnedAtWhenUnpinning() async throws {
+    let history = InMemoryHistoryStore()
+    let payloads = InMemoryPayloadStore()
+    let service = HistoryMutationService(store: history, payloadStore: payloads)
+    let record = makeMutationRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000407")!,
+      hash: "unpin",
+      isPinned: true,
+      retentionExempt: true,
+      pinnedAt: Date(timeIntervalSince1970: 5)
+    )
+    _ = try await history.upsert(record)
+
+    let updated = try await service.togglePinned(id: record.id)
+
+    XCTAssertFalse(updated.isPinned)
+    XCTAssertFalse(updated.retentionExempt)
+    XCTAssertNil(updated.pinnedAt)
   }
 
   func testClearUnpinnedPreservesPinnedRecordsAndRemovesUnpinnedPayloads() async throws {
@@ -108,7 +131,8 @@ private func makeMutationRecord(
   hash: String,
   isPinned: Bool = false,
   isFavorite: Bool = false,
-  retentionExempt: Bool = false
+  retentionExempt: Bool = false,
+  pinnedAt: Date? = nil
 ) -> ClipboardRecord {
   ClipboardRecord(
     id: id,
@@ -123,6 +147,7 @@ private func makeMutationRecord(
     lastCopiedAt: Date(timeIntervalSince1970: 0),
     copyCount: 1,
     isPinned: isPinned,
+    pinnedAt: pinnedAt,
     isFavorite: isFavorite,
     groupIds: [],
     retentionExempt: retentionExempt,

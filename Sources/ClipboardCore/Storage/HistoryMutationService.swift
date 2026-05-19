@@ -8,10 +8,16 @@ public enum HistoryMutationError: Error, Equatable {
 public actor HistoryMutationService {
   private let store: any HistoryStore
   private let payloadStore: any ClipboardPayloadStore
+  private let now: @Sendable () -> Date
 
-  public init(store: any HistoryStore, payloadStore: any ClipboardPayloadStore) {
+  public init(
+    store: any HistoryStore,
+    payloadStore: any ClipboardPayloadStore,
+    now: @escaping @Sendable () -> Date = { Date() }
+  ) {
     self.store = store
     self.payloadStore = payloadStore
+    self.now = now
   }
 
   public func deleteRecord(id: UUID) async throws {
@@ -29,6 +35,7 @@ public actor HistoryMutationService {
       throw HistoryMutationError.recordNotFound
     }
     record.isPinned.toggle()
+    record.pinnedAt = record.isPinned ? now() : nil
     record.retentionExempt = record.isPinned || record.isFavorite
     return try await mutationStore.replaceRecord(record)
   }

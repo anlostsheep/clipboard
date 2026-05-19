@@ -74,6 +74,7 @@ public struct ClipboardRecord: Identifiable, Codable, Equatable, Sendable {
   public var lastCopiedAt: Date
   public var copyCount: Int
   public var isPinned: Bool
+  public var pinnedAt: Date?
   public var isFavorite: Bool
   public var groupIds: [String]
   public var retentionExempt: Bool
@@ -93,6 +94,7 @@ public struct ClipboardRecord: Identifiable, Codable, Equatable, Sendable {
     lastCopiedAt: Date,
     copyCount: Int,
     isPinned: Bool,
+    pinnedAt: Date? = nil,
     isFavorite: Bool,
     groupIds: [String],
     retentionExempt: Bool,
@@ -111,6 +113,7 @@ public struct ClipboardRecord: Identifiable, Codable, Equatable, Sendable {
     self.lastCopiedAt = lastCopiedAt
     self.copyCount = copyCount
     self.isPinned = isPinned
+    self.pinnedAt = pinnedAt
     self.isFavorite = isFavorite
     self.groupIds = groupIds
     self.retentionExempt = retentionExempt

@@ -18,6 +18,7 @@ public struct ImportRecordBuilder: Sendable {
       lastCopiedAt: imported.lastCopiedAt,
       copyCount: imported.copyCount,
       isPinned: imported.isPinned,
+      pinnedAt: imported.isPinned ? imported.lastCopiedAt : nil,
       isFavorite: imported.isFavorite,
       groupIds: groupIDs,
       retentionExempt: imported.isPinned || imported.isFavorite,

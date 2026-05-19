@@ -216,9 +216,9 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
         id, content_hash, primary_type, title, plain_preview,
         source_bundle, source_app, source_device,
         created_at, last_copied_at, copy_count,
-        is_pinned, is_favorite, group_ids_json, retention_exempt,
+        is_pinned, pinned_at, is_favorite, group_ids_json, retention_exempt,
         metadata_json, pasteboard_types_json, payload_ref
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(content_hash) DO UPDATE SET
         copy_count = copy_count + 1,
         last_copied_at = excluded.last_copied_at
@@ -237,12 +237,13 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
     stmt.bindDouble(10, r.lastCopiedAt.timeIntervalSince1970)
     stmt.bindInt(11, r.copyCount)
     stmt.bindBool(12, r.isPinned)
-    stmt.bindBool(13, r.isFavorite)
-    stmt.bindText(14, try Self.encodeJSON(r.groupIds))
-    stmt.bindBool(15, r.retentionExempt)
-    stmt.bindText(16, try Self.encodeJSONOptional(r.metadata))
-    stmt.bindText(17, try Self.encodeJSON(Array(r.pasteboardTypes)))
-    stmt.bindText(18, nil)  // payload_ref handled separately by PayloadStore
+    bindDate(13, r.pinnedAt, to: stmt)
+    stmt.bindBool(14, r.isFavorite)
+    stmt.bindText(15, try Self.encodeJSON(r.groupIds))
+    stmt.bindBool(16, r.retentionExempt)
+    stmt.bindText(17, try Self.encodeJSONOptional(r.metadata))
+    stmt.bindText(18, try Self.encodeJSON(Array(r.pasteboardTypes)))
+    stmt.bindText(19, nil)  // payload_ref handled separately by PayloadStore
     _ = try stmt.step()
   }
 
@@ -252,9 +253,9 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
         id, content_hash, primary_type, title, plain_preview,
         source_bundle, source_app, source_device,
         created_at, last_copied_at, copy_count,
-        is_pinned, is_favorite, group_ids_json, retention_exempt,
+        is_pinned, pinned_at, is_favorite, group_ids_json, retention_exempt,
         metadata_json, pasteboard_types_json, payload_ref
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(content_hash) DO UPDATE SET
         id = excluded.id,
         primary_type = excluded.primary_type,
@@ -267,6 +268,7 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
         last_copied_at = excluded.last_copied_at,
         copy_count = excluded.copy_count,
         is_pinned = excluded.is_pinned,
+        pinned_at = excluded.pinned_at,
         is_favorite = excluded.is_favorite,
         group_ids_json = excluded.group_ids_json,
         retention_exempt = excluded.retention_exempt,
@@ -288,13 +290,22 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
     stmt.bindDouble(10, r.lastCopiedAt.timeIntervalSince1970)
     stmt.bindInt(11, r.copyCount)
     stmt.bindBool(12, r.isPinned)
-    stmt.bindBool(13, r.isFavorite)
-    stmt.bindText(14, try Self.encodeJSON(r.groupIds))
-    stmt.bindBool(15, r.retentionExempt)
-    stmt.bindText(16, try Self.encodeJSONOptional(r.metadata))
-    stmt.bindText(17, try Self.encodeJSON(Array(r.pasteboardTypes)))
-    stmt.bindText(18, nil)
+    bindDate(13, r.pinnedAt, to: stmt)
+    stmt.bindBool(14, r.isFavorite)
+    stmt.bindText(15, try Self.encodeJSON(r.groupIds))
+    stmt.bindBool(16, r.retentionExempt)
+    stmt.bindText(17, try Self.encodeJSONOptional(r.metadata))
+    stmt.bindText(18, try Self.encodeJSON(Array(r.pasteboardTypes)))
+    stmt.bindText(19, nil)
     _ = try stmt.step()
+  }
+
+  private func bindDate(_ index: Int32, _ value: Date?, to stmt: Statement) {
+    if let value {
+      stmt.bindDouble(index, value.timeIntervalSince1970)
+    } else {
+      stmt.bindText(index, nil)
+    }
   }
 
   /// Deletes records by UUID.
@@ -365,7 +376,7 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
       SELECT id, content_hash, primary_type, title, plain_preview,
              source_bundle, source_app, source_device,
              created_at, last_copied_at, copy_count,
-             is_pinned, is_favorite, group_ids_json, retention_exempt,
+             is_pinned, pinned_at, is_favorite, group_ids_json, retention_exempt,
              metadata_json, pasteboard_types_json, payload_ref
       FROM records
       """
@@ -396,11 +407,12 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
       lastCopiedAt: Date(timeIntervalSince1970: stmt.columnDouble(9)),
       copyCount: stmt.columnInt(10),
       isPinned: stmt.columnBool(11),
-      isFavorite: stmt.columnBool(12),
-      groupIds: try decodeJSON([String].self, from: stmt.columnText(13) ?? "[]"),
-      retentionExempt: stmt.columnBool(14),
-      metadata: try decodeJSONOptional(LargeTextMetadata.self, from: stmt.columnText(15)),
-      pasteboardTypes: Set(try decodeJSON([String].self, from: stmt.columnText(16) ?? "[]"))
+      pinnedAt: stmt.columnIsNull(12) ? nil : Date(timeIntervalSince1970: stmt.columnDouble(12)),
+      isFavorite: stmt.columnBool(13),
+      groupIds: try decodeJSON([String].self, from: stmt.columnText(14) ?? "[]"),
+      retentionExempt: stmt.columnBool(15),
+      metadata: try decodeJSONOptional(LargeTextMetadata.self, from: stmt.columnText(16)),
+      pasteboardTypes: Set(try decodeJSON([String].self, from: stmt.columnText(17) ?? "[]"))
     )
   }
 

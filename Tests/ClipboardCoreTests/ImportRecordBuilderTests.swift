@@ -33,6 +33,7 @@ final class ImportRecordBuilderTests: XCTestCase {
     XCTAssertEqual(first.title, "Example")
     XCTAssertEqual(first.copyCount, 3)
     XCTAssertEqual(first.isPinned, true)
+    XCTAssertEqual(first.pinnedAt, imported.lastCopiedAt)
     XCTAssertEqual(first.retentionExempt, true)
     XCTAssertEqual(first.groupIds, ["maccy-import"])
     XCTAssertEqual(first.sourceDeviceHint, .imported)

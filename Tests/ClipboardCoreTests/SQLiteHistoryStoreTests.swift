@@ -1,4 +1,5 @@
 import XCTest
+import SQLite3
 @testable import ClipboardCore
 
 final class SQLiteHistoryStoreTests: XCTestCase {
@@ -70,6 +71,86 @@ final class SQLiteHistoryStoreTests: XCTestCase {
     XCTAssertEqual(records.first?.id, replacement.id)
     XCTAssertEqual(records.first?.copyCount, 2)
     XCTAssertEqual(records.first?.title, "replacement")
+  }
+
+  func testPinnedAtSurvivesColdStart() async throws {
+    let storeA = try makeStore()
+    let pinnedAt = Date(timeIntervalSince1970: 123)
+    _ = try await storeA.importRecord(makeRecord(hash: "pin", title: "p", isPinned: true, pinnedAt: pinnedAt))
+    await storeA.close()
+
+    let storeB = try makeStore()
+    let records = try await storeB.fetchAll()
+
+    XCTAssertEqual(records.first?.pinnedAt, pinnedAt)
+  }
+
+  func testMigratesV1DatabaseByAddingPinnedAtColumn() async throws {
+    let dbPath = tempDir.appendingPathComponent("legacy.sqlite")
+    do {
+      let connection = try SQLiteConnection(path: dbPath.path)
+      try connection.exec("""
+        CREATE TABLE records (
+            id              TEXT PRIMARY KEY,
+            content_hash    TEXT NOT NULL UNIQUE,
+            primary_type    TEXT NOT NULL,
+            title           TEXT NOT NULL,
+            plain_preview   TEXT,
+            source_bundle   TEXT,
+            source_app      TEXT,
+            source_device   TEXT NOT NULL,
+            created_at      REAL NOT NULL,
+            last_copied_at  REAL NOT NULL,
+            copy_count      INTEGER NOT NULL,
+            is_pinned       INTEGER NOT NULL,
+            is_favorite     INTEGER NOT NULL,
+            group_ids_json  TEXT NOT NULL,
+            retention_exempt INTEGER NOT NULL,
+            metadata_json   TEXT,
+            pasteboard_types_json TEXT NOT NULL,
+            payload_ref     TEXT
+        )
+      """)
+      try connection.exec("CREATE INDEX idx_last_copied_at ON records(last_copied_at DESC)")
+      try connection.exec("CREATE INDEX idx_pinned_favorite ON records(is_pinned, is_favorite)")
+      try connection.exec("""
+        INSERT INTO records (
+          id, content_hash, primary_type, title, plain_preview,
+          source_bundle, source_app, source_device,
+          created_at, last_copied_at, copy_count,
+          is_pinned, is_favorite, group_ids_json, retention_exempt,
+          metadata_json, pasteboard_types_json, payload_ref
+        ) VALUES (
+          '00000000-0000-0000-0000-000000000333', 'legacy-pin', 'text', 'legacy pin', 'legacy pin',
+          NULL, 'App', 'local',
+          1, 2, 1,
+          1, 0, '[]', 1,
+          NULL, '["public.utf8-plain-text"]', NULL
+        )
+      """)
+      try connection.exec("PRAGMA user_version = 1")
+    }
+
+    let store = try SQLiteHistoryStore(databaseFile: dbPath)
+    let records = try await store.fetchAll()
+    await store.close()
+
+    XCTAssertEqual(records.count, 1)
+    XCTAssertEqual(records.first?.title, "legacy pin")
+    XCTAssertEqual(records.first?.isPinned, true)
+    XCTAssertNil(records.first?.pinnedAt)
+
+    let connection = try SQLiteConnection(path: dbPath.path)
+    XCTAssertEqual(try connection.intScalar("PRAGMA user_version"), SQLiteSchema.currentVersion)
+    let stmt = try connection.prepare("PRAGMA table_info(records)")
+    defer { stmt.finalize() }
+    var columns: [String] = []
+    while try stmt.step() == SQLITE_ROW {
+      if let name = stmt.columnText(1) {
+        columns.append(name)
+      }
+    }
+    XCTAssertTrue(columns.contains("pinned_at"))
   }
 
   func testRecordForContentHashLooksUpImportedRecord() async throws {
@@ -180,7 +261,8 @@ private func makeRecord(
   copyCount: Int = 1,
   lastCopiedAt: TimeInterval? = nil,
   isPinned: Bool = false,
-  isFavorite: Bool = false
+  isFavorite: Bool = false,
+  pinnedAt: Date? = nil
 ) -> ClipboardRecord {
   let copiedAt = Date(timeIntervalSinceNow: -(lastCopiedAt ?? TimeInterval(abs(hash.hashValue) % 10000)))
   return ClipboardRecord(
@@ -196,6 +278,7 @@ private func makeRecord(
     lastCopiedAt: copiedAt,
     copyCount: copyCount,
     isPinned: isPinned,
+    pinnedAt: pinnedAt,
     isFavorite: isFavorite,
     groupIds: [],
     retentionExempt: false,

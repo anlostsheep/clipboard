@@ -1,14 +1,17 @@
 import Foundation
+import SQLite3
 
 enum SQLiteSchema {
-  static let currentVersion: Int = 1
+  static let currentVersion: Int = 2
 
   static func migrate(connection: SQLiteConnection) throws {
     let version = try connection.intScalar("PRAGMA user_version")
     if version < 1 {
       try migrateToV1(connection: connection)
     }
-    // Future v2: if version < 2 { try migrateToV2(connection: connection) }
+    if version < 2 {
+      try migrateToV2(connection: connection)
+    }
   }
 
   static func setupPragmas(connection: SQLiteConnection) throws {
@@ -44,6 +47,29 @@ enum SQLiteSchema {
     try connection.exec("CREATE INDEX IF NOT EXISTS idx_last_copied_at ON records(last_copied_at DESC)")
     try connection.exec("CREATE INDEX IF NOT EXISTS idx_pinned_favorite ON records(is_pinned, is_favorite)")
     try connection.exec("PRAGMA user_version = 1")
+  }
+
+  private static func migrateToV2(connection: SQLiteConnection) throws {
+    if try !hasColumn("pinned_at", in: "records", connection: connection) {
+      try connection.exec("ALTER TABLE records ADD COLUMN pinned_at REAL")
+    }
+    try connection.exec("CREATE INDEX IF NOT EXISTS idx_pinned_at ON records(is_pinned, pinned_at DESC)")
+    try connection.exec("PRAGMA user_version = 2")
+  }
+
+  private static func hasColumn(
+    _ column: String,
+    in table: String,
+    connection: SQLiteConnection
+  ) throws -> Bool {
+    let stmt = try connection.prepare("PRAGMA table_info(\(table))")
+    defer { stmt.finalize() }
+    while try stmt.step() == SQLITE_ROW {
+      if stmt.columnText(1) == column {
+        return true
+      }
+    }
+    return false
   }
 
   /// Backs up a corrupted database file. Returns the backup URL.

@@ -118,13 +118,47 @@ final class QuickPanelViewModelTests: XCTestCase {
     XCTAssertEqual(titles, ["older pinned", "newer unpinned", "middle unpinned"])
   }
 
+  func testRefreshSortsPinnedItemsByPinnedAtDescending() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000030")!,
+      title: "copied newer pinned earlier",
+      lastCopiedAt: 30,
+      isPinned: true,
+      pinnedAt: 5
+    ))
+    _ = try await store.upsert(makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000031")!,
+      title: "copied older pinned later",
+      lastCopiedAt: 10,
+      isPinned: true,
+      pinnedAt: 20
+    ))
+    _ = try await store.upsert(makeRecord(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000032")!,
+      title: "newest unpinned",
+      lastCopiedAt: 40
+    ))
+
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+    await viewModel.refresh(query: "")
+    let titles = await viewModel.items.map(\.title)
+
+    XCTAssertEqual(titles, [
+      "copied older pinned later",
+      "copied newer pinned earlier",
+      "newest unpinned"
+    ])
+  }
+
   private func makeRecord(
     id: UUID,
     title: String,
     primaryType: ClipboardContentType = .text,
     lastCopiedAt: TimeInterval,
     groupIds: [String] = [],
-    isPinned: Bool = false
+    isPinned: Bool = false,
+    pinnedAt: TimeInterval? = nil
   ) -> ClipboardRecord {
     ClipboardRecord(
       id: id,
@@ -139,6 +173,7 @@ final class QuickPanelViewModelTests: XCTestCase {
       lastCopiedAt: Date(timeIntervalSince1970: lastCopiedAt),
       copyCount: 1,
       isPinned: isPinned,
+      pinnedAt: pinnedAt.map(Date.init(timeIntervalSince1970:)),
       isFavorite: false,
       groupIds: groupIds,
       retentionExempt: isPinned,
