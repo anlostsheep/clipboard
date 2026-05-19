@@ -13,7 +13,7 @@ public struct RetentionPolicy: Sendable {
   }
 }
 
-public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating {
+public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating, HistoryMutationStore {
   private let connection: SQLiteConnection
   private var retentionPolicy: RetentionPolicy
   private var indexByHash: [String: ClipboardRecord] = [:]
@@ -136,6 +136,53 @@ public actor SQLiteHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpda
   public func removeAll() async throws {
     try connection.exec("DELETE FROM records")
     indexByHash.removeAll()
+  }
+
+  public func deleteRecord(id: UUID) async throws -> ClipboardRecord? {
+    guard let record = indexByHash.values.first(where: { $0.id == id }) else {
+      return nil
+    }
+    try deleteRecords(ids: [id])
+    indexByHash.removeValue(forKey: record.contentHash)
+    try connection.exec("PRAGMA incremental_vacuum")
+    return record
+  }
+
+  public func replaceRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    guard let existing = indexByHash.values.first(where: { $0.id == record.id }) else {
+      throw HistoryMutationError.recordNotFound
+    }
+    let originalIndex = indexByHash
+
+    try connection.exec("BEGIN IMMEDIATE")
+    inExplicitTransaction = true
+    defer { inExplicitTransaction = false }
+
+    do {
+      try deleteRecords(ids: [existing.id])
+      indexByHash.removeValue(forKey: existing.contentHash)
+      try writeRecordForImport(record)
+      indexByHash[record.contentHash] = record
+      try enforceRetention()
+      try connection.exec("COMMIT")
+      return record
+    } catch {
+      try? connection.exec("ROLLBACK")
+      indexByHash = originalIndex
+      throw error
+    }
+  }
+
+  public func clearUnpinned() async throws -> [ClipboardRecord] {
+    let removed = indexByHash.values
+      .filter { !$0.isPinned }
+      .sorted { $0.lastCopiedAt > $1.lastCopiedAt }
+    try deleteRecords(ids: removed.map(\.id))
+    for record in removed {
+      indexByHash.removeValue(forKey: record.contentHash)
+    }
+    try connection.exec("PRAGMA incremental_vacuum")
+    return removed
   }
 
   /// Removes the oldest `percent` fraction of non-exempt records.

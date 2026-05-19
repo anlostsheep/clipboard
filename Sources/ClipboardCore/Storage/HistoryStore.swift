@@ -55,6 +55,12 @@ public protocol ImportWritableHistoryStore: HistoryStore {
   func importRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord
 }
 
+public protocol HistoryMutationStore: HistoryStore {
+  func deleteRecord(id: UUID) async throws -> ClipboardRecord?
+  func replaceRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord
+  func clearUnpinned() async throws -> [ClipboardRecord]
+}
+
 public protocol RetentionPolicyUpdating: Sendable {
   func updateRetentionPolicy(_ policy: RetentionPolicy) async throws
 }
@@ -65,7 +71,7 @@ public extension HistoryStore {
   }
 }
 
-public actor InMemoryHistoryStore: ImportWritableHistoryStore {
+public actor InMemoryHistoryStore: ImportWritableHistoryStore, HistoryMutationStore {
   private var recordsByHash: [String: ClipboardRecord] = [:]
 
   public init() {}
@@ -107,6 +113,31 @@ public actor InMemoryHistoryStore: ImportWritableHistoryStore {
 
   public func removeAll() async throws {
     recordsByHash.removeAll()
+  }
+
+  public func deleteRecord(id: UUID) async throws -> ClipboardRecord? {
+    guard let record = recordsByHash.values.first(where: { $0.id == id }) else {
+      return nil
+    }
+    recordsByHash.removeValue(forKey: record.contentHash)
+    return record
+  }
+
+  public func replaceRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    guard let existing = recordsByHash.values.first(where: { $0.id == record.id }) else {
+      throw HistoryMutationError.recordNotFound
+    }
+    recordsByHash.removeValue(forKey: existing.contentHash)
+    recordsByHash[record.contentHash] = record
+    return record
+  }
+
+  public func clearUnpinned() async throws -> [ClipboardRecord] {
+    let removed = recordsByHash.values.filter { !$0.isPinned }
+    for record in removed {
+      recordsByHash.removeValue(forKey: record.contentHash)
+    }
+    return removed.sorted { $0.lastCopiedAt > $1.lastCopiedAt }
   }
 
   public func evictOldest(percent: Double) async throws -> Int {

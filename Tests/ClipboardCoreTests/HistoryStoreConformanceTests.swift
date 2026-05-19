@@ -7,6 +7,10 @@ final class InMemoryHistoryStoreConformanceTests: XCTestCase {
   func testInMemoryConformsToContract() async throws {
     try await runHistoryStoreConformance { InMemoryHistoryStore() }
   }
+
+  func testInMemoryConformsToMutationContract() async throws {
+    try await runHistoryMutationStoreConformance { InMemoryHistoryStore() }
+  }
 }
 
 func runHistoryStoreConformance<S: HistoryStore>(
@@ -23,6 +27,15 @@ func runHistoryStoreConformance<S: HistoryStore>(
   try await assertRemoveAllClearsStore(makeStore, file: file, line: line)
   try await assertEvictOldestRespectsExemptions(makeStore, file: file, line: line)
   try await assertEvictOldestRoundsUp(makeStore, file: file, line: line)
+}
+
+func runHistoryMutationStoreConformance<S: HistoryMutationStore>(
+  _ makeStore: () async throws -> S,
+  file: StaticString = #file,
+  line: UInt = #line
+) async throws {
+  try await assertDeleteRecordByIDUpdatesCount(makeStore, file: file, line: line)
+  try await assertReplaceMissingRecordThrows(makeStore, file: file, line: line)
 }
 
 private func makeRecord(
@@ -164,6 +177,42 @@ private func assertEvictOldestRoundsUp<S: HistoryStore>(
   XCTAssertEqual(countAfterEvict, 0, file: file, line: line)
 }
 
+private func assertDeleteRecordByIDUpdatesCount<S: HistoryMutationStore>(
+  _ make: () async throws -> S, file: StaticString, line: UInt
+) async throws {
+  let store = try await make()
+  let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+  let secondID = UUID(uuidString: "00000000-0000-0000-0000-000000000502")!
+  _ = try await store.upsert(makeRecord(id: firstID, hash: "a"))
+  _ = try await store.upsert(makeRecord(id: secondID, hash: "b"))
+
+  let removed = try await store.deleteRecord(id: firstID)
+  let countAfterDelete = try await store.count()
+  let remainingIDs = try await store.fetchAll().map(\.id)
+
+  XCTAssertEqual(removed?.id, firstID, file: file, line: line)
+  XCTAssertEqual(countAfterDelete, 1, file: file, line: line)
+  XCTAssertEqual(remainingIDs, [secondID], file: file, line: line)
+}
+
+private func assertReplaceMissingRecordThrows<S: HistoryMutationStore>(
+  _ make: () async throws -> S, file: StaticString, line: UInt
+) async throws {
+  let store = try await make()
+  let missing = makeRecord(
+    id: UUID(uuidString: "00000000-0000-0000-0000-000000000503")!,
+    hash: "missing"
+  )
+
+  do {
+    _ = try await store.replaceRecord(missing)
+    XCTFail("Expected missing replace to throw", file: file, line: line)
+  } catch HistoryMutationError.recordNotFound {
+    let count = try await store.count()
+    XCTAssertEqual(count, 0, file: file, line: line)
+  }
+}
+
 // MARK: - SQLiteHistoryStore conformance
 
 final class SQLiteHistoryStoreConformanceTests: XCTestCase {
@@ -188,6 +237,17 @@ final class SQLiteHistoryStoreConformanceTests: XCTestCase {
     try await runHistoryStoreConformance {
       let n = await counter.next()
       let url = dir.appendingPathComponent("test-\(n).sqlite")
+      return try SQLiteHistoryStore(databaseFile: url, retentionPolicy: policy)
+    }
+  }
+
+  func testSQLiteConformsToMutationContract() async throws {
+    let counter = TestCounter()
+    let dir = tempDir!
+    let policy = RetentionPolicy(maxCount: 100_000, maxAgeDays: 365 * 200)
+    try await runHistoryMutationStoreConformance {
+      let n = await counter.next()
+      let url = dir.appendingPathComponent("mutation-\(n).sqlite")
       return try SQLiteHistoryStore(databaseFile: url, retentionPolicy: policy)
     }
   }

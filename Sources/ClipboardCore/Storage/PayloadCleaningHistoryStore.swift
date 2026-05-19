@@ -1,6 +1,6 @@
 import Foundation
 
-public actor PayloadCleaningHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating {
+public actor PayloadCleaningHistoryStore: ImportWritableHistoryStore, RetentionPolicyUpdating, HistoryMutationStore {
   private let underlying: any HistoryStore
   private let payloadStore: any ClipboardPayloadStore
 
@@ -49,8 +49,37 @@ public actor PayloadCleaningHistoryStore: ImportWritableHistoryStore, RetentionP
     let before = try await underlying.fetchAll()
     try await underlying.removeAll()
     for record in before {
-      try? await payloadStore.delete(for: record.id)
+      try await payloadStore.delete(for: record.id)
     }
+  }
+
+  public func deleteRecord(id: UUID) async throws -> ClipboardRecord? {
+    guard let mutating = underlying as? any HistoryMutationStore else {
+      return nil
+    }
+    let removed = try await mutating.deleteRecord(id: id)
+    if let removed {
+      try await payloadStore.delete(for: removed.id)
+    }
+    return removed
+  }
+
+  public func replaceRecord(_ record: ClipboardRecord) async throws -> ClipboardRecord {
+    guard let mutating = underlying as? any HistoryMutationStore else {
+      return try await importRecord(record)
+    }
+    return try await mutating.replaceRecord(record)
+  }
+
+  public func clearUnpinned() async throws -> [ClipboardRecord] {
+    guard let mutating = underlying as? any HistoryMutationStore else {
+      return []
+    }
+    let removed = try await mutating.clearUnpinned()
+    for record in removed {
+      try await payloadStore.delete(for: record.id)
+    }
+    return removed
   }
 
   public func evictOldest(percent: Double) async throws -> Int {
@@ -70,7 +99,7 @@ public actor PayloadCleaningHistoryStore: ImportWritableHistoryStore, RetentionP
   private func deletePayloadsForRecordsRemoved(from before: [ClipboardRecord]) async throws {
     let remainingIDs = Set(try await underlying.fetchAll().map(\.id))
     for record in before where !remainingIDs.contains(record.id) {
-      try? await payloadStore.delete(for: record.id)
+      try await payloadStore.delete(for: record.id)
     }
   }
 }
