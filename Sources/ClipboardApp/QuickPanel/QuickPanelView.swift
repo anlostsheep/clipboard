@@ -334,6 +334,7 @@ struct QuickPanelView: View {
         focusSearch()
       },
       onTogglePinned: {
+        state.suppressNextShortcutQueryMutation(insertedText: "π")
         Task {
           await state.togglePinned()
         }

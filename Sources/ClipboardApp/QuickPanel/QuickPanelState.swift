@@ -99,6 +99,7 @@ final class QuickPanelState: ObservableObject {
   private var selectedRecordID: UUID?
   private var footerStatusSource: FooterStatusSource = .refresh
   private var pendingOpenSelectionBehavior: QuickPanelOpenSelectionBehavior?
+  private var suppressedShortcutInsertedText: String?
 
   init(
     viewModel: QuickPanelViewModel,
@@ -117,10 +118,18 @@ final class QuickPanelState: ObservableObject {
       return
     }
 
+    if shouldSuppressShortcutQueryMutation(query) {
+      return
+    }
+
     self.query = query
     footerStatusSource = .refresh
     actionPrompt = nil
     scheduleRefresh()
+  }
+
+  func suppressNextShortcutQueryMutation(insertedText: String) {
+    suppressedShortcutInsertedText = insertedText
   }
 
   func updateContentFilter(_ filter: QuickPanelContentFilter) {
@@ -364,6 +373,14 @@ final class QuickPanelState: ObservableObject {
   private func setUserActionFooterStatus(_ status: String) {
     footerStatusSource = .userAction
     footerStatus = status
+  }
+
+  private func shouldSuppressShortcutQueryMutation(_ newQuery: String) -> Bool {
+    guard let insertedText = suppressedShortcutInsertedText else {
+      return false
+    }
+    suppressedShortcutInsertedText = nil
+    return newQuery == insertedText || newQuery == query + insertedText
   }
 }
 

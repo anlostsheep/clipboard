@@ -138,6 +138,17 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertNil(state.actionPrompt)
   }
 
+  func testSuppressesNextQueryUpdateGeneratedByOptionShortcutCharacter() async throws {
+    let store = InMemoryHistoryStore()
+    let state = makeState(store: store)
+
+    state.updateQuery("pay")
+    state.suppressNextShortcutQueryMutation(insertedText: "π")
+    state.updateQuery("payπ")
+
+    XCTAssertEqual(state.query, "pay")
+  }
+
   func testDeleteSelectedRefreshesItemsAndFooterStatus() async throws {
     let store = InMemoryHistoryStore()
     _ = try await store.upsert(makePanelRecord(hash: "older", title: "Older", type: .text, lastCopiedAt: 1))
