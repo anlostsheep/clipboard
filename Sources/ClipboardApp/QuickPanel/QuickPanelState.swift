@@ -42,6 +42,43 @@ enum QuickPanelActionPrompt: Equatable {
   case autoPasteRequiresAccessibilityPermission
 }
 
+struct QuickPanelItemRow: Identifiable, Equatable {
+  let index: Int
+  let record: ClipboardRecord
+
+  var id: UUID { record.id }
+}
+
+struct QuickPanelItemSection: Identifiable, Equatable {
+  enum Kind: String {
+    case pinned
+    case history
+  }
+
+  let kind: Kind
+  let title: String
+  let rows: [QuickPanelItemRow]
+
+  var id: Kind { kind }
+
+  static func make(from items: [ClipboardRecord]) -> [QuickPanelItemSection] {
+    let rows = items.enumerated().map { index, record in
+      QuickPanelItemRow(index: index, record: record)
+    }
+    let pinnedRows = rows.filter { $0.record.isPinned }
+    let historyRows = rows.filter { !$0.record.isPinned }
+
+    var sections: [QuickPanelItemSection] = []
+    if !pinnedRows.isEmpty {
+      sections.append(QuickPanelItemSection(kind: .pinned, title: "Pinned", rows: pinnedRows))
+    }
+    if !historyRows.isEmpty {
+      sections.append(QuickPanelItemSection(kind: .history, title: "History", rows: historyRows))
+    }
+    return sections
+  }
+}
+
 @MainActor
 final class QuickPanelState: ObservableObject {
   @Published private(set) var query = ""
@@ -113,6 +150,10 @@ final class QuickPanelState: ObservableObject {
       let task = scheduleRefresh()
       await task.value
     } while (latestAppliedQuery != query || latestAppliedContentFilter != contentFilter) && !Task.isCancelled
+  }
+
+  var itemSections: [QuickPanelItemSection] {
+    QuickPanelItemSection.make(from: items)
   }
 
   func moveSelection(delta: Int) {
@@ -294,12 +335,20 @@ final class QuickPanelState: ObservableObject {
       return
     }
 
+    let selectionRecordID = selectedRecordID
     if pendingOpenSelectionBehavior == .latestRecord {
       await viewModel.setSelection(index: 0)
     }
 
     let refreshedItems = await viewModel.items
-    let refreshedSelectedIndex = await viewModel.selectedIndex
+    let refreshedSelectedIndex: Int
+    if let selectionRecordID,
+       let matchingIndex = refreshedItems.firstIndex(where: { $0.id == selectionRecordID }) {
+      refreshedSelectedIndex = matchingIndex
+      await viewModel.setSelection(index: matchingIndex)
+    } else {
+      refreshedSelectedIndex = await viewModel.selectedIndex
+    }
 
     items = refreshedItems
     selectedIndex = refreshedSelectedIndex

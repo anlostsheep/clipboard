@@ -163,6 +163,45 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.items.first?.isPinned, true)
     XCTAssertEqual(state.footerStatus, "Pinned item")
   }
+
+  func testTogglePinnedMovesSelectedItemToPinnedSectionAndKeepsItSelected() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "older", title: "Older", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "newer", title: "Newer", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectItem(at: 1)
+    await state.togglePinned()
+
+    XCTAssertEqual(state.items.map(\.title), ["Older", "Newer"])
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.itemSections.first?.rows.map(\.record.title), ["Older"])
+    XCTAssertEqual(state.footerStatus, "Pinned item")
+  }
+
+  func testItemSectionsSeparatePinnedItemsFromHistory() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "newer", title: "Newer", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned",
+      title: "Pinned",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(hash: "middle", title: "Middle", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["Pinned", "Newer", "Middle"])
+    XCTAssertEqual(state.itemSections.map(\.title), ["Pinned", "History"])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.record.title), ["Pinned"])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.index), [0])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.record.title), ["Newer", "Middle"])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.index), [1, 2])
+  }
 }
 
 @MainActor
@@ -187,7 +226,8 @@ private func makePanelRecord(
   hash: String,
   title: String,
   type: ClipboardContentType,
-  lastCopiedAt: TimeInterval
+  lastCopiedAt: TimeInterval,
+  isPinned: Bool = false
 ) -> ClipboardRecord {
   ClipboardRecord(
     id: UUID(),
@@ -201,10 +241,10 @@ private func makePanelRecord(
     createdAt: Date(timeIntervalSince1970: lastCopiedAt),
     lastCopiedAt: Date(timeIntervalSince1970: lastCopiedAt),
     copyCount: 1,
-    isPinned: false,
+    isPinned: isPinned,
     isFavorite: false,
     groupIds: [],
-    retentionExempt: false,
+    retentionExempt: isPinned,
     metadata: nil,
     pasteboardTypes: []
   )

@@ -30,14 +30,26 @@ public actor QuickPanelViewModel {
     refreshGeneration += 1
     let generation = refreshGeneration
     let historyQuery = HistoryQuery(text: query, contentTypes: contentTypes, groupIDs: groupIDs)
-    let refreshedItems = (try? await store.fetchPage(historyQuery, limit: pageLimit)) ?? []
+    let refreshedItems = ((try? await store.fetchAll()) ?? [])
+      .filter { historyQuery.matches($0) }
+      .sorted(by: Self.quickPanelSort)
 
     guard generation == refreshGeneration else {
       return
     }
 
-    items = refreshedItems
+    items = Array(refreshedItems.prefix(max(0, pageLimit)))
     selectedIndex = items.isEmpty ? 0 : min(selectedIndex, items.count - 1)
+  }
+
+  private static func quickPanelSort(_ lhs: ClipboardRecord, _ rhs: ClipboardRecord) -> Bool {
+    if lhs.isPinned != rhs.isPinned {
+      return lhs.isPinned && !rhs.isPinned
+    }
+    if lhs.lastCopiedAt != rhs.lastCopiedAt {
+      return lhs.lastCopiedAt > rhs.lastCopiedAt
+    }
+    return lhs.id.uuidString < rhs.id.uuidString
   }
 
   public func moveSelection(delta: Int) {

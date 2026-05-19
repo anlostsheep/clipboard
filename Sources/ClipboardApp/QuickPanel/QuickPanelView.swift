@@ -174,22 +174,33 @@ struct QuickPanelView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {
       ScrollViewReader { proxy in
-        List(Array(state.items.enumerated()), id: \.element.id) { index, record in
-          QuickPanelRow(
-            record: record,
-            isSelected: index == state.selectedIndex,
-            sourceIcon: sourceAppIconProvider.icon(for: record),
-            imagePreviewLoader: { record in
-              await state.imagePreview(for: record)
+        List {
+          ForEach(state.itemSections) { section in
+            Section {
+              ForEach(section.rows) { row in
+                QuickPanelRow(
+                  record: row.record,
+                  isSelected: row.index == state.selectedIndex,
+                  sourceIcon: sourceAppIconProvider.icon(for: row.record),
+                  imagePreviewLoader: { record in
+                    await state.imagePreview(for: record)
+                  }
+                )
+                .id(row.record.id)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                  state.selectItem(at: row.index)
+                  onSubmit()
+                }
+                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+              }
+            } header: {
+              Text(section.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
             }
-          )
-          .id(record.id)
-          .contentShape(Rectangle())
-          .onTapGesture {
-            state.selectItem(at: index)
-            onSubmit()
           }
-          .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
         }
         .listStyle(.plain)
         .onChange(of: state.items.map(\.id)) { _, itemIDs in
@@ -316,10 +327,26 @@ struct QuickPanelView: View {
       onOpenSettings: {
         AppDelegate.shared.openSettings()
       },
+      onDeleteSelected: {
+        Task {
+          await state.deleteSelected()
+        }
+        focusSearch()
+      },
       onTogglePinned: {
         Task {
           await state.togglePinned()
         }
+        focusSearch()
+      },
+      onClearUnpinned: {
+        Task {
+          await state.clearUnpinned()
+        }
+        focusSearch()
+      },
+      onClearAll: {
+        confirmsClearAll = true
         focusSearch()
       }
     )
