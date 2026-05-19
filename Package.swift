@@ -8,7 +8,8 @@ let package = Package(
     .library(name: "ClipboardCore", targets: ["ClipboardCore"]),
     .library(name: "ClipboardPlatform", targets: ["ClipboardPlatform"]),
     .executable(name: "ClipboardApp", targets: ["ClipboardApp"]),
-    .executable(name: "ClipboardManualProbe", targets: ["ClipboardManualProbe"])
+    .executable(name: "ClipboardManualProbe", targets: ["ClipboardManualProbe"]),
+    .executable(name: "ClipboardBenchmarkProbe", targets: ["ClipboardBenchmarkProbe"])
   ],
   targets: [
     .target(
@@ -30,6 +31,11 @@ let package = Package(
       name: "ClipboardManualProbe",
       dependencies: ["ClipboardCore", "ClipboardPlatform"],
       path: "Sources/ClipboardManualProbe"
+    ),
+    .executableTarget(
+      name: "ClipboardBenchmarkProbe",
+      dependencies: ["ClipboardCore", "ClipboardPlatform"],
+      path: "Sources/ClipboardBenchmarkProbe"
     ),
     .testTarget(
       name: "ClipboardCoreTests",
