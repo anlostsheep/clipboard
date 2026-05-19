@@ -102,6 +102,21 @@ swift run ClipboardManualProbe read-once
 - [ ] JSON/YAML pretty print 不在 QuickPanel 首帧执行
 - [ ] 1000 张图片历史首屏不解码原图
 
+## Maccy Replacement Privacy And Performance
+
+- [ ] 暂停采集后复制 3 条内容，历史数量不增长
+- [ ] 恢复采集后复制 1 条内容，历史数量增长
+- [ ] 触发“忽略下一次复制”后，第一条复制不入库，第二条复制正常入库
+- [ ] 开启忽略 Universal Clipboard 后，带 `com.apple.is-remote-clipboard` 的内容不入库
+- [ ] 添加 ignored pasteboard type 后，对应 type 的 capture 不入库
+- [ ] 添加 ignored app bundle id 后，对应来源 App 的 capture 不入库
+- [ ] QuickPanel `Option+Delete` 删除当前项，列表刷新且 payload 清理
+- [ ] QuickPanel `Option+P` 置顶/取消置顶当前项
+- [ ] QuickPanel `Option+Command+Delete` 清除未置顶项，置顶项保留
+- [ ] QuickPanel `Shift+Option+Command+Delete` 弹出确认，确认后清除全部历史
+- [ ] `Scripts/benchmark-maccy-replacement.sh` 生成 JSON 报告和可读摘要
+- [ ] 报告中的 Maccy 对比项只使用 `better` / `same` / `worse` / `not_comparable` 表述
+
 ## 记录格式
 
 每次验收写一条记录：
