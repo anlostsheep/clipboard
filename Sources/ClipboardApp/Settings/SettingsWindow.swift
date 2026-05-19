@@ -66,7 +66,7 @@ struct SettingsRootView: View {
             case .general:
                 GeneralSettingsView(hotKeyManager: hotKeyManager)
             case .privacy:
-                PrivacySettingsView()
+                PrivacySettingsView(services: services)
             case .history:
                 HistorySettingsView(
                     services: services,

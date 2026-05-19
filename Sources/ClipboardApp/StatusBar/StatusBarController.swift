@@ -10,11 +10,23 @@ final class StatusBarController {
     private var statusItem: NSStatusItem?
     private let onLeftClick: (NSPoint) -> Void
     private let onQuit: () -> Void
+    private let onToggleCapture: () -> Void
+    private let onIgnoreNextCopy: () -> Void
+    private let isCapturePaused: () -> Bool
     private var storageHealth: AppServices.StorageHealth = .ok
 
-    init(onLeftClick: @escaping (NSPoint) -> Void, onQuit: @escaping () -> Void) {
+    init(
+        onLeftClick: @escaping (NSPoint) -> Void,
+        onQuit: @escaping () -> Void,
+        onToggleCapture: @escaping () -> Void = {},
+        onIgnoreNextCopy: @escaping () -> Void = {},
+        isCapturePaused: @escaping () -> Bool = { false }
+    ) {
         self.onLeftClick = onLeftClick
         self.onQuit = onQuit
+        self.onToggleCapture = onToggleCapture
+        self.onIgnoreNextCopy = onIgnoreNextCopy
+        self.isCapturePaused = isCapturePaused
     }
 
     func setup() {
@@ -74,6 +86,17 @@ final class StatusBarController {
 
     private func showContextMenu() {
         let menu = NSMenu()
+        let pauseTitle = isCapturePaused() ? "恢复采集" : "暂停采集"
+        let pauseItem = NSMenuItem(title: pauseTitle, action: #selector(toggleCapture), keyEquivalent: "")
+        pauseItem.target = self
+        menu.addItem(pauseItem)
+
+        let ignoreNextCopyItem = NSMenuItem(title: "忽略下一次复制", action: #selector(ignoreNextCopy), keyEquivalent: "")
+        ignoreNextCopyItem.target = self
+        menu.addItem(ignoreNextCopyItem)
+
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(title: "退出 Clipboard", action: #selector(quitAction), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -85,5 +108,13 @@ final class StatusBarController {
 
     @MainActor @objc private func quitAction() {
         onQuit()
+    }
+
+    @MainActor @objc private func toggleCapture() {
+        onToggleCapture()
+    }
+
+    @MainActor @objc private func ignoreNextCopy() {
+        onIgnoreNextCopy()
     }
 }

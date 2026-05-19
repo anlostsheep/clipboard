@@ -1,6 +1,7 @@
 import AppKit
-import Foundation
 import Carbon
+import ClipboardCore
+import Foundation
 
 enum QuickPanelSelectionBehavior: String, CaseIterable, Identifiable {
     case autoPaste
@@ -155,6 +156,39 @@ enum ClipboardAppSettings {
     static func storageNotifyOnAutoEvict(defaults: UserDefaults = .standard) -> Bool {
         if defaults.object(forKey: notifyOnAutoEvictKey) == nil { return true }
         return defaults.bool(forKey: notifyOnAutoEvictKey)
+    }
+
+    // MARK: - Privacy
+
+    static let ignoreUniversalClipboardKey = "privacy.ignoreUniversalClipboard"
+    static let ignoredPasteboardTypesKey = "privacy.ignoredPasteboardTypes"
+    static let ignoredAppBundleIDsKey = "privacy.ignoredAppBundleIds"
+    static let capturePausedKey = "capture.paused"
+
+    static func ignoredPasteboardTypes(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: ignoredPasteboardTypesKey) ?? [])
+    }
+
+    static func ignoredAppBundleIDs(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: ignoredAppBundleIDsKey) ?? [])
+    }
+
+    static func privacyPolicy(defaults: UserDefaults = .standard) -> PrivacyPolicy {
+        var policy = PrivacyPolicy.standard
+        if defaults.bool(forKey: ignoreUniversalClipboardKey) {
+            policy.recordsUniversalClipboard = false
+        }
+        policy.ignoredPasteboardTypes.formUnion(ignoredPasteboardTypes(defaults: defaults))
+        policy.ignoredAppBundleIds.formUnion(ignoredAppBundleIDs(defaults: defaults))
+        return policy
+    }
+
+    static func capturePaused(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: capturePausedKey)
+    }
+
+    static func setCapturePaused(_ paused: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(paused, forKey: capturePausedKey)
     }
 
     // MARK: - Appearance

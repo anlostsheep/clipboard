@@ -9,6 +9,10 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     case move(Int)
     case focusSearch
     case openSettings
+    case deleteSelected
+    case togglePinned
+    case clearUnpinned
+    case clearAll
   }
 
   let onMove: (Int) -> Void
@@ -16,6 +20,10 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
   let onCancel: () -> Void
   let onFocusSearch: () -> Void
   let onOpenSettings: () -> Void
+  let onDeleteSelected: () -> Void
+  let onTogglePinned: () -> Void
+  let onClearUnpinned: () -> Void
+  let onClearAll: () -> Void
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
@@ -23,7 +31,11 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onSubmit: onSubmit,
       onCancel: onCancel,
       onFocusSearch: onFocusSearch,
-      onOpenSettings: onOpenSettings
+      onOpenSettings: onOpenSettings,
+      onDeleteSelected: onDeleteSelected,
+      onTogglePinned: onTogglePinned,
+      onClearUnpinned: onClearUnpinned,
+      onClearAll: onClearAll
     )
   }
 
@@ -41,6 +53,10 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     context.coordinator.onCancel = onCancel
     context.coordinator.onFocusSearch = onFocusSearch
     context.coordinator.onOpenSettings = onOpenSettings
+    context.coordinator.onDeleteSelected = onDeleteSelected
+    context.coordinator.onTogglePinned = onTogglePinned
+    context.coordinator.onClearUnpinned = onClearUnpinned
+    context.coordinator.onClearAll = onClearAll
     context.coordinator.installMonitor()
   }
 
@@ -55,6 +71,10 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     var onCancel: () -> Void
     var onFocusSearch: () -> Void
     var onOpenSettings: () -> Void
+    var onDeleteSelected: () -> Void
+    var onTogglePinned: () -> Void
+    var onClearUnpinned: () -> Void
+    var onClearAll: () -> Void
     weak var observedView: KeyCaptureNSView?
 
     private var monitor: Any?
@@ -64,13 +84,21 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onSubmit: @escaping () -> Void,
       onCancel: @escaping () -> Void,
       onFocusSearch: @escaping () -> Void,
-      onOpenSettings: @escaping () -> Void
+      onOpenSettings: @escaping () -> Void,
+      onDeleteSelected: @escaping () -> Void,
+      onTogglePinned: @escaping () -> Void,
+      onClearUnpinned: @escaping () -> Void,
+      onClearAll: @escaping () -> Void
     ) {
       self.onMove = onMove
       self.onSubmit = onSubmit
       self.onCancel = onCancel
       self.onFocusSearch = onFocusSearch
       self.onOpenSettings = onOpenSettings
+      self.onDeleteSelected = onDeleteSelected
+      self.onTogglePinned = onTogglePinned
+      self.onClearUnpinned = onClearUnpinned
+      self.onClearAll = onClearAll
     }
 
     func installMonitor() {
@@ -117,6 +145,18 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       case .openSettings:
         onOpenSettings()
         return nil
+      case .deleteSelected:
+        onDeleteSelected()
+        return nil
+      case .togglePinned:
+        onTogglePinned()
+        return nil
+      case .clearUnpinned:
+        onClearUnpinned()
+        return nil
+      case .clearAll:
+        onClearAll()
+        return nil
       case nil:
         return event
       }
@@ -132,6 +172,18 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     modifierFlags: NSEvent.ModifierFlags
   ) -> KeyboardAction? {
     let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+    if keyCode == UInt16(kVK_Delete), modifiers == [.shift, .option, .command] {
+      return .clearAll
+    }
+    if keyCode == UInt16(kVK_Delete), modifiers == [.option, .command] {
+      return .clearUnpinned
+    }
+    if keyCode == UInt16(kVK_Delete), modifiers == [.option] {
+      return .deleteSelected
+    }
+    if keyCode == UInt16(kVK_ANSI_P), modifiers == [.option] {
+      return .togglePinned
+    }
     if keyCode == UInt16(kVK_ANSI_F), modifiers.contains(.command) {
       return .focusSearch
     }

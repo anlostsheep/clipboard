@@ -15,6 +15,16 @@ final class CaptureControlServiceTests: XCTestCase {
     XCTAssertEqual(lastSkipReason, .paused)
   }
 
+  func testInitialPausedStateSkipsWithoutAsyncPauseRace() async {
+    let service = CaptureControlService(policy: .standard, capturePaused: true)
+
+    let decision = await service.evaluate(makeCapture())
+    let capturePaused = await service.capturePaused
+
+    XCTAssertEqual(decision, .skip(.paused))
+    XCTAssertTrue(capturePaused)
+  }
+
   func testResumeAllowsCaptureAndClearsSkipReason() async {
     let service = CaptureControlService(policy: .standard)
     await service.pauseCapture()

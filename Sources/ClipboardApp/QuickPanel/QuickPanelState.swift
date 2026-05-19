@@ -54,6 +54,7 @@ final class QuickPanelState: ObservableObject {
   private let viewModel: QuickPanelViewModel
   private let payloadStore: any ClipboardPayloadStore
   private let pasteController: PasteController
+  private let mutationService: HistoryMutationService
   private var refreshTask: Task<Void, Never>?
   private var refreshGeneration = 0
   private var latestAppliedQuery = ""
@@ -65,11 +66,13 @@ final class QuickPanelState: ObservableObject {
   init(
     viewModel: QuickPanelViewModel,
     payloadStore: any ClipboardPayloadStore,
-    pasteController: PasteController
+    pasteController: PasteController,
+    mutationService: HistoryMutationService
   ) {
     self.viewModel = viewModel
     self.payloadStore = payloadStore
     self.pasteController = pasteController
+    self.mutationService = mutationService
   }
 
   func updateQuery(_ query: String) {
@@ -147,7 +150,7 @@ final class QuickPanelState: ObservableObject {
 
   func selectCurrent(autoPaste: Bool) async {
     let selectionQuery = query
-    let recordID = selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
+    let recordID = currentRecordID
     await refresh()
 
     guard selectionQuery == query else {
@@ -195,6 +198,64 @@ final class QuickPanelState: ObservableObject {
     }
 
     return NSImage(data: data)
+  }
+
+  func deleteSelected() async {
+    guard let recordID = currentRecordID else {
+      setUserActionFooterStatus("No clipboard item selected")
+      return
+    }
+
+    do {
+      try await mutationService.deleteRecord(id: recordID)
+      selectedRecordID = nil
+      setUserActionFooterStatus("Deleted 1 item")
+      await refresh()
+    } catch {
+      setUserActionFooterStatus("Delete failed: \(error.localizedDescription)")
+    }
+  }
+
+  func togglePinned() async {
+    guard let recordID = currentRecordID else {
+      setUserActionFooterStatus("No clipboard item selected")
+      return
+    }
+
+    do {
+      let updated = try await mutationService.togglePinned(id: recordID)
+      selectedRecordID = updated.id
+      setUserActionFooterStatus(updated.isPinned ? "Pinned item" : "Unpinned item")
+      await refresh()
+    } catch {
+      setUserActionFooterStatus("Pin failed: \(error.localizedDescription)")
+    }
+  }
+
+  func clearUnpinned() async {
+    do {
+      let count = try await mutationService.clearUnpinned()
+      selectedRecordID = nil
+      setUserActionFooterStatus("Cleared \(count) unpinned item\(count == 1 ? "" : "s")")
+      await refresh()
+    } catch {
+      setUserActionFooterStatus("Clear failed: \(error.localizedDescription)")
+    }
+  }
+
+  func clearAll() async {
+    do {
+      let count = try await mutationService.clearAll()
+      selectedRecordID = nil
+      setUserActionFooterStatus("Cleared \(count) item\(count == 1 ? "" : "s")")
+      await refresh()
+    } catch {
+      setUserActionFooterStatus("Clear failed: \(error.localizedDescription)")
+    }
+  }
+
+  private var currentRecordID: UUID? {
+    selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
   }
 
   @discardableResult

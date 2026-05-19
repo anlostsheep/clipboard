@@ -25,8 +25,9 @@ public actor CaptureControlService {
   public private(set) var capturePaused = false
   public private(set) var lastSkipReason: CaptureSkipReason?
 
-  public init(policy: PrivacyPolicy) {
+  public init(policy: PrivacyPolicy, capturePaused: Bool = false) {
     self.policy = policy
+    self.capturePaused = capturePaused
   }
 
   public func pauseCapture() {

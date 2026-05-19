@@ -91,17 +91,21 @@ final class AppServices: ObservableObject {
   let monitor: ClipboardMonitor
   let captureCoordinator: ClipboardCaptureCoordinator
   let captureLoop: ClipboardCaptureLoop
+  let captureControl: CaptureControlService
+  let historyMutationService: HistoryMutationService
   let pasteController: PasteController
   let importService: ImportService?
   let importReportsDirectory: URL?
   @Published private(set) var storageHealth: StorageHealth = .ok
+  @Published private(set) var capturePaused: Bool = false
 
   let storageNotifier = StorageHealthNotifier()
 
   lazy var quickPanelState = QuickPanelState(
     viewModel: QuickPanelViewModel(store: store, pageLimit: 50),
     payloadStore: payloadStore,
-    pasteController: pasteController
+    pasteController: pasteController,
+    mutationService: historyMutationService
   )
   lazy var quickPanelController = QuickPanelController(
     state: quickPanelState,
@@ -119,6 +123,13 @@ final class AppServices: ObservableObject {
     self.payloadStore = payloadImpl
     self.storageHealth = health
     self.importReportsDirectory = paths?.importReportsDirectory
+    let initialCapturePaused = ClipboardAppSettings.capturePaused()
+    self.capturePaused = initialCapturePaused
+    self.captureControl = CaptureControlService(
+      policy: ClipboardAppSettings.privacyPolicy(),
+      capturePaused: initialCapturePaused
+    )
+    self.historyMutationService = HistoryMutationService(store: storeImpl, payloadStore: payloadImpl)
     if let importingStore = storeImpl as? any ImportWritableHistoryStore,
        let reports = paths?.importReportsDirectory {
       self.importService = ImportService(
@@ -132,7 +143,7 @@ final class AppServices: ObservableObject {
     self.systemClient = SystemPasteboardClient()
     self.ingestService = ClipboardIngestService(
       store: storeImpl,
-      privacyPolicy: .standard,
+      privacyPolicy: ClipboardAppSettings.privacyPolicy(),
       largeTextPolicy: .default
     )
     self.monitor = ClipboardMonitor(reader: systemClient)
@@ -151,7 +162,8 @@ final class AppServices: ObservableObject {
       monitor: monitor,
       ingestService: ingestService,
       payloadStore: payloadImpl,
-      failureHandler: handler
+      failureHandler: handler,
+      captureControl: captureControl
     )
     self.captureCoordinator = coordinator
     self.captureLoop = ClipboardCaptureLoop(coordinator: coordinator)
@@ -182,6 +194,34 @@ final class AppServices: ObservableObject {
       storageHealth = .ok
     } catch {
       storageHealth = .failing(reason: error.localizedDescription)
+    }
+  }
+
+  func refreshPrivacyPolicyFromSettings() {
+    Task {
+      await captureControl.updatePolicy(ClipboardAppSettings.privacyPolicy())
+    }
+  }
+
+  func pauseCapture() {
+    ClipboardAppSettings.setCapturePaused(true)
+    capturePaused = true
+    Task {
+      await captureControl.pauseCapture()
+    }
+  }
+
+  func resumeCapture() {
+    ClipboardAppSettings.setCapturePaused(false)
+    capturePaused = false
+    Task {
+      await captureControl.resumeCapture()
+    }
+  }
+
+  func ignoreNextCopy() {
+    Task {
+      await captureControl.ignoreNextCopy()
     }
   }
 

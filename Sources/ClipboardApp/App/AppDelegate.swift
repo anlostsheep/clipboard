@@ -59,6 +59,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onQuit: {
                 NSApp.terminate(nil)
+            },
+            onToggleCapture: { [weak self] in
+                guard let self else { return }
+                if self.services.capturePaused {
+                    self.services.resumeCapture()
+                } else {
+                    self.services.pauseCapture()
+                }
+            },
+            onIgnoreNextCopy: { [weak self] in
+                self?.services.ignoreNextCopy()
+            },
+            isCapturePaused: { [weak self] in
+                self?.services.capturePaused ?? false
             }
         )
         statusBarController.setup()

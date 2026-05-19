@@ -137,13 +137,40 @@ final class QuickPanelStateFilterTests: XCTestCase {
 
     XCTAssertNil(state.actionPrompt)
   }
+
+  func testDeleteSelectedRefreshesItemsAndFooterStatus() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "older", title: "Older", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "newer", title: "Newer", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    await state.deleteSelected()
+
+    XCTAssertEqual(state.items.map(\.title), ["Older"])
+    XCTAssertEqual(state.footerStatus, "Deleted 1 item")
+  }
+
+  func testTogglePinnedUpdatesVisibleItemAndFooterStatus() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "item", title: "Item", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    await state.togglePinned()
+
+    XCTAssertEqual(state.items.first?.title, "Item")
+    XCTAssertEqual(state.items.first?.isPinned, true)
+    XCTAssertEqual(state.footerStatus, "Pinned item")
+  }
 }
 
 @MainActor
 private func makeState(
   store: InMemoryHistoryStore,
   payloadStore: InMemoryPayloadStore = InMemoryPayloadStore(),
-  pasteboard: AppTestPasteboardWriter = AppTestPasteboardWriter()
+  pasteboard: AppTestPasteboardWriter = AppTestPasteboardWriter(),
+  mutationService: HistoryMutationService? = nil
 ) -> QuickPanelState {
   QuickPanelState(
     viewModel: QuickPanelViewModel(store: store, pageLimit: 20),
@@ -151,7 +178,8 @@ private func makeState(
     pasteController: PasteController(
       pasteboard: pasteboard,
       eventPoster: AppTestPasteEventPoster()
-    )
+    ),
+    mutationService: mutationService ?? HistoryMutationService(store: store, payloadStore: payloadStore)
   )
 }
 

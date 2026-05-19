@@ -25,8 +25,46 @@ struct ClipboardManualProbe {
       print("write: \(wrote ? "ok" : "failed")")
       print("marker: \(hasMarker ? "present" : "missing")")
       print(client.isAccessibilityTrusted() ? "accessibility: authorized" : "accessibility: required")
+    case "policy-universal-ignore":
+      var policy = PrivacyPolicy.standard
+      policy.recordsUniversalClipboard = false
+      let service = CaptureControlService(policy: policy)
+      let decision = await service.evaluate(ClipboardCapture(
+        payload: .text("remote"),
+        pasteboardTypes: ["com.apple.is-remote-clipboard"],
+        sourceAppBundleId: nil,
+        sourceAppName: nil,
+        capturedAt: Date()
+      ))
+      print("decision: \(describe(decision))")
+    case "policy-ignore-type":
+      let ignoredType = CommandLine.arguments.dropFirst(2).first ?? "com.example.secret"
+      var policy = PrivacyPolicy.standard
+      policy.ignoredPasteboardTypes.insert(ignoredType)
+      let service = CaptureControlService(policy: policy)
+      let decision = await service.evaluate(ClipboardCapture(
+        payload: .text("typed"),
+        pasteboardTypes: [ignoredType],
+        sourceAppBundleId: nil,
+        sourceAppName: nil,
+        capturedAt: Date()
+      ))
+      print("decision: \(describe(decision))")
+    case "policy-ignore-app":
+      let ignoredBundleID = CommandLine.arguments.dropFirst(2).first ?? "com.example.Passwords"
+      var policy = PrivacyPolicy.standard
+      policy.ignoredAppBundleIds.insert(ignoredBundleID)
+      let service = CaptureControlService(policy: policy)
+      let decision = await service.evaluate(ClipboardCapture(
+        payload: .text("app"),
+        pasteboardTypes: ["public.utf8-plain-text"],
+        sourceAppBundleId: ignoredBundleID,
+        sourceAppName: "Ignored App",
+        capturedAt: Date()
+      ))
+      print("decision: \(describe(decision))")
     default:
-      print("usage: ClipboardManualProbe read-once|write-marker-text|accessibility|self-check")
+      print("usage: ClipboardManualProbe read-once|write-marker-text|accessibility|self-check|policy-universal-ignore|policy-ignore-type|policy-ignore-app")
       Darwin.exit(2)
     }
   }
@@ -59,6 +97,39 @@ struct ClipboardManualProbe {
       print("payload: fileURLs")
       print("fileCount: \(urls.count)")
       print("files: \(urls.map(\.path).joined(separator: "|"))")
+    }
+  }
+
+  private static func describe(_ decision: CaptureDecision) -> String {
+    switch decision {
+    case .allow:
+      return "allow"
+    case let .skip(reason):
+      return "skip(\(describe(reason)))"
+    }
+  }
+
+  private static func describe(_ reason: CaptureSkipReason) -> String {
+    switch reason {
+    case .paused:
+      return "paused"
+    case .ignoreNextCopy:
+      return "ignoreNextCopy"
+    case let .privacy(reason):
+      return "privacy.\(describe(reason))"
+    }
+  }
+
+  private static func describe(_ reason: CapturePrivacySkipReason) -> String {
+    switch reason {
+    case .universalClipboard:
+      return "universalClipboard"
+    case let .pasteboardType(type):
+      return "pasteboardType(\(type))"
+    case let .sourceApp(bundleID):
+      return "sourceApp(\(bundleID))"
+    case .transientOnly:
+      return "transientOnly"
     }
   }
 }

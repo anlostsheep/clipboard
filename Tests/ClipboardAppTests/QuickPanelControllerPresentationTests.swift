@@ -5,14 +5,7 @@ import XCTest
 @MainActor
 final class QuickPanelControllerPresentationTests: XCTestCase {
     func testSubmitKeepsPanelVisibleAndShowsAuthorizationMessageWhenAutoPasteIsUnauthorized() async throws {
-        let state = QuickPanelState(
-            viewModel: QuickPanelViewModel(store: InMemoryHistoryStore(), pageLimit: 20),
-            payloadStore: InMemoryPayloadStore(),
-            pasteController: PasteController(
-                pasteboard: PresentationTestPasteboardWriter(),
-                eventPoster: PresentationTestPasteEventPoster()
-            )
-        )
+        let state = makePresentationState()
         let controller = QuickPanelController(
             state: state,
             autoPasteEnabled: { true },
@@ -33,14 +26,7 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
     func testUnauthorizedSubmitMessageSurvivesShowRefreshCompletion() async throws {
         let store = InMemoryHistoryStore()
         _ = try await store.upsert(makePresentationRecord())
-        let state = QuickPanelState(
-            viewModel: QuickPanelViewModel(store: store, pageLimit: 20),
-            payloadStore: InMemoryPayloadStore(),
-            pasteController: PasteController(
-                pasteboard: PresentationTestPasteboardWriter(),
-                eventPoster: PresentationTestPasteEventPoster()
-            )
-        )
+        let state = makePresentationState(store: store)
         let controller = QuickPanelController(
             state: state,
             prepareForShow: {
@@ -66,13 +52,11 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         _ = try await store.upsert(record)
         try await payloadStore.save(.text("copy-only payload"), for: record.id)
         let eventPoster = PresentationTestPasteEventPoster()
-        let state = QuickPanelState(
-            viewModel: QuickPanelViewModel(store: store, pageLimit: 20),
+        let state = makePresentationState(
+            store: store,
             payloadStore: payloadStore,
-            pasteController: PasteController(
-                pasteboard: pasteboard,
-                eventPoster: eventPoster
-            )
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
         )
         let controller = QuickPanelController(state: state)
 
@@ -85,14 +69,7 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
     }
 
     func testAuthorizationPromptButtonCanBeInjected() async throws {
-        let state = QuickPanelState(
-            viewModel: QuickPanelViewModel(store: InMemoryHistoryStore(), pageLimit: 20),
-            payloadStore: InMemoryPayloadStore(),
-            pasteController: PasteController(
-                pasteboard: PresentationTestPasteboardWriter(),
-                eventPoster: PresentationTestPasteEventPoster()
-            )
-        )
+        let state = makePresentationState()
         var didRequestAuthorization = false
         let controller = QuickPanelController(
             state: state,
@@ -107,14 +84,7 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
     }
 
     func testCancelHidesPanelAndRestoresPreviousApplication() async throws {
-        let state = QuickPanelState(
-            viewModel: QuickPanelViewModel(store: InMemoryHistoryStore(), pageLimit: 20),
-            payloadStore: InMemoryPayloadStore(),
-            pasteController: PasteController(
-                pasteboard: PresentationTestPasteboardWriter(),
-                eventPoster: PresentationTestPasteEventPoster()
-            )
-        )
+        let state = makePresentationState()
         var didRequestRestore = false
         let controller = QuickPanelController(
             state: state,
@@ -134,14 +104,7 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
     }
 
     func testShowOrdersPanelBeforeSlowRefreshCompletes() async throws {
-        let state = QuickPanelState(
-            viewModel: QuickPanelViewModel(store: InMemoryHistoryStore(), pageLimit: 20),
-            payloadStore: InMemoryPayloadStore(),
-            pasteController: PasteController(
-                pasteboard: PresentationTestPasteboardWriter(),
-                eventPoster: PresentationTestPasteEventPoster()
-            )
-        )
+        let state = makePresentationState()
         let controller = QuickPanelController(state: state) {
             try? await Task.sleep(nanoseconds: 250_000_000)
         }
@@ -154,6 +117,24 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
             "QuickPanel should become visible immediately, before capture/refresh work finishes."
         )
     }
+}
+
+@MainActor
+private func makePresentationState(
+    store: InMemoryHistoryStore = InMemoryHistoryStore(),
+    payloadStore: InMemoryPayloadStore = InMemoryPayloadStore(),
+    pasteboard: PresentationTestPasteboardWriter = PresentationTestPasteboardWriter(),
+    eventPoster: PresentationTestPasteEventPoster = PresentationTestPasteEventPoster()
+) -> QuickPanelState {
+    QuickPanelState(
+        viewModel: QuickPanelViewModel(store: store, pageLimit: 20),
+        payloadStore: payloadStore,
+        pasteController: PasteController(
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        ),
+        mutationService: HistoryMutationService(store: store, payloadStore: payloadStore)
+    )
 }
 
 private final class PresentationTestPasteboardWriter: PasteboardWriting, @unchecked Sendable {

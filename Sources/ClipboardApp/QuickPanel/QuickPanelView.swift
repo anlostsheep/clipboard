@@ -11,6 +11,7 @@ struct QuickPanelView: View {
   @FocusState private var isSearchFocused: Bool
   @State private var scrollCoordinator = QuickPanelScrollCoordinator()
   @State private var sourceAppIconProvider = SourceAppIconProvider()
+  @State private var confirmsClearAll = false
   @AppStorage(ClipboardAppSettings.quickPanelReturnCopiesOnlyKey)
   private var quickPanelReturnCopiesOnly = false
 
@@ -40,6 +41,19 @@ struct QuickPanelView: View {
     .task {
       await state.refresh()
       isSearchFocused = true
+    }
+    .confirmationDialog(
+      "Clear all clipboard items?",
+      isPresented: $confirmsClearAll,
+      titleVisibility: .visible
+    ) {
+      Button("Clear All", role: .destructive) {
+        Task {
+          await state.clearAll()
+        }
+      }
+
+      Button("Cancel", role: .cancel) {}
     }
   }
 
@@ -86,6 +100,8 @@ struct QuickPanelView: View {
       .labelsHidden()
       .frame(width: 260)
 
+      actionMenu
+
       Button {
         AppDelegate.shared.openSettings()
       } label: {
@@ -97,6 +113,54 @@ struct QuickPanelView: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
+  }
+
+  private var actionMenu: some View {
+    Menu {
+      Button(role: .destructive) {
+        Task {
+          await state.deleteSelected()
+        }
+      } label: {
+        Label("Delete Selected", systemImage: "trash")
+      }
+      .disabled(selectedRecord == nil)
+
+      Button {
+        Task {
+          await state.togglePinned()
+        }
+      } label: {
+        Label(selectedRecord?.isPinned == true ? "Unpin Item" : "Pin Item", systemImage: "pin")
+      }
+      .disabled(selectedRecord == nil)
+
+      Divider()
+
+      Button(role: .destructive) {
+        Task {
+          await state.clearUnpinned()
+        }
+      } label: {
+        Label("Clear Unpinned", systemImage: "pin.slash")
+      }
+
+      Button(role: .destructive) {
+        confirmsClearAll = true
+      } label: {
+        Label("Clear All", systemImage: "trash.slash")
+      }
+    } label: {
+      Image(systemName: "ellipsis.circle")
+        .foregroundStyle(.secondary)
+    }
+    .menuStyle(.borderlessButton)
+    .fixedSize()
+    .help("管理剪贴板历史")
+  }
+
+  private var selectedRecord: ClipboardRecord? {
+    state.items.indices.contains(state.selectedIndex) ? state.items[state.selectedIndex] : nil
   }
 
   @ViewBuilder
@@ -251,6 +315,28 @@ struct QuickPanelView: View {
       onFocusSearch: focusSearch,
       onOpenSettings: {
         AppDelegate.shared.openSettings()
+      },
+      onDeleteSelected: {
+        Task {
+          await state.deleteSelected()
+        }
+        focusSearch()
+      },
+      onTogglePinned: {
+        Task {
+          await state.togglePinned()
+        }
+        focusSearch()
+      },
+      onClearUnpinned: {
+        Task {
+          await state.clearUnpinned()
+        }
+        focusSearch()
+      },
+      onClearAll: {
+        confirmsClearAll = true
+        focusSearch()
       }
     )
   }
@@ -281,6 +367,13 @@ private struct QuickPanelRow: View {
         isSelected: isSelected
       )
       .frame(maxWidth: .infinity, alignment: .leading)
+
+      if record.isPinned {
+        Image(systemName: "pin.fill")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(isSelected ? .white.opacity(0.9) : .secondary)
+          .accessibilityLabel("Pinned")
+      }
 
       Spacer()
     }
