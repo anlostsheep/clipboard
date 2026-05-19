@@ -29,7 +29,7 @@ public struct QuickPanelScrollCoordinator: Sendable {
     itemIDs: [UUID],
     selectedIndex: Int
   ) -> QuickPanelScrollTarget? {
-    target(itemIDs: itemIDs, selectedIndex: selectedIndex, anchor: .top)
+    target(itemIDs: itemIDs, selectedIndex: selectedIndex, anchor: .center)
   }
 
   public static func targetForSelectionChange(
