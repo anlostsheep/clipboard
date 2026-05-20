@@ -8,16 +8,30 @@ public enum PanelPositionCalculator {
     /// Returns the origin that centers the panel within `visibleFrame`,
     /// offset upward by 80 pt so it clears the Dock on typical displays.
     public static func centerOrigin(panelSize: CGSize, visibleFrame: NSRect) -> NSPoint {
-        NSPoint(
+        let raw = NSPoint(
             x: visibleFrame.midX - panelSize.width / 2,
             y: visibleFrame.midY - panelSize.height / 2 + 80
         )
+        return clampToVisible(origin: raw, panelSize: panelSize, visibleFrame: visibleFrame)
     }
 
     /// Returns an origin that places the panel under the current mouse cursor,
     /// clamped so the panel stays fully inside `visibleFrame`.
     public static func followMouseOrigin(panelSize: CGSize, visibleFrame: NSRect) -> NSPoint {
-        let mouseLocation = NSEvent.mouseLocation
+        followMouseOrigin(
+            mouseLocation: NSEvent.mouseLocation,
+            panelSize: panelSize,
+            visibleFrame: visibleFrame
+        )
+    }
+
+    /// Returns an origin that places the panel under `mouseLocation`,
+    /// clamped so the panel stays fully inside `visibleFrame`.
+    public static func followMouseOrigin(
+        mouseLocation: NSPoint,
+        panelSize: CGSize,
+        visibleFrame: NSRect
+    ) -> NSPoint {
         let raw = NSPoint(
             x: mouseLocation.x - panelSize.width / 2,
             y: mouseLocation.y - panelSize.height / 2
@@ -52,12 +66,26 @@ public enum PanelPositionCalculator {
         return NSPoint(x: clampedX, y: clampedY)
     }
 
+    /// Clamps a whole panel frame so the final window rectangle remains visible.
+    public static func clampToVisible(frame: NSRect, visibleFrame: NSRect) -> NSRect {
+        let origin = clampToVisible(
+            origin: frame.origin,
+            panelSize: frame.size,
+            visibleFrame: visibleFrame
+        )
+        return NSRect(origin: origin, size: frame.size)
+    }
+
     /// Returns the NSScreen that currently contains the mouse pointer.
     /// Falls back to the main screen. Returns nil only when no screens are available,
     /// which callers must handle gracefully rather than force-unwrapping.
     public static func mouseScreen() -> NSScreen? {
-        let mouse = NSEvent.mouseLocation
-        return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
+        mouseScreen(mouseLocation: NSEvent.mouseLocation)
+    }
+
+    /// Returns the NSScreen containing `mouseLocation`.
+    public static func mouseScreen(mouseLocation: NSPoint) -> NSScreen? {
+        NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
             ?? NSScreen.main
     }
 }

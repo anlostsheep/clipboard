@@ -22,6 +22,24 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         XCTAssertEqual(action, .openSettings)
     }
 
+    func testCommandQRequestsQuit() {
+        let action = QuickPanelKeyCaptureView.keyboardAction(
+            keyCode: UInt16(kVK_ANSI_Q),
+            modifierFlags: [.command]
+        )
+
+        XCTAssertEqual(action, .quit)
+    }
+
+    func testCommandShiftQIsNotCapturedByQuickPanel() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_Q),
+                modifierFlags: [.shift, .command]
+            )
+        )
+    }
+
     func testArrowKeysMoveSelection() {
         XCTAssertEqual(
             QuickPanelKeyCaptureView.keyboardAction(keyCode: UInt16(kVK_DownArrow), modifierFlags: []),

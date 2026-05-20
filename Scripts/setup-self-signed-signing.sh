@@ -18,6 +18,14 @@ fi
 security unlock-keychain -p "$password" "$keychain"
 security set-keychain-settings -lut 21600 "$keychain"
 
+configure_key_access() {
+  security set-key-partition-list \
+    -S apple-tool:,apple:,codesign: \
+    -s \
+    -k "$password" \
+    "$keychain" >/dev/null
+}
+
 trust_identity() {
   local certificate_path="$1"
   security add-trusted-cert \
@@ -75,14 +83,10 @@ EOF
     -T /usr/bin/security >/dev/null
   trust_identity "$tmp_dir/signing.crt"
 
-  security set-key-partition-list \
-    -S apple-tool:,apple: \
-    -s \
-    -k "$password" \
-    "$keychain" >/dev/null
-
   echo "created signing identity: $identity" >&2
 fi
+
+configure_key_access
 
 if ! security find-identity -v -p codesigning "$keychain" | grep -Fq "\"$identity\""; then
   tmp_cert="$(mktemp)"
@@ -91,10 +95,20 @@ if ! security find-identity -v -p codesigning "$keychain" | grep -Fq "\"$identit
   rm -f "$tmp_cert"
 fi
 
+identity_hash="$(
+  security find-identity -v -p codesigning "$keychain" |
+    awk -v name="$identity" 'index($0, "\"" name "\"") { print $2; exit }'
+)"
+
+if [[ -z "$identity_hash" ]]; then
+  echo "error: signing identity '$identity' was not found in keychain: $keychain" >&2
+  exit 1
+fi
+
 probe="$PWD/.build/signing-probe"
 mkdir -p "$(dirname "$probe")"
 cp /usr/bin/true "$probe"
-codesign --force --sign "$identity" --keychain "$keychain" "$probe" >/dev/null
+codesign --force --sign "$identity_hash" --keychain "$keychain" "$probe" >/dev/null
 rm -f "$probe"
 
 cat <<EOF

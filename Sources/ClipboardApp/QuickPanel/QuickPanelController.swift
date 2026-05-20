@@ -25,6 +25,7 @@ final class QuickPanelController {
     private let requestAccessibilityAuthorizationAction: () -> Void
     private let openSelectionBehavior: () -> QuickPanelOpenSelectionBehavior
     private let activatePreviousApplication: (NSRunningApplication?) -> Void
+    private let quitApplication: () -> Void
     private var panel: NSPanel?
     private var previousApplication: NSRunningApplication?
 
@@ -42,6 +43,11 @@ final class QuickPanelController {
         activatePreviousApplication: @escaping (NSRunningApplication?) -> Void = { app in
             guard let app, !app.isTerminated else { return }
             app.activate(options: [.activateAllWindows])
+        },
+        quitApplication: @escaping () -> Void = {
+            Task { @MainActor in
+                NSApp.terminate(nil)
+            }
         }
     ) {
         self.state = state
@@ -51,6 +57,7 @@ final class QuickPanelController {
         self.requestAccessibilityAuthorizationAction = requestAccessibilityAuthorization
         self.openSelectionBehavior = openSelectionBehavior
         self.activatePreviousApplication = activatePreviousApplication
+        self.quitApplication = quitApplication
     }
 
     func toggle(trigger: TriggerSource = .hotkey) {
@@ -95,7 +102,8 @@ final class QuickPanelController {
             onClose: { [weak self] in self?.cancel() },
             onSubmit: { [weak self] in self?.submitSelection() },
             onCopyOnly: { [weak self] in self?.copySelectionOnly() },
-            onRequestAccessibilityAuthorization: { [weak self] in self?.requestAccessibilityAuthorization() }
+            onRequestAccessibilityAuthorization: { [weak self] in self?.requestAccessibilityAuthorization() },
+            onQuit: { [weak self] in self?.quitApplication() }
         )
         let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
@@ -119,7 +127,9 @@ final class QuickPanelController {
     /// - Status-bar clicks always use `statusBarClickOrigin`.
     /// - Hot-key invocations respect the user's `PanelPositionMode` preference.
     private func position(_ panel: NSPanel, trigger: TriggerSource) {
-        let visibleFrame = PanelPositionCalculator.mouseScreen()?.visibleFrame
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = PanelPositionCalculator.mouseScreen(mouseLocation: mouseLocation)
+        let visibleFrame = screen?.visibleFrame
             ?? NSScreen.main?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900) // last resort fallback
         let size = panel.frame.size
@@ -139,7 +149,9 @@ final class QuickPanelController {
                 )
             case .followMouse:
                 origin = PanelPositionCalculator.followMouseOrigin(
-                    panelSize: size, visibleFrame: visibleFrame
+                    mouseLocation: mouseLocation,
+                    panelSize: size,
+                    visibleFrame: visibleFrame
                 )
             case .menuBar:
                 // Use the last known status-bar icon position when available;
@@ -156,7 +168,12 @@ final class QuickPanelController {
             }
         }
 
-        panel.setFrame(NSRect(origin: origin, size: size), display: true)
+        let visibleFrameClamped = PanelPositionCalculator.clampToVisible(
+            frame: NSRect(origin: origin, size: size),
+            visibleFrame: visibleFrame
+        )
+        let constrainedFrame = panel.constrainFrameRect(visibleFrameClamped, to: screen)
+        panel.setFrame(constrainedFrame, display: true)
     }
 
     private func present(_ panel: NSPanel) {

@@ -16,6 +16,20 @@ final class QuickPanelMouseInteractionTests: XCTestCase {
     XCTAssertEqual(submitCount, 0)
   }
 
+  func testMouseDownSingleClickSelectsRowImmediatelyWithoutSubmitting() {
+    var selectedIndexes: [Int] = []
+    var submitCount = 0
+    let interaction = QuickPanelMouseInteraction(
+      selectItem: { selectedIndexes.append($0) },
+      submitSelection: { submitCount += 1 }
+    )
+
+    interaction.handleMouseDown(rowIndex: 4, clickCount: 1)
+
+    XCTAssertEqual(selectedIndexes, [4])
+    XCTAssertEqual(submitCount, 0)
+  }
+
   func testDoubleClickSelectsRowThenSubmits() {
     var events: [String] = []
     let interaction = QuickPanelMouseInteraction(
@@ -34,7 +48,7 @@ final class QuickPanelMouseInteractionTests: XCTestCase {
       actionPrompt: nil
     )
 
-    XCTAssertEqual(hint, "单击选择  Return/双击复制  Cmd+V 粘贴  Esc 关闭")
+    XCTAssertEqual(hint, "单击选择  Return/双击复制  Cmd+V 粘贴  Cmd+Q 退出  Esc 关闭")
   }
 
   func testShortcutHintDescribesSingleClickSelectionAndDoubleClickAutoPasteExecution() {
@@ -43,7 +57,7 @@ final class QuickPanelMouseInteractionTests: XCTestCase {
       actionPrompt: nil
     )
 
-    XCTAssertEqual(hint, "单击选择  Return/双击自动粘贴  Esc 关闭")
+    XCTAssertEqual(hint, "单击选择  Return/双击自动粘贴  Cmd+Q 退出  Esc 关闭")
   }
 
   func testShortcutHintDescribesDoubleClickAuthorizationState() {
@@ -52,6 +66,6 @@ final class QuickPanelMouseInteractionTests: XCTestCase {
       actionPrompt: .autoPasteRequiresAccessibilityPermission
     )
 
-    XCTAssertEqual(hint, "单击选择  Return/双击需授权  Cmd+V 手动粘贴")
+    XCTAssertEqual(hint, "单击选择  Return/双击需授权  Cmd+V 手动粘贴  Cmd+Q 退出")
   }
 }

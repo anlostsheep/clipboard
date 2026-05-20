@@ -9,6 +9,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     case move(Int)
     case focusSearch
     case openSettings
+    case quit
     case deleteSelected
     case togglePinned
     case clearUnpinned
@@ -20,6 +21,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
   let onCancel: () -> Void
   let onFocusSearch: () -> Void
   let onOpenSettings: () -> Void
+  let onQuit: () -> Void
   let onDeleteSelected: () -> Void
   let onTogglePinned: () -> Void
   let onClearUnpinned: () -> Void
@@ -32,6 +34,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onCancel: onCancel,
       onFocusSearch: onFocusSearch,
       onOpenSettings: onOpenSettings,
+      onQuit: onQuit,
       onDeleteSelected: onDeleteSelected,
       onTogglePinned: onTogglePinned,
       onClearUnpinned: onClearUnpinned,
@@ -53,6 +56,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     context.coordinator.onCancel = onCancel
     context.coordinator.onFocusSearch = onFocusSearch
     context.coordinator.onOpenSettings = onOpenSettings
+    context.coordinator.onQuit = onQuit
     context.coordinator.onDeleteSelected = onDeleteSelected
     context.coordinator.onTogglePinned = onTogglePinned
     context.coordinator.onClearUnpinned = onClearUnpinned
@@ -71,6 +75,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     var onCancel: () -> Void
     var onFocusSearch: () -> Void
     var onOpenSettings: () -> Void
+    var onQuit: () -> Void
     var onDeleteSelected: () -> Void
     var onTogglePinned: () -> Void
     var onClearUnpinned: () -> Void
@@ -85,6 +90,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onCancel: @escaping () -> Void,
       onFocusSearch: @escaping () -> Void,
       onOpenSettings: @escaping () -> Void,
+      onQuit: @escaping () -> Void,
       onDeleteSelected: @escaping () -> Void,
       onTogglePinned: @escaping () -> Void,
       onClearUnpinned: @escaping () -> Void,
@@ -95,6 +101,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       self.onCancel = onCancel
       self.onFocusSearch = onFocusSearch
       self.onOpenSettings = onOpenSettings
+      self.onQuit = onQuit
       self.onDeleteSelected = onDeleteSelected
       self.onTogglePinned = onTogglePinned
       self.onClearUnpinned = onClearUnpinned
@@ -145,6 +152,9 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       case .openSettings:
         onOpenSettings()
         return nil
+      case .quit:
+        onQuit()
+        return nil
       case .deleteSelected:
         onDeleteSelected()
         return nil
@@ -189,6 +199,9 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     }
     if keyCode == UInt16(kVK_ANSI_Comma), modifiers.contains(.command) {
       return .openSettings
+    }
+    if keyCode == UInt16(kVK_ANSI_Q), modifiers == [.command] {
+      return .quit
     }
 
     switch keyCode {

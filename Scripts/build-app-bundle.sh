@@ -10,19 +10,79 @@ version="${VERSION:-0.1.0}"
 icon_source="$PWD/Assets/AppIcon.png"
 icon_name="AppIcon"
 local_code_sign_identity="${LOCAL_CODE_SIGN_IDENTITY:-ClipboardApp Local Code Signing}"
+default_code_sign_keychain="$HOME/Library/Keychains/clipboard-signing.keychain-db"
 code_sign_identity="${CODE_SIGN_IDENTITY:-}"
 code_sign_keychain="${CODE_SIGN_KEYCHAIN:-}"
+code_sign_keychain_password="${CLIPBOARD_SIGNING_KEYCHAIN_PASSWORD:-clipboard-local-signing}"
 code_sign_timeout_seconds="${CODESIGN_TIMEOUT_SECONDS:-120}"
 require_stable_code_signing="${REQUIRE_STABLE_CODE_SIGNING:-0}"
 
-if [[ -z "$code_sign_identity" ]]; then
-  find_identity_args=(-v -p codesigning)
+if [[ -z "$code_sign_keychain" && -f "$default_code_sign_keychain" ]]; then
+  code_sign_keychain="$default_code_sign_keychain"
+fi
+
+prepare_signing_keychain() {
+  if [[ -z "$code_sign_keychain" || "$code_sign_identity" == "-" || ! -f "$code_sign_keychain" ]]; then
+    return
+  fi
+
+  if [[ -z "${CLIPBOARD_SIGNING_KEYCHAIN_PASSWORD+x}" && "$code_sign_keychain" != "$default_code_sign_keychain" ]]; then
+    return
+  fi
+
+  if ! security unlock-keychain -p "$code_sign_keychain_password" "$code_sign_keychain" >/dev/null 2>&1; then
+    echo "warning: failed to unlock signing keychain: $code_sign_keychain" >&2
+    echo "warning: set CLIPBOARD_SIGNING_KEYCHAIN_PASSWORD if this keychain does not use the project default password" >&2
+    return
+  fi
+
+  if ! security set-key-partition-list \
+    -S apple-tool:,apple:,codesign: \
+    -s \
+    -k "$code_sign_keychain_password" \
+    "$code_sign_keychain" >/dev/null 2>&1; then
+    echo "warning: failed to refresh codesign access for signing keychain: $code_sign_keychain" >&2
+  fi
+}
+
+find_signing_identity_hash() {
+  local find_identity_args=(-v -p codesigning)
+  local identity_hash=""
+  local match_count=0
+  local line
+  local matched_hash
+
   if [[ -n "$code_sign_keychain" ]]; then
     find_identity_args+=("$code_sign_keychain")
   fi
 
-  if security find-identity "${find_identity_args[@]}" | grep -Fq "\"$local_code_sign_identity\""; then
-    code_sign_identity="$local_code_sign_identity"
+  while IFS= read -r line; do
+    if [[ "$line" == *"\"$local_code_sign_identity\""* ]]; then
+      matched_hash="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*[0-9]+\) ([0-9A-Fa-f]{40}) .*/\1/')"
+      if [[ "$matched_hash" =~ ^[0-9A-Fa-f]{40}$ ]]; then
+        identity_hash="$matched_hash"
+        match_count=$((match_count + 1))
+      fi
+    fi
+  done < <(security find-identity "${find_identity_args[@]}" 2>/dev/null || true)
+
+  if (( match_count == 1 )); then
+    printf '%s\n' "$identity_hash"
+    return
+  fi
+
+  if (( match_count > 1 )); then
+    echo "error: signing identity '$local_code_sign_identity' is ambiguous; set CODE_SIGN_KEYCHAIN or CODE_SIGN_IDENTITY to the target SHA-1 hash" >&2
+  fi
+
+  return 1
+}
+
+prepare_signing_keychain
+
+if [[ -z "$code_sign_identity" ]]; then
+  if code_sign_identity="$(find_signing_identity_hash)"; then
+    true
   elif [[ "$require_stable_code_signing" == "1" ]]; then
     echo "error: stable code signing required but identity '$local_code_sign_identity' was not found" >&2
     if [[ -n "$code_sign_keychain" ]]; then
@@ -34,6 +94,8 @@ if [[ -z "$code_sign_identity" ]]; then
     code_sign_identity="-"
   fi
 fi
+
+prepare_signing_keychain
 
 swift build -c "$configuration" --product "$app_name" >&2
 bin_path="$(swift build -c "$configuration" --show-bin-path)"

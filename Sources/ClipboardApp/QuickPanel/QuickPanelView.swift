@@ -8,6 +8,7 @@ struct QuickPanelView: View {
   let onSubmit: () -> Void
   let onCopyOnly: () -> Void
   let onRequestAccessibilityAuthorization: () -> Void
+  let onQuit: () -> Void
   @FocusState private var isSearchFocused: Bool
   @State private var scrollCoordinator = QuickPanelScrollCoordinator()
   @State private var sourceAppIconProvider = SourceAppIconProvider()
@@ -198,12 +199,12 @@ struct QuickPanelView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .contentShape(Rectangle())
-                .simultaneousGesture(TapGesture(count: 1).onEnded {
-                  mouseInteraction.handleClick(rowIndex: row.index, count: 1)
-                })
-                .onTapGesture(count: 2) {
-                  mouseInteraction.handleClick(rowIndex: row.index, count: 2)
+                .overlay {
+                  QuickPanelRowMouseCaptureView(
+                    rowIndex: row.index,
+                    interaction: mouseInteraction
+                  )
+                  .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
                 Divider()
@@ -348,6 +349,7 @@ struct QuickPanelView: View {
       onOpenSettings: {
         AppDelegate.shared.openSettings()
       },
+      onQuit: onQuit,
       onDeleteSelected: {
         Task {
           await state.deleteSelected()
@@ -449,6 +451,31 @@ private struct QuickPanelRow: View {
       return "photo"
     case .file:
       return "doc"
+    }
+  }
+}
+
+private struct QuickPanelRowMouseCaptureView: NSViewRepresentable {
+  let rowIndex: Int
+  let interaction: QuickPanelMouseInteraction
+
+  func makeNSView(context: Context) -> MouseCaptureNSView {
+    let view = MouseCaptureNSView()
+    updateNSView(view, context: context)
+    return view
+  }
+
+  func updateNSView(_ nsView: MouseCaptureNSView, context: Context) {
+    nsView.onMouseDown = { clickCount in
+      interaction.handleMouseDown(rowIndex: rowIndex, clickCount: clickCount)
+    }
+  }
+
+  final class MouseCaptureNSView: NSView {
+    var onMouseDown: ((Int) -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+      onMouseDown?(event.clickCount)
     }
   }
 }

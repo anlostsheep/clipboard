@@ -18,6 +18,8 @@ Defaults:
 - Keychain: `~/Library/Keychains/clipboard-signing.keychain-db`
 - Keychain password: `clipboard-local-signing`
 
+The keychain password is the password for this dedicated local signing keychain, not your macOS administrator password.
+
 Override them when needed:
 
 ```bash
