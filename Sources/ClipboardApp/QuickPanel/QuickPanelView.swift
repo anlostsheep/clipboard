@@ -163,6 +163,13 @@ struct QuickPanelView: View {
     state.items.indices.contains(state.selectedIndex) ? state.items[state.selectedIndex] : nil
   }
 
+  private var mouseInteraction: QuickPanelMouseInteraction {
+    QuickPanelMouseInteraction(
+      selectItem: { index in state.selectItem(at: index) },
+      submitSelection: onSubmit
+    )
+  }
+
   @ViewBuilder
   private var results: some View {
     if state.items.isEmpty {
@@ -192,9 +199,11 @@ struct QuickPanelView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .contentShape(Rectangle())
-                .onTapGesture {
-                  state.selectItem(at: row.index)
-                  onSubmit()
+                .simultaneousGesture(TapGesture(count: 1).onEnded {
+                  mouseInteraction.handleClick(rowIndex: row.index, count: 1)
+                })
+                .onTapGesture(count: 2) {
+                  mouseInteraction.handleClick(rowIndex: row.index, count: 2)
                 }
 
                 Divider()
@@ -261,15 +270,10 @@ struct QuickPanelView: View {
   }
 
   private var shortcutHint: String {
-    if quickPanelReturnCopiesOnly {
-      return "Return/Click 复制  Cmd+V 粘贴  Esc 关闭"
-    }
-
-    if state.actionPrompt == .autoPasteRequiresAccessibilityPermission {
-      return "Return/Click 需要授权  Cmd+V 手动粘贴"
-    }
-
-    return "Return/Click 自动粘贴  Esc 关闭"
+    QuickPanelMouseInteraction.shortcutHint(
+      returnCopiesOnly: quickPanelReturnCopiesOnly,
+      actionPrompt: state.actionPrompt
+    )
   }
 
   @ViewBuilder

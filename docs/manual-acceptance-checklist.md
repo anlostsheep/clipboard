@@ -71,15 +71,15 @@ swift run ClipboardManualProbe read-once
 - [ ] 按 `Escape` 关闭 QuickPanel
 - [x] 打开过设置页后，切到其他 App 呼出 QuickPanel，再按 `Escape` 关闭，焦点保留在呼出前的 App，不重新弹出设置页
 - [x] 按 `Down` / `Up` 移动选中项后，按 `Command+F` 可重新聚焦搜索框并继续输入
-- [x] 鼠标单击某条历史记录可选择该记录，并遵循与 `Return` 相同的复制/粘贴语义
+- [x] 鼠标单击某条历史记录只选中该记录；鼠标双击遵循与 `Return` 相同的复制/粘贴语义
 - [x] 在 QuickPanel 中按 `Command+,` 可打开设置窗口
-- [ ] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或单击记录后，记录被复制并自动粘贴
-- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或单击记录后，目标文本框不立即粘贴
-- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，按 `Return` 或单击记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
-- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，QuickPanel footer 显示 `Return/Click Copy  Cmd+V Paste  Esc Close`
+- [ ] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，记录被复制并自动粘贴
+- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，目标文本框不立即粘贴
+- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，按 `Return` 或双击记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
+- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，QuickPanel footer 显示 `单击选择  Return/双击复制  Cmd+V 粘贴  Esc 关闭`
 - [ ] 重启 app 后，`选择历史项时仅复制，不自动粘贴` 勾选状态保持不变
 - [x] 未开启辅助功能权限且处于自动粘贴模式时，按 `Return` 不静默失败，QuickPanel 显示授权提示并保持打开
-- [x] 未开启辅助功能权限且处于自动粘贴模式时，鼠标单击记录不静默失败，QuickPanel 显示授权提示并保持打开
+- [x] 未开启辅助功能权限且处于自动粘贴模式时，鼠标双击记录不静默失败，QuickPanel 显示授权提示并保持打开
 - [x] 切换“打开快捷面板时选中：最新记录 / 上次选中项”后，重新打开 QuickPanel 的初始选中项符合设置
 - [x] QuickPanel 顶部类型过滤控件中的“类型”标签不换行、不挤压成两行
 - [ ] 复制 10MB JSON 后打开 QuickPanel，列表只显示摘要，不渲染全文

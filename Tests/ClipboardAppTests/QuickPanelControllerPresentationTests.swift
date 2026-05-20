@@ -68,6 +68,34 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         XCTAssertFalse(eventPoster.didPostCommandV)
     }
 
+    func testSubmitSelectionRespectsCopyOnlySetting() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord()
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.text("copy-only submit payload"), for: record.id)
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        )
+        let controller = QuickPanelController(
+            state: state,
+            autoPasteEnabled: { false },
+            isAutoPasteAuthorized: { true }
+        )
+
+        await state.refresh()
+        controller.submitSelection()
+        try await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(pasteboard.lastText, "copy-only submit payload")
+        XCTAssertFalse(eventPoster.didPostCommandV)
+    }
+
     func testAuthorizationPromptButtonCanBeInjected() async throws {
         let state = makePresentationState()
         var didRequestAuthorization = false
