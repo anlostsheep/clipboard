@@ -1,5 +1,6 @@
 .worktrees/
 .build/
+.DS_Store
 *.o
 *.d
 .worktrees/
