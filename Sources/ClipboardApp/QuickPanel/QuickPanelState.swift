@@ -101,6 +101,14 @@ struct QuickPanelItemRenderIdentity: Hashable {
   }
 }
 
+struct QuickPanelDetailPreview: Identifiable, Equatable {
+  let id: UUID
+  let title: String
+  let source: String
+  let body: String
+  let isTruncated: Bool
+}
+
 @MainActor
 final class QuickPanelState: ObservableObject {
   @Published private(set) var query = ""
@@ -109,6 +117,7 @@ final class QuickPanelState: ObservableObject {
   @Published private(set) var selectedIndex = 0
   @Published private(set) var footerStatus = "Ready"
   @Published private(set) var actionPrompt: QuickPanelActionPrompt?
+  @Published private(set) var detailPreview: QuickPanelDetailPreview?
 
   private let viewModel: QuickPanelViewModel
   private let payloadStore: any ClipboardPayloadStore
@@ -116,6 +125,7 @@ final class QuickPanelState: ObservableObject {
   private let mutationService: HistoryMutationService
   private var refreshTask: Task<Void, Never>?
   private var refreshGeneration = 0
+  private var detailPreviewGeneration = 0
   private var latestAppliedQuery = ""
   private var latestAppliedContentFilter: QuickPanelContentFilter = .all
   private var selectedRecordID: UUID?
@@ -288,6 +298,43 @@ final class QuickPanelState: ObservableObject {
     return NSImage(data: data)
   }
 
+  func showDetailPreview() async {
+    detailPreviewGeneration += 1
+    let generation = detailPreviewGeneration
+
+    guard let recordID = currentRecordID,
+          let record = items.first(where: { $0.id == recordID }) else {
+      setUserActionFooterStatus("No clipboard item selected")
+      return
+    }
+
+    guard let payload = try? await payloadStore.loadPayload(for: record.id) else {
+      guard isCurrentDetailPreviewRequest(generation: generation, recordID: recordID) else {
+        return
+      }
+      setUserActionFooterStatus("Payload is unavailable in this session")
+      return
+    }
+
+    guard isCurrentDetailPreviewRequest(generation: generation, recordID: recordID) else {
+      return
+    }
+
+    let body = detailBody(for: payload, fallback: record.plainTextPreview ?? record.title)
+    detailPreview = QuickPanelDetailPreview(
+      id: record.id,
+      title: record.title,
+      source: QuickPanelRowPresentation.sourceName(for: record),
+      body: body.text,
+      isTruncated: body.isTruncated
+    )
+  }
+
+  func dismissDetailPreview() {
+    detailPreviewGeneration += 1
+    detailPreview = nil
+  }
+
   func deleteSelected() async {
     guard let recordID = currentRecordID else {
       setUserActionFooterStatus("No clipboard item selected")
@@ -373,6 +420,29 @@ final class QuickPanelState: ObservableObject {
     }
 
     return (record, payload)
+  }
+
+  private func isCurrentDetailPreviewRequest(generation: Int, recordID: UUID) -> Bool {
+    generation == detailPreviewGeneration && currentRecordID == recordID
+  }
+
+  private func detailBody(for payload: ClipboardPayload, fallback: String) -> (text: String, isTruncated: Bool) {
+    let rawText: String = switch payload {
+    case .text(let text):
+      text
+    case .richText(let plainText, _):
+      plainText
+    case .image:
+      fallback.isEmpty ? "Image preview is available in the row." : fallback
+    case .fileURLs(let urls):
+      urls.map(\.path).joined(separator: "\n")
+    }
+
+    let limit = 20_000
+    guard rawText.count > limit else {
+      return (rawText, false)
+    }
+    return (String(rawText.prefix(limit)), true)
   }
 
   private func setPasteTransactionFooterStatus(_ transaction: PasteTransaction, successStatus: String) {

@@ -56,6 +56,20 @@ struct QuickPanelView: View {
 
       Button("Cancel", role: .cancel) {}
     }
+    .sheet(
+      isPresented: Binding(
+        get: { state.detailPreview != nil },
+        set: { isPresented in
+          if !isPresented {
+            state.dismissDetailPreview()
+          }
+        }
+      )
+    ) {
+      if let preview = state.detailPreview {
+        QuickPanelDetailPreviewView(preview: preview)
+      }
+    }
   }
 
   private func focusSearch() {
@@ -375,6 +389,28 @@ struct QuickPanelView: View {
       },
       onCycleContentFilter: { delta in
         state.cycleContentFilter(delta: delta)
+        focusSearch()
+      },
+      onSelectNumber: { number in
+        state.selectVisibleItem(number: number)
+        focusSearch()
+      },
+      onPasteNumber: { number in
+        Task {
+          await state.pasteVisibleItem(number: number)
+        }
+        focusSearch()
+      },
+      onPastePlainText: {
+        Task {
+          await state.pastePlainText()
+        }
+        focusSearch()
+      },
+      onShowDetailPreview: {
+        Task {
+          await state.showDetailPreview()
+        }
         focusSearch()
       }
     )

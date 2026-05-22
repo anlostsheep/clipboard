@@ -406,12 +406,144 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.itemSections[1].rows.map(\.record.title), ["Newer", "Middle"])
     XCTAssertEqual(state.itemSections[1].rows.map(\.index), [1, 2])
   }
+
+  func testShowDetailPreviewLoadsSafeTextPayload() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let record = makePanelRecord(hash: "text", title: "Text", type: .text, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    try await payloadStore.save(.text("full text"), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.showDetailPreview()
+
+    XCTAssertEqual(state.detailPreview?.title, "Text")
+    XCTAssertEqual(state.detailPreview?.body, "full text")
+    XCTAssertFalse(state.detailPreview?.isTruncated ?? true)
+  }
+
+  func testShowDetailPreviewKeepsLargeTextSummaryFirst() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let largeText = String(repeating: "a", count: 25_000)
+    let record = makePanelRecord(hash: "large", title: "Large", type: .text, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    try await payloadStore.save(.text(largeText), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.showDetailPreview()
+
+    XCTAssertEqual(state.detailPreview?.body.count, 20_000)
+    XCTAssertTrue(state.detailPreview?.isTruncated ?? false)
+  }
+
+  func testShowDetailPreviewUsesUniversalClipboardSourceName() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let record = makePanelRecord(
+      hash: "universal",
+      title: "Remote",
+      type: .text,
+      lastCopiedAt: 1,
+      sourceAppName: "VS Code",
+      sourceDeviceHint: .universalClipboard
+    )
+    _ = try await store.upsert(record)
+    try await payloadStore.save(.text("remote text"), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.showDetailPreview()
+
+    XCTAssertEqual(state.detailPreview?.source, "Universal Clipboard")
+  }
+
+  func testShowDetailPreviewUsesImageFallbackText() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let record = makePanelRecord(hash: "image", title: "Image title", type: .image, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    try await payloadStore.save(.image(data: Data([1, 2, 3]), uti: "public.png"), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.showDetailPreview()
+
+    XCTAssertEqual(state.detailPreview?.body, "Image title")
+    XCTAssertFalse(state.detailPreview?.isTruncated ?? true)
+  }
+
+  func testShowDetailPreviewListsFileURLs() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let record = makePanelRecord(hash: "files", title: "Files", type: .file, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    try await payloadStore.save(
+      .fileURLs([
+        URL(fileURLWithPath: "/tmp/a.txt"),
+        URL(fileURLWithPath: "/tmp/b.txt")
+      ]),
+      for: record.id
+    )
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.showDetailPreview()
+
+    XCTAssertEqual(state.detailPreview?.body, "/tmp/a.txt\n/tmp/b.txt")
+    XCTAssertFalse(state.detailPreview?.isTruncated ?? true)
+  }
+
+  func testShowDetailPreviewIgnoresStaleLoadAfterSelectionChanges() async throws {
+    let store = InMemoryHistoryStore()
+    let slowRecord = makePanelRecord(hash: "slow", title: "Slow", type: .text, lastCopiedAt: 2)
+    let fastRecord = makePanelRecord(hash: "fast", title: "Fast", type: .text, lastCopiedAt: 1)
+    _ = try await store.upsert(slowRecord)
+    _ = try await store.upsert(fastRecord)
+
+    let payloadStore = ControlledDelayPayloadStore(delayedRecordID: slowRecord.id)
+    try await payloadStore.save(.text("slow text"), for: slowRecord.id)
+    try await payloadStore.save(.text("fast text"), for: fastRecord.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    state.selectItem(at: 0)
+    let slowLoad = Task { await state.showDetailPreview() }
+    await payloadStore.waitForDelayedLoadToStart()
+    state.selectItem(at: 1)
+    await state.showDetailPreview()
+
+    XCTAssertEqual(state.detailPreview?.title, "Fast")
+
+    await payloadStore.resumeDelayedLoad()
+    await slowLoad.value
+
+    XCTAssertEqual(state.detailPreview?.title, "Fast")
+    XCTAssertEqual(state.detailPreview?.body, "fast text")
+  }
+
+  func testDismissDetailPreviewClearsPreview() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let record = makePanelRecord(hash: "text", title: "Text", type: .text, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    try await payloadStore.save(.text("full text"), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.showDetailPreview()
+    state.dismissDetailPreview()
+
+    XCTAssertNil(state.detailPreview)
+  }
 }
 
 @MainActor
 private func makeState(
   store: InMemoryHistoryStore,
-  payloadStore: InMemoryPayloadStore = InMemoryPayloadStore(),
+  payloadStore: any ClipboardPayloadStore = InMemoryPayloadStore(),
   pasteboard: AppTestPasteboardWriter = AppTestPasteboardWriter(),
   eventPoster: AppTestPasteEventPoster = AppTestPasteEventPoster(),
   mutationService: HistoryMutationService? = nil
@@ -432,17 +564,20 @@ private func makePanelRecord(
   title: String,
   type: ClipboardContentType,
   lastCopiedAt: TimeInterval,
-  isPinned: Bool = false
+  isPinned: Bool = false,
+  sourceAppName: String? = "App",
+  sourceDeviceHint: ClipboardSourceDeviceHint = .local,
+  plainTextPreview: String? = nil
 ) -> ClipboardRecord {
   ClipboardRecord(
     id: UUID(),
     contentHash: hash,
     primaryType: type,
     title: title,
-    plainTextPreview: title,
+    plainTextPreview: plainTextPreview ?? title,
     sourceAppBundleId: nil,
-    sourceAppName: "App",
-    sourceDeviceHint: .local,
+    sourceAppName: sourceAppName,
+    sourceDeviceHint: sourceDeviceHint,
     createdAt: Date(timeIntervalSince1970: lastCopiedAt),
     lastCopiedAt: Date(timeIntervalSince1970: lastCopiedAt),
     copyCount: 1,
@@ -453,6 +588,58 @@ private func makePanelRecord(
     metadata: nil,
     pasteboardTypes: []
   )
+}
+
+private actor ControlledDelayPayloadStore: ClipboardPayloadStore {
+  private var payloadsByRecordID: [UUID: ClipboardPayload] = [:]
+  private var delayedRecordID: UUID?
+  private var delayedContinuation: CheckedContinuation<Void, Never>?
+  private var loadStartedContinuations: [CheckedContinuation<Void, Never>] = []
+
+  init(delayedRecordID: UUID) {
+    self.delayedRecordID = delayedRecordID
+  }
+
+  func save(_ payload: ClipboardPayload, for recordID: UUID) async throws {
+    payloadsByRecordID[recordID] = payload
+  }
+
+  func loadPayload(for recordID: UUID) async throws -> ClipboardPayload? {
+    if delayedRecordID == recordID {
+      delayedRecordID = nil
+      await withCheckedContinuation { continuation in
+        delayedContinuation = continuation
+        signalDelayedLoadStarted()
+      }
+    }
+
+    return payloadsByRecordID[recordID]
+  }
+
+  func delete(for recordID: UUID) async throws {
+    payloadsByRecordID.removeValue(forKey: recordID)
+  }
+
+  func waitForDelayedLoadToStart() async {
+    if delayedContinuation != nil {
+      return
+    }
+
+    await withCheckedContinuation { continuation in
+      loadStartedContinuations.append(continuation)
+    }
+  }
+
+  func resumeDelayedLoad() {
+    delayedContinuation?.resume()
+    delayedContinuation = nil
+  }
+
+  private func signalDelayedLoadStarted() {
+    let continuations = loadStartedContinuations
+    loadStartedContinuations.removeAll()
+    continuations.forEach { $0.resume() }
+  }
 }
 
 private final class AppTestPasteboardWriter: PasteboardWriting, @unchecked Sendable {
