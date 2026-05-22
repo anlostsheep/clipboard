@@ -85,6 +85,24 @@ final class PasteControllerTests: XCTestCase {
     XCTAssertEqual(transaction.state, .failed(.targetAppRejectedPaste))
   }
 
+  func testPlainTextPastePayloadExtractsText() {
+    XCTAssertEqual(ClipboardPayload.text("plain").plainTextForPaste, "plain")
+  }
+
+  func testPlainTextPastePayloadExtractsRichTextPlainText() {
+    let payload = ClipboardPayload.richText(
+      plainText: "rich plain",
+      rtfData: Data("{\\rtf1 rich}".utf8)
+    )
+
+    XCTAssertEqual(payload.plainTextForPaste, "rich plain")
+  }
+
+  func testPlainTextPastePayloadRejectsImageAndFiles() {
+    XCTAssertNil(ClipboardPayload.image(data: Data([1, 2, 3]), uti: "public.png").plainTextForPaste)
+    XCTAssertNil(ClipboardPayload.fileURLs([URL(fileURLWithPath: "/tmp/a.txt")]).plainTextForPaste)
+  }
+
   private static func record(text: String) -> ClipboardRecord {
     ClipboardRecord(
       id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
