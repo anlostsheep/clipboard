@@ -214,6 +214,11 @@ final class QuickPanelState: ObservableObject {
     }
   }
 
+  func selectVisibleItem(number: Int) {
+    let index = number - 1
+    selectItem(at: index)
+  }
+
   func reportAutoPasteRequiresAccessibilityPermission() {
     actionPrompt = .autoPasteRequiresAccessibilityPermission
     setUserActionFooterStatus("自动粘贴需要辅助功能权限，请在设置中授权")
@@ -264,6 +269,64 @@ final class QuickPanelState: ObservableObject {
     case .completed:
       actionPrompt = nil
       setUserActionFooterStatus(autoPaste ? "Pasted \(record.primaryType.rawValue)" : "Copied \(record.primaryType.rawValue)")
+    case let .failed(reason):
+      setUserActionFooterStatus("Paste failed: \(reason.rawValue)")
+    default:
+      setUserActionFooterStatus("Paste transaction ended in \(transaction.state)")
+    }
+  }
+
+  func pasteVisibleItem(number: Int) async {
+    let index = number - 1
+    guard items.indices.contains(index) else {
+      return
+    }
+
+    selectItem(at: index)
+    await selectCurrent(autoPaste: true)
+  }
+
+  func pastePlainText() async {
+    let selectionQuery = query
+    let recordID = currentRecordID
+    await refresh()
+
+    guard selectionQuery == query else {
+      await refresh()
+      setUserActionFooterStatus("Selection changed")
+      return
+    }
+
+    guard let recordID else {
+      setUserActionFooterStatus("No clipboard item selected")
+      return
+    }
+
+    guard let record = items.first(where: { $0.id == recordID }) else {
+      setUserActionFooterStatus("Selected item is no longer visible")
+      return
+    }
+
+    guard let payload = try? await payloadStore.loadPayload(for: record.id) else {
+      setUserActionFooterStatus("Payload is unavailable in this session")
+      return
+    }
+
+    guard let plainText = payload.plainTextForPaste else {
+      setUserActionFooterStatus("Plain text paste is not supported for \(record.primaryType.rawValue)")
+      return
+    }
+
+    let transaction = await pasteController.paste(
+      record: record,
+      payload: .text(plainText),
+      autoPaste: true
+    )
+
+    switch transaction.state {
+    case .completed:
+      actionPrompt = nil
+      setUserActionFooterStatus("Pasted plain text")
     case let .failed(reason):
       setUserActionFooterStatus("Paste failed: \(reason.rawValue)")
     default:

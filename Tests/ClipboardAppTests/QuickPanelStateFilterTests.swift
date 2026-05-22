@@ -16,6 +16,99 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.selectedIndex, 1)
   }
 
+  func testSelectVisibleItemByNumberUsesOneBasedVisibleOrder() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "second", title: "Second", type: .text, lastCopiedAt: 2))
+    _ = try await store.upsert(makePanelRecord(hash: "third", title: "Third", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectVisibleItem(number: 2)
+
+    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Second")
+  }
+
+  func testSelectVisibleItemByNumberIgnoresOutOfRangeNumbers() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectVisibleItem(number: 9)
+
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "First")
+  }
+
+  func testNumberSelectionFollowsFilteredVisibleOrder() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "alpha-text", title: "Alpha Text", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "alpha-image", title: "Alpha Image", type: .image, lastCopiedAt: 2))
+    _ = try await store.upsert(makePanelRecord(hash: "beta-text", title: "Beta Text", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    state.updateQuery("Alpha")
+    await state.refresh()
+    state.selectVisibleItem(number: 2)
+
+    XCTAssertEqual(state.items.map(\.title), ["Alpha Text", "Alpha Image"])
+    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Alpha Image")
+  }
+
+  func testPasteVisibleItemByNumberAutoPastesEvenWhenCopyOnlyWouldBeUsed() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let pasteboard = AppTestPasteboardWriter()
+    let poster = AppTestPasteEventPoster()
+    let first = makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 2)
+    let second = makePanelRecord(hash: "second", title: "Second", type: .text, lastCopiedAt: 1)
+    _ = try await store.upsert(first)
+    _ = try await store.upsert(second)
+    try await payloadStore.save(.text("first payload"), for: first.id)
+    try await payloadStore.save(.text("second payload"), for: second.id)
+    let state = makeState(store: store, payloadStore: payloadStore, pasteboard: pasteboard, eventPoster: poster)
+
+    await state.refresh()
+    await state.pasteVisibleItem(number: 2)
+
+    XCTAssertEqual(pasteboard.lastText, "second payload")
+    XCTAssertEqual(poster.postCount, 1)
+    XCTAssertEqual(state.footerStatus, "Pasted text")
+  }
+
+  func testPastePlainTextUsesRichTextPlainText() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let pasteboard = AppTestPasteboardWriter()
+    let record = makePanelRecord(hash: "rich", title: "Rich", type: .richText, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    try await payloadStore.save(.richText(plainText: "unstyled", rtfData: Data("{\\rtf1 styled}".utf8)), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore, pasteboard: pasteboard)
+
+    await state.refresh()
+    await state.pastePlainText()
+
+    XCTAssertEqual(pasteboard.lastText, "unstyled")
+    XCTAssertEqual(state.footerStatus, "Pasted plain text")
+  }
+
+  func testPastePlainTextReportsUnsupportedFormatForImage() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let record = makePanelRecord(hash: "image", title: "Image", type: .image, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    try await payloadStore.save(.image(data: Data([1, 2, 3]), uti: "public.png"), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.pastePlainText()
+
+    XCTAssertEqual(state.footerStatus, "Plain text paste is not supported for image")
+  }
+
   func testSelectCurrentUsesMouseSelectedItem() async throws {
     let store = InMemoryHistoryStore()
     let payloadStore = InMemoryPayloadStore()
@@ -320,6 +413,7 @@ private func makeState(
   store: InMemoryHistoryStore,
   payloadStore: InMemoryPayloadStore = InMemoryPayloadStore(),
   pasteboard: AppTestPasteboardWriter = AppTestPasteboardWriter(),
+  eventPoster: AppTestPasteEventPoster = AppTestPasteEventPoster(),
   mutationService: HistoryMutationService? = nil
 ) -> QuickPanelState {
   QuickPanelState(
@@ -327,7 +421,7 @@ private func makeState(
     payloadStore: payloadStore,
     pasteController: PasteController(
       pasteboard: pasteboard,
-      eventPoster: AppTestPasteEventPoster()
+      eventPoster: eventPoster
     ),
     mutationService: mutationService ?? HistoryMutationService(store: store, payloadStore: payloadStore)
   )
@@ -375,6 +469,17 @@ private final class AppTestPasteboardWriter: PasteboardWriting, @unchecked Senda
 }
 
 private final class AppTestPasteEventPoster: PasteEventPosting, @unchecked Sendable {
+  private(set) var postCount = 0
+
   func isAccessibilityTrusted() -> Bool { true }
-  func postCommandV() async -> Bool { true }
+
+  func postCommandV() async -> Bool {
+    postCount += 1
+    return true
+  }
+
+  func postCommandV(marker: String, pasteboard: any PasteboardWriting) async -> PasteEventResult {
+    postCount += 1
+    return .posted
+  }
 }
