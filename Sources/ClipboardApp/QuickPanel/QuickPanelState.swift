@@ -36,6 +36,17 @@ enum QuickPanelContentFilter: String, CaseIterable, Identifiable {
       return [.file]
     }
   }
+
+  func advanced(by delta: Int) -> QuickPanelContentFilter {
+    let filters = Self.allCases
+    guard let currentIndex = filters.firstIndex(of: self), !filters.isEmpty else {
+      return self
+    }
+
+    let count = filters.count
+    let nextIndex = ((currentIndex + delta) % count + count) % count
+    return filters[nextIndex]
+  }
 }
 
 enum QuickPanelActionPrompt: Equatable {
@@ -152,6 +163,10 @@ final class QuickPanelState: ObservableObject {
     footerStatusSource = .refresh
     actionPrompt = nil
     scheduleRefresh()
+  }
+
+  func cycleContentFilter(delta: Int) {
+    updateContentFilter(contentFilter.advanced(by: delta))
   }
 
   func prepareForPresentation(openSelectionBehavior: QuickPanelOpenSelectionBehavior = .latestRecord) {
@@ -370,6 +385,9 @@ final class QuickPanelState: ObservableObject {
        let matchingIndex = refreshedItems.firstIndex(where: { $0.id == selectionRecordID }) {
       refreshedSelectedIndex = matchingIndex
       await viewModel.setSelection(index: matchingIndex)
+    } else if selectionRecordID != nil {
+      refreshedSelectedIndex = 0
+      await viewModel.setSelection(index: 0)
     } else {
       refreshedSelectedIndex = await viewModel.selectedIndex
     }

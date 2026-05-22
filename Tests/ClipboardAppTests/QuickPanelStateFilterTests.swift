@@ -49,6 +49,91 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.items.map(\.title), ["Image"])
   }
 
+  func testCycleContentFilterMovesForwardWithWraparound() async throws {
+    let store = InMemoryHistoryStore()
+    let state = makeState(store: store)
+
+    XCTAssertEqual(state.contentFilter, .all)
+
+    state.cycleContentFilter(delta: 1)
+    XCTAssertEqual(state.contentFilter, .text)
+
+    state.cycleContentFilter(delta: 1)
+    XCTAssertEqual(state.contentFilter, .link)
+
+    state.cycleContentFilter(delta: 1)
+    XCTAssertEqual(state.contentFilter, .image)
+
+    state.cycleContentFilter(delta: 1)
+    XCTAssertEqual(state.contentFilter, .file)
+
+    state.cycleContentFilter(delta: 1)
+    XCTAssertEqual(state.contentFilter, .all)
+  }
+
+  func testCycleContentFilterMovesBackwardWithWraparound() async throws {
+    let store = InMemoryHistoryStore()
+    let state = makeState(store: store)
+
+    XCTAssertEqual(state.contentFilter, .all)
+
+    state.cycleContentFilter(delta: -1)
+    XCTAssertEqual(state.contentFilter, .file)
+
+    state.cycleContentFilter(delta: -1)
+    XCTAssertEqual(state.contentFilter, .image)
+
+    state.cycleContentFilter(delta: -1)
+    XCTAssertEqual(state.contentFilter, .link)
+
+    state.cycleContentFilter(delta: -1)
+    XCTAssertEqual(state.contentFilter, .text)
+
+    state.cycleContentFilter(delta: -1)
+    XCTAssertEqual(state.contentFilter, .all)
+  }
+
+  func testCycleContentFilterPreservesQueryAndRefreshesVisibleItems() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "alpha-text", title: "Alpha Text", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "alpha-image", title: "Alpha Image", type: .image, lastCopiedAt: 2))
+    _ = try await store.upsert(makePanelRecord(hash: "beta-text", title: "Beta Text", type: .text, lastCopiedAt: 1))
+    let state = makeState(store: store)
+
+    state.updateQuery("Alpha")
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["Alpha Text", "Alpha Image"])
+
+    state.cycleContentFilter(delta: 1)
+    await state.refresh()
+
+    XCTAssertEqual(state.query, "Alpha")
+    XCTAssertEqual(state.contentFilter, .text)
+    XCTAssertEqual(state.items.map(\.title), ["Alpha Text"])
+  }
+
+  func testFilterRefreshSelectsFirstVisibleItemWhenPreviousSelectionDisappears() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "text-newer", title: "Text Newer", type: .text, lastCopiedAt: 4))
+    _ = try await store.upsert(makePanelRecord(hash: "image", title: "Image", type: .image, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "text-older", title: "Text Older", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    XCTAssertEqual(state.items.map(\.title), ["Text Newer", "Image", "Text Older"])
+
+    state.selectItem(at: 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Image")
+
+    state.cycleContentFilter(delta: 1)
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["Text Newer", "Text Older"])
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Text Newer")
+  }
+
   func testAuthorizationFooterStatusSurvivesBackgroundRefresh() async throws {
     let store = InMemoryHistoryStore()
     _ = try await store.upsert(makePanelRecord(hash: "text", title: "Text", type: .text, lastCopiedAt: 1))
