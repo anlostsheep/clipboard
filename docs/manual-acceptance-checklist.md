@@ -82,6 +82,12 @@ swift run ClipboardManualProbe read-once
 - [x] 未开启辅助功能权限且处于自动粘贴模式时，鼠标双击记录不静默失败，QuickPanel 显示授权提示并保持打开
 - [x] 切换“打开快捷面板时选中：最新记录 / 上次选中项”后，重新打开 QuickPanel 的初始选中项符合设置
 - [x] QuickPanel 顶部类型过滤控件中的“类型”标签不换行、不挤压成两行
+- [ ] 打开 QuickPanel 且搜索框聚焦时，按 `Tab` 可将类型从 `All` 切到 `Text`
+- [ ] 连续按 `Tab` 可按 `All → Text → Link → Image → File → All` 循环类型
+- [ ] 按 `Shift+Tab` 可按反向顺序循环类型
+- [ ] 输入搜索关键词后按 `Tab`，关键词不丢失，列表按“关键词 + 类型”共同过滤
+- [ ] 中文输入法正在组词时，`Tab` 不破坏输入法 composition
+- [ ] 切换类型后 QuickPanel 布局稳定，不出现 pinned/history 大空白回归
 - [ ] 复制 10MB JSON 后打开 QuickPanel，列表只显示摘要，不渲染全文
 
 ## 失败提示

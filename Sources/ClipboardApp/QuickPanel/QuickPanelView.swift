@@ -372,6 +372,10 @@ struct QuickPanelView: View {
       onClearAll: {
         confirmsClearAll = true
         focusSearch()
+      },
+      onCycleContentFilter: { delta in
+        state.cycleContentFilter(delta: delta)
+        focusSearch()
       }
     )
   }
