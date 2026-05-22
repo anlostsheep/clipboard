@@ -14,6 +14,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     case togglePinned
     case clearUnpinned
     case clearAll
+    case cycleContentFilter(Int)
   }
 
   let onMove: (Int) -> Void
@@ -26,6 +27,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
   let onTogglePinned: () -> Void
   let onClearUnpinned: () -> Void
   let onClearAll: () -> Void
+  let onCycleContentFilter: (Int) -> Void = { _ in }
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
@@ -38,7 +40,8 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onDeleteSelected: onDeleteSelected,
       onTogglePinned: onTogglePinned,
       onClearUnpinned: onClearUnpinned,
-      onClearAll: onClearAll
+      onClearAll: onClearAll,
+      onCycleContentFilter: onCycleContentFilter
     )
   }
 
@@ -61,6 +64,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     context.coordinator.onTogglePinned = onTogglePinned
     context.coordinator.onClearUnpinned = onClearUnpinned
     context.coordinator.onClearAll = onClearAll
+    context.coordinator.onCycleContentFilter = onCycleContentFilter
     context.coordinator.installMonitor()
   }
 
@@ -80,6 +84,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     var onTogglePinned: () -> Void
     var onClearUnpinned: () -> Void
     var onClearAll: () -> Void
+    var onCycleContentFilter: (Int) -> Void
     weak var observedView: KeyCaptureNSView?
 
     private var monitor: Any?
@@ -94,7 +99,8 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onDeleteSelected: @escaping () -> Void,
       onTogglePinned: @escaping () -> Void,
       onClearUnpinned: @escaping () -> Void,
-      onClearAll: @escaping () -> Void
+      onClearAll: @escaping () -> Void,
+      onCycleContentFilter: @escaping (Int) -> Void
     ) {
       self.onMove = onMove
       self.onSubmit = onSubmit
@@ -106,6 +112,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       self.onTogglePinned = onTogglePinned
       self.onClearUnpinned = onClearUnpinned
       self.onClearAll = onClearAll
+      self.onCycleContentFilter = onCycleContentFilter
     }
 
     func installMonitor() {
@@ -167,6 +174,9 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       case .clearAll:
         onClearAll()
         return nil
+      case .cycleContentFilter(let delta):
+        onCycleContentFilter(delta)
+        return nil
       case nil:
         return event
       }
@@ -182,6 +192,15 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     modifierFlags: NSEvent.ModifierFlags
   ) -> KeyboardAction? {
     let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+    if keyCode == UInt16(kVK_Tab) {
+      if modifiers.isEmpty {
+        return .cycleContentFilter(1)
+      }
+      if modifiers == [.shift] {
+        return .cycleContentFilter(-1)
+      }
+      return nil
+    }
     if keyCode == UInt16(kVK_Delete), modifiers == [.shift, .option, .command] {
       return .clearAll
     }

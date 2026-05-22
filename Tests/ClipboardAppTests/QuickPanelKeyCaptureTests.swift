@@ -62,6 +62,51 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
     }
 
+    func testTabCyclesContentFilterForward() {
+        let action = QuickPanelKeyCaptureView.keyboardAction(
+            keyCode: UInt16(kVK_Tab),
+            modifierFlags: []
+        )
+
+        XCTAssertEqual(action, .cycleContentFilter(1))
+    }
+
+    func testShiftTabCyclesContentFilterBackward() {
+        let action = QuickPanelKeyCaptureView.keyboardAction(
+            keyCode: UInt16(kVK_Tab),
+            modifierFlags: [.shift]
+        )
+
+        XCTAssertEqual(action, .cycleContentFilter(-1))
+    }
+
+    func testModifiedTabCombinationsAreNotCaptured() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Tab),
+                modifierFlags: [.command]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Tab),
+                modifierFlags: [.option]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Tab),
+                modifierFlags: [.control]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Tab),
+                modifierFlags: [.shift, .command]
+            )
+        )
+    }
+
     func testPlainFIsNotCaptured() {
         XCTAssertNil(
             QuickPanelKeyCaptureView.keyboardAction(keyCode: UInt16(kVK_ANSI_F), modifierFlags: [])
