@@ -9,7 +9,11 @@ struct ClipboardBenchmarkProbe {
   static func main() async throws {
     let arguments = try ProbeArguments.parse(CommandLine.arguments.dropFirst())
     let paths = try ApplicationSupportPaths(bundleIdentifier: arguments.bundleID)
-    let report = try await run(paths: paths, bundleID: arguments.bundleID)
+    let report = try await run(
+      paths: paths,
+      bundleID: arguments.bundleID,
+      maccyBaselineURL: arguments.maccyBaselineURL
+    )
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -24,7 +28,11 @@ struct ClipboardBenchmarkProbe {
     printSummary(report, outputURL: arguments.outputURL)
   }
 
-  private static func run(paths: ApplicationSupportPaths, bundleID: String) async throws -> BenchmarkReport {
+  private static func run(
+    paths: ApplicationSupportPaths,
+    bundleID: String,
+    maccyBaselineURL: URL?
+  ) async throws -> BenchmarkReport {
     let snapshot = try BenchmarkDatabaseSnapshot(sourceDatabaseFile: paths.databaseFile)
     let (store, loadMetric) = try measureStoreLoad(databaseFile: snapshot.databaseFile)
     let records = try await store.fetchAll()
@@ -35,6 +43,10 @@ struct ClipboardBenchmarkProbe {
     let fetchHTTP = try await measure(name: "search_http_50_ms", iterations: 10) {
       _ = try await store.fetchPage(HistoryQuery(text: "http"), limit: 50)
     }
+
+    let metrics = [loadMetric, fetchRecent, fetchHTTP]
+    let baseline = try loadMaccyBaseline(from: maccyBaselineURL)
+    let comparisons = compare(metrics: metrics, baseline: baseline)
 
     return BenchmarkReport(
       generatedAt: Date(),
@@ -49,8 +61,8 @@ struct ClipboardBenchmarkProbe {
         typeCounts: typeCounts(records),
         pinnedCount: records.filter(\.isPinned).count
       ),
-      metrics: [loadMetric, fetchRecent, fetchHTTP],
-      maccyComparison: .notComparable
+      metrics: metrics,
+      comparisons: comparisons
     )
   }
 
@@ -113,6 +125,32 @@ struct ClipboardBenchmarkProbe {
       .mapValues(\.count)
   }
 
+  private static func loadMaccyBaseline(from url: URL?) throws -> MaccyBaselineReport? {
+    guard let url else { return nil }
+    let data = try Data(contentsOf: url)
+    return try JSONDecoder().decode(MaccyBaselineReport.self, from: data)
+  }
+
+  private static func compare(
+    metrics: [BenchmarkMetric],
+    baseline: MaccyBaselineReport?
+  ) -> [BenchmarkMetricComparison] {
+    let baselineByName = Dictionary(
+      uniqueKeysWithValues: baseline?.metrics.map { ($0.name, $0) } ?? []
+    )
+    return metrics.map { metric in
+      let maccy = baselineByName[metric.name]
+      return BenchmarkComparison.compareMetric(
+        name: metric.name,
+        clipboardMedian: metric.medianMs,
+        clipboardP95: metric.p95Ms,
+        maccyMedian: maccy?.medianMs,
+        maccyP95: maccy?.p95Ms,
+        maccySource: baseline?.source
+      )
+    }
+  }
+
   private static func printSummary(_ report: BenchmarkReport, outputURL: URL) {
     print("Clipboard benchmark report: \(outputURL.path)")
     print("Bundle ID: \(report.bundleID)")
@@ -124,7 +162,10 @@ struct ClipboardBenchmarkProbe {
     for metric in report.metrics {
       print(String(format: "  %@ median=%.3fms p95=%.3fms", metric.name, metric.medianMs, metric.p95Ms))
     }
-    print("Maccy comparison: \(report.maccyComparison.rawValue)")
+    print("Maccy comparisons:")
+    for comparison in report.comparisons {
+      print("  \(comparison.name): \(comparison.result.rawValue) (\(comparison.reason))")
+    }
   }
 }
 
@@ -162,10 +203,12 @@ private final class BenchmarkDatabaseSnapshot {
 private struct ProbeArguments {
   let bundleID: String
   let outputURL: URL
+  let maccyBaselineURL: URL?
 
   static func parse<S: Sequence>(_ rawArguments: S) throws -> ProbeArguments where S.Element == String {
     var bundleID = ClipboardBenchmarkProbe.defaultBundleID
     var outputPath: String?
+    var maccyBaselinePath: String?
     var iterator = rawArguments.makeIterator()
 
     while let argument = iterator.next() {
@@ -180,6 +223,11 @@ private struct ProbeArguments {
           throw ProbeArgumentError.missingValue("--output")
         }
         outputPath = value
+      case "--maccy-baseline":
+        guard let value = iterator.next(), !value.isEmpty else {
+          throw ProbeArgumentError.missingValue("--maccy-baseline")
+        }
+        maccyBaselinePath = value
       case "--help", "-h":
         throw ProbeArgumentError.help
       default:
@@ -193,7 +241,8 @@ private struct ProbeArguments {
 
     return ProbeArguments(
       bundleID: bundleID,
-      outputURL: URL(fileURLWithPath: outputPath)
+      outputURL: URL(fileURLWithPath: outputPath),
+      maccyBaselineURL: maccyBaselinePath.map(URL.init(fileURLWithPath:))
     )
   }
 }
@@ -214,7 +263,7 @@ private enum ProbeArgumentError: Error, CustomStringConvertible {
     }
   }
 
-  private static let usage = "usage: ClipboardBenchmarkProbe [--bundle-id BUNDLE_ID] --output REPORT_JSON"
+  private static let usage = "usage: ClipboardBenchmarkProbe [--bundle-id BUNDLE_ID] [--maccy-baseline BASELINE_JSON] --output REPORT_JSON"
 }
 
 private struct BenchmarkReport: Encodable {
@@ -223,7 +272,7 @@ private struct BenchmarkReport: Encodable {
   let paths: BenchmarkPaths
   let dataset: DatasetSummary
   let metrics: [BenchmarkMetric]
-  let maccyComparison: BenchmarkComparisonResult
+  let comparisons: [BenchmarkMetricComparison]
 }
 
 private struct BenchmarkPaths: Encodable {
@@ -236,6 +285,17 @@ private struct DatasetSummary: Encodable {
   let payloadBytes: Int64
   let typeCounts: [String: Int]
   let pinnedCount: Int
+}
+
+private struct MaccyBaselineReport: Decodable {
+  let source: String
+  let metrics: [MaccyBaselineMetric]
+}
+
+private struct MaccyBaselineMetric: Decodable {
+  let name: String
+  let medianMs: Double
+  let p95Ms: Double
 }
 
 private struct BenchmarkMetric: Encodable {
