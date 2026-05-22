@@ -169,4 +169,79 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
             )
         )
     }
+
+    func testOptionShiftReturnRequestsPlainTextPaste() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_Return),
+                modifierFlags: [.option, .shift]
+            ),
+            .pastePlainText
+        )
+    }
+
+    func testCommandNumberSelectsVisibleItem() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.command]
+            ),
+            .selectNumber(1)
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_9),
+                modifierFlags: [.command]
+            ),
+            .selectNumber(9)
+        )
+    }
+
+    func testOptionNumberPastesVisibleItem() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.option]
+            ),
+            .pasteNumber(1)
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_9),
+                modifierFlags: [.option]
+            ),
+            .pasteNumber(9)
+        )
+    }
+
+    func testCommandYRequestsDetailPreview() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_Y),
+                modifierFlags: [.command]
+            ),
+            .showDetailPreview
+        )
+    }
+
+    func testNumberShortcutsRequireExactModifiers() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: []
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.shift, .command]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.shift, .option]
+            )
+        )
+    }
 }
