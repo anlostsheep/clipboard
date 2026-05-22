@@ -27,7 +27,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
   let onTogglePinned: () -> Void
   let onClearUnpinned: () -> Void
   let onClearAll: () -> Void
-  var onCycleContentFilter: (Int) -> Void = { _ in }
+  var onCycleContentFilter: ((Int) -> Void)? = nil
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
@@ -84,7 +84,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     var onTogglePinned: () -> Void
     var onClearUnpinned: () -> Void
     var onClearAll: () -> Void
-    var onCycleContentFilter: (Int) -> Void
+    var onCycleContentFilter: ((Int) -> Void)?
     weak var observedView: KeyCaptureNSView?
 
     private var monitor: Any?
@@ -100,7 +100,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onTogglePinned: @escaping () -> Void,
       onClearUnpinned: @escaping () -> Void,
       onClearAll: @escaping () -> Void,
-      onCycleContentFilter: @escaping (Int) -> Void
+      onCycleContentFilter: ((Int) -> Void)?
     ) {
       self.onMove = onMove
       self.onSubmit = onSubmit
@@ -175,6 +175,9 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
         onClearAll()
         return nil
       case .cycleContentFilter(let delta):
+        guard let onCycleContentFilter else {
+          return event
+        }
         onCycleContentFilter(delta)
         return nil
       case nil:
