@@ -27,7 +27,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
   let onTogglePinned: () -> Void
   let onClearUnpinned: () -> Void
   let onClearAll: () -> Void
-  let onCycleContentFilter: (Int) -> Void = { _ in }
+  var onCycleContentFilter: (Int) -> Void = { _ in }
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
