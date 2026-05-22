@@ -234,28 +234,7 @@ final class QuickPanelState: ObservableObject {
   }
 
   func selectCurrent(autoPaste: Bool) async {
-    let selectionQuery = query
-    let recordID = currentRecordID
-    await refresh()
-
-    guard selectionQuery == query else {
-      await refresh()
-      setUserActionFooterStatus("Selection changed")
-      return
-    }
-
-    guard let recordID else {
-      setUserActionFooterStatus("No clipboard item selected")
-      return
-    }
-
-    guard let record = items.first(where: { $0.id == recordID }) else {
-      setUserActionFooterStatus("Selected item is no longer visible")
-      return
-    }
-
-    guard let payload = try? await payloadStore.loadPayload(for: record.id) else {
-      setUserActionFooterStatus("Payload is unavailable in this session")
+    guard let (record, payload) = await currentRecordAndPayloadAfterRefresh() else {
       return
     }
 
@@ -265,15 +244,10 @@ final class QuickPanelState: ObservableObject {
       autoPaste: autoPaste
     )
 
-    switch transaction.state {
-    case .completed:
-      actionPrompt = nil
-      setUserActionFooterStatus(autoPaste ? "Pasted \(record.primaryType.rawValue)" : "Copied \(record.primaryType.rawValue)")
-    case let .failed(reason):
-      setUserActionFooterStatus("Paste failed: \(reason.rawValue)")
-    default:
-      setUserActionFooterStatus("Paste transaction ended in \(transaction.state)")
-    }
+    setPasteTransactionFooterStatus(
+      transaction,
+      successStatus: autoPaste ? "Pasted \(record.primaryType.rawValue)" : "Copied \(record.primaryType.rawValue)"
+    )
   }
 
   func pasteVisibleItem(number: Int) async {
@@ -287,28 +261,7 @@ final class QuickPanelState: ObservableObject {
   }
 
   func pastePlainText() async {
-    let selectionQuery = query
-    let recordID = currentRecordID
-    await refresh()
-
-    guard selectionQuery == query else {
-      await refresh()
-      setUserActionFooterStatus("Selection changed")
-      return
-    }
-
-    guard let recordID else {
-      setUserActionFooterStatus("No clipboard item selected")
-      return
-    }
-
-    guard let record = items.first(where: { $0.id == recordID }) else {
-      setUserActionFooterStatus("Selected item is no longer visible")
-      return
-    }
-
-    guard let payload = try? await payloadStore.loadPayload(for: record.id) else {
-      setUserActionFooterStatus("Payload is unavailable in this session")
+    guard let (record, payload) = await currentRecordAndPayloadAfterRefresh() else {
       return
     }
 
@@ -323,15 +276,7 @@ final class QuickPanelState: ObservableObject {
       autoPaste: true
     )
 
-    switch transaction.state {
-    case .completed:
-      actionPrompt = nil
-      setUserActionFooterStatus("Pasted plain text")
-    case let .failed(reason):
-      setUserActionFooterStatus("Paste failed: \(reason.rawValue)")
-    default:
-      setUserActionFooterStatus("Paste transaction ended in \(transaction.state)")
-    }
+    setPasteTransactionFooterStatus(transaction, successStatus: "Pasted plain text")
   }
 
   func imagePreview(for record: ClipboardRecord) async -> NSImage? {
@@ -399,6 +344,47 @@ final class QuickPanelState: ObservableObject {
 
   private var currentRecordID: UUID? {
     selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
+  }
+
+  private func currentRecordAndPayloadAfterRefresh() async -> (record: ClipboardRecord, payload: ClipboardPayload)? {
+    let selectionQuery = query
+    let recordID = currentRecordID
+    await refresh()
+
+    guard selectionQuery == query else {
+      await refresh()
+      setUserActionFooterStatus("Selection changed")
+      return nil
+    }
+
+    guard let recordID else {
+      setUserActionFooterStatus("No clipboard item selected")
+      return nil
+    }
+
+    guard let record = items.first(where: { $0.id == recordID }) else {
+      setUserActionFooterStatus("Selected item is no longer visible")
+      return nil
+    }
+
+    guard let payload = try? await payloadStore.loadPayload(for: record.id) else {
+      setUserActionFooterStatus("Payload is unavailable in this session")
+      return nil
+    }
+
+    return (record, payload)
+  }
+
+  private func setPasteTransactionFooterStatus(_ transaction: PasteTransaction, successStatus: String) {
+    switch transaction.state {
+    case .completed:
+      actionPrompt = nil
+      setUserActionFooterStatus(successStatus)
+    case let .failed(reason):
+      setUserActionFooterStatus("Paste failed: \(reason.rawValue)")
+    default:
+      setUserActionFooterStatus("Paste transaction ended in \(transaction.state)")
+    }
   }
 
   @discardableResult
