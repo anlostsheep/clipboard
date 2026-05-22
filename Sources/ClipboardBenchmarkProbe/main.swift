@@ -1,12 +1,23 @@
 import ClipboardCore
 import ClipboardPlatform
+import Darwin
 import Foundation
 
 @main
 struct ClipboardBenchmarkProbe {
   fileprivate static let defaultBundleID = "com.local.clipboard-manager"
 
-  static func main() async throws {
+  static func main() async {
+    do {
+      try await runMain()
+    } catch {
+      let message = "Error: \(errorMessage(error))\n"
+      FileHandle.standardError.write(Data(message.utf8))
+      exit(1)
+    }
+  }
+
+  private static func runMain() async throws {
     let arguments = try ProbeArguments.parse(CommandLine.arguments.dropFirst())
     let paths = try ApplicationSupportPaths(bundleIdentifier: arguments.bundleID)
     let report = try await run(
@@ -26,6 +37,16 @@ struct ClipboardBenchmarkProbe {
     try data.write(to: arguments.outputURL, options: .atomic)
 
     printSummary(report, outputURL: arguments.outputURL)
+  }
+
+  private static func errorMessage(_ error: Error) -> String {
+    if let error = error as? ProbeArgumentError {
+      return error.description
+    }
+    if let error = error as? MaccyBaselineError {
+      return error.description
+    }
+    return error.localizedDescription
   }
 
   private static func run(
@@ -128,7 +149,14 @@ struct ClipboardBenchmarkProbe {
   private static func loadMaccyBaseline(from url: URL?) throws -> MaccyBaselineReport? {
     guard let url else { return nil }
     let data = try Data(contentsOf: url)
-    return try JSONDecoder().decode(MaccyBaselineReport.self, from: data)
+    let baseline = try JSONDecoder().decode(MaccyBaselineReport.self, from: data)
+    var metricNames = Set<String>()
+    for metric in baseline.metrics {
+      guard metricNames.insert(metric.name).inserted else {
+        throw MaccyBaselineError.duplicateMetricName(metric.name)
+      }
+    }
+    return baseline
   }
 
   private static func compare(
@@ -264,6 +292,21 @@ private enum ProbeArgumentError: Error, CustomStringConvertible {
   }
 
   private static let usage = "usage: ClipboardBenchmarkProbe [--bundle-id BUNDLE_ID] [--maccy-baseline BASELINE_JSON] --output REPORT_JSON"
+}
+
+private enum MaccyBaselineError: Error, CustomStringConvertible, LocalizedError {
+  case duplicateMetricName(String)
+
+  var description: String {
+    switch self {
+    case .duplicateMetricName(let name):
+      return "Maccy baseline contains duplicate metric name: \(name)"
+    }
+  }
+
+  var errorDescription: String? {
+    description
+  }
 }
 
 private struct BenchmarkReport: Encodable {
