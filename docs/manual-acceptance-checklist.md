@@ -123,6 +123,32 @@ swift run ClipboardManualProbe read-once
 - [ ] `Scripts/benchmark-maccy-replacement.sh` 生成 JSON 报告和可读摘要
 - [ ] 报告中的 Maccy 对比项只使用 `better` / `same` / `worse` / `not_comparable` 表述
 
+## Maccy B-Level Daily Replacement
+
+- [ ] 普通文本框中，QuickPanel `Return` 自动粘贴当前选中项
+- [ ] 普通文本框中，QuickPanel 双击自动粘贴当前记录
+- [ ] 富文本编辑器中，QuickPanel `Return` 自动粘贴当前选中项
+- [ ] Terminal 中，QuickPanel `Return` 自动粘贴当前选中项
+- [ ] 浏览器地址栏中，QuickPanel `Return` 自动粘贴当前选中项
+- [ ] 仅复制模式下，`Return` 和双击只写入系统剪贴板，不自动粘贴
+- [ ] 仅复制模式下，随后手动 `Command+V` 能粘贴刚选中的记录
+- [ ] `Option+Shift+Enter` 对富文本记录执行无格式粘贴
+- [ ] `Option+Shift+Enter` 对文本和链接记录执行纯文本粘贴
+- [ ] `Option+Shift+Enter` 对图片或文件记录显示不支持无格式粘贴的状态
+- [ ] `Command+1...9` 选择当前可见列表中的第 N 条记录
+- [ ] `Option+1...9` 自动粘贴当前可见列表中的第 N 条记录
+- [ ] 开启仅复制模式后，`Option+1...9` 仍作为显式自动粘贴命令执行
+- [ ] 搜索和类型过滤后，数字快捷键对应过滤后的可见顺序
+- [ ] pinned/history 混排时，数字快捷键按视觉顺序定位记录
+- [ ] 详情预览可查看安全大小文本记录的完整内容
+- [ ] 详情预览对大文本保持摘要优先，不在 QuickPanel 首帧加载全文
+- [ ] 暂停采集后复制 3 条内容，历史数量不增长
+- [ ] 恢复采集后复制 1 条内容，历史数量增长
+- [ ] 触发“忽略下一次复制”后，第一条复制不入库，第二条复制正常入库
+- [ ] 添加 Maccy baseline 后，benchmark 报告输出 per-metric comparison
+- [ ] benchmark comparison 只使用 `better` / `same` / `worse` / `not_comparable`
+- [ ] 本轮真实 UI 验收使用的 app bundle 签名包含 `Authority=ClipboardApp Local Code Signing`
+
 ## 记录格式
 
 每次验收写一条记录：
