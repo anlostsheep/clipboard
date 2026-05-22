@@ -112,6 +112,34 @@ final class BenchmarkComparisonTests: XCTestCase {
     )
   }
 
+  func testNotComparableWhenMaccyP95IsZeroOrNegative() {
+    XCTAssertEqual(
+      BenchmarkComparison.classify(
+        clipboardMedian: 79,
+        maccyMedian: 100,
+        clipboardP95: 150,
+        maccyP95: 0
+      ),
+      .notComparable
+    )
+
+    XCTAssertEqual(
+      BenchmarkComparison.classify(
+        clipboardMedian: 79,
+        maccyMedian: 100,
+        clipboardP95: 150,
+        maccyP95: -1
+      ),
+      .notComparable
+    )
+  }
+
+  func testConfidenceRawValuesMatchBenchmarkJSONContract() {
+    XCTAssertEqual(BenchmarkComparisonConfidence.sameMachineBaseline.rawValue, "sameMachineBaseline")
+    XCTAssertEqual(BenchmarkComparisonConfidence.missingBaseline.rawValue, "missingBaseline")
+    XCTAssertEqual(BenchmarkComparisonConfidence.invalidBaseline.rawValue, "invalidBaseline")
+  }
+
   func testMetricComparisonExplainsMissingMaccyBaseline() {
     let comparison = BenchmarkComparison.compareMetric(
       name: "fetch_recent_50_ms",
@@ -126,6 +154,32 @@ final class BenchmarkComparisonTests: XCTestCase {
     XCTAssertEqual(comparison.result, .notComparable)
     XCTAssertEqual(comparison.confidence, .missingBaseline)
     XCTAssertEqual(comparison.reason, "Maccy baseline is missing for fetch_recent_50_ms")
+  }
+
+  func testMetricComparisonExplainsInvalidMaccyP95Baseline() {
+    let zeroP95 = BenchmarkComparison.compareMetric(
+      name: "fetch_recent_50_ms",
+      clipboardMedian: 10,
+      clipboardP95: 15,
+      maccyMedian: 20,
+      maccyP95: 0,
+      maccySource: "same-machine-json"
+    )
+    let negativeP95 = BenchmarkComparison.compareMetric(
+      name: "search_http_50_ms",
+      clipboardMedian: 10,
+      clipboardP95: 15,
+      maccyMedian: 20,
+      maccyP95: -1,
+      maccySource: "same-machine-json"
+    )
+
+    XCTAssertEqual(zeroP95.result, .notComparable)
+    XCTAssertEqual(zeroP95.confidence, .invalidBaseline)
+    XCTAssertEqual(zeroP95.maccyP95Ms, 0)
+    XCTAssertEqual(negativeP95.result, .notComparable)
+    XCTAssertEqual(negativeP95.confidence, .invalidBaseline)
+    XCTAssertEqual(negativeP95.maccyP95Ms, -1)
   }
 
   func testMetricComparisonRecordsBetterSameWorseWithReasons() {

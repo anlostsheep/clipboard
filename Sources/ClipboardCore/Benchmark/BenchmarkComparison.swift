@@ -8,9 +8,9 @@ public enum BenchmarkComparisonResult: String, Codable, Equatable, Sendable {
 }
 
 public enum BenchmarkComparisonConfidence: String, Codable, Equatable, Sendable {
-  case sameMachineBaseline
-  case missingBaseline
-  case invalidBaseline
+  case sameMachineBaseline = "sameMachineBaseline"
+  case missingBaseline = "missingBaseline"
+  case invalidBaseline = "invalidBaseline"
 }
 
 public struct BenchmarkMetricComparison: Codable, Equatable, Sendable {
@@ -54,7 +54,7 @@ public enum BenchmarkComparison {
     clipboardP95: Double,
     maccyP95: Double?
   ) -> BenchmarkComparisonResult {
-    guard let maccyMedian, let maccyP95, maccyMedian > 0 else {
+    guard let maccyMedian, let maccyP95, maccyMedian > 0, maccyP95 > 0 else {
       return .notComparable
     }
 
