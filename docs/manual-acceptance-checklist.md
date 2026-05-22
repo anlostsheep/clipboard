@@ -82,12 +82,12 @@ swift run ClipboardManualProbe read-once
 - [x] 未开启辅助功能权限且处于自动粘贴模式时，鼠标双击记录不静默失败，QuickPanel 显示授权提示并保持打开
 - [x] 切换“打开快捷面板时选中：最新记录 / 上次选中项”后，重新打开 QuickPanel 的初始选中项符合设置
 - [x] QuickPanel 顶部类型过滤控件中的“类型”标签不换行、不挤压成两行
-- [ ] 打开 QuickPanel 且搜索框聚焦时，按 `Tab` 可将类型从 `All` 切到 `Text`
-- [ ] 连续按 `Tab` 可按 `All → Text → Link → Image → File → All` 循环类型
-- [ ] 按 `Shift+Tab` 可按反向顺序循环类型
-- [ ] 输入搜索关键词后按 `Tab`，关键词不丢失，列表按“关键词 + 类型”共同过滤
-- [ ] 中文输入法正在组词时，`Tab` 不破坏输入法 composition
-- [ ] 切换类型后 QuickPanel 布局稳定，不出现 pinned/history 大空白回归
+- [x] 打开 QuickPanel 且搜索框聚焦时，按 `Tab` 可将类型从 `All` 切到 `Text`
+- [x] 连续按 `Tab` 可按 `All → Text → Link → Image → File → All` 循环类型
+- [x] 按 `Shift+Tab` 可按反向顺序循环类型
+- [x] 输入搜索关键词后按 `Tab`，关键词不丢失，列表按“关键词 + 类型”共同过滤
+- [x] 中文输入法正在组词时，`Tab` 不破坏输入法 composition
+- [x] 切换类型后 QuickPanel 布局稳定，不出现 pinned/history 大空白回归
 - [ ] 复制 10MB JSON 后打开 QuickPanel，列表只显示摘要，不渲染全文
 
 ## 失败提示
@@ -344,4 +344,33 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
   - ad-hoc signing 后 macOS 可能要求重新确认辅助功能授权
 截图/录屏: 未采集；以自动化测试、verify 脚本和 app bundle 构建输出作为证据
 结论: AUTO PASS，代码级能力覆盖与构建验证完成；真实来源数据库导入为剩余手工验收项
+```
+
+## Tab 类型切换验收记录（2026-05-22）
+
+```text
+日期: 2026-05-22
+机器: 本机 Apple Silicon
+系统: macOS 26.5 (25F71)
+架构: arm64
+场景: codex/maccy-core-parity-tab-cycling 分支 QuickPanel Tab / Shift+Tab 类型过滤切换真实 UI 验收
+命令:
+  - swift test --filter QuickPanelKeyCaptureTests
+  - swift test --filter QuickPanelStateFilterTests
+  - swift test --filter QuickPanel
+  - Scripts/verify.sh
+  - CODE_SIGN_KEYCHAIN="$HOME/Library/Keychains/clipboard-signing.keychain-db" LOCAL_CODE_SIGN_IDENTITY="ClipboardApp Local Code Signing" REQUIRE_STABLE_CODE_SIGNING=1 Scripts/build-app-bundle.sh
+  - codesign -dv --verbose=4 .build/app-bundles/release/ClipboardApp.app
+  - 用户手动打开 QuickPanel，验证 Tab / Shift+Tab 类型切换、搜索词保留、中文输入法组词和 pinned/history 布局稳定性
+结果:
+  - QuickPanelKeyCaptureTests 通过：15 tests, 0 failures
+  - QuickPanelStateFilterTests 通过：20 tests, 0 failures
+  - QuickPanel 聚合测试复跑通过：72 tests, 0 failures
+  - Scripts/verify.sh 通过
+  - 稳定签名 app bundle 构建成功：.build/app-bundles/release/ClipboardApp.app
+  - codesign 输出包含 Authority=ClipboardApp Local Code Signing
+  - 用户手动验收 6 项 Tab 类型切换场景全部通过
+问题: 未发现问题
+截图/录屏: 未采集；以用户真实 UI 验收反馈和自动化命令输出作为证据。
+结论: PASS，QuickPanel Tab 类型切换功能完成真实 UI 验收。
 ```
