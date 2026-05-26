@@ -60,6 +60,11 @@ struct QuickPanelItemRow: Identifiable, Equatable {
   var id: UUID { record.id }
 }
 
+struct QuickPanelPlainTextPasteRequest {
+  let record: ClipboardRecord
+  let plainText: String
+}
+
 struct QuickPanelItemSection: Identifiable, Equatable {
   enum Kind: String {
     case pinned
@@ -118,12 +123,13 @@ final class QuickPanelState: ObservableObject {
   @Published private(set) var footerStatus = "Ready"
   @Published private(set) var actionPrompt: QuickPanelActionPrompt?
   @Published private(set) var detailPreview: QuickPanelDetailPreview?
+  @Published private(set) var presentationGeneration = 0
 
   private let viewModel: QuickPanelViewModel
   private let payloadStore: any ClipboardPayloadStore
   private let pasteController: PasteController
   private let mutationService: HistoryMutationService
-  private var refreshTask: Task<Void, Never>?
+  private var refreshTask: Task<Bool, Never>?
   private var refreshGeneration = 0
   private var detailPreviewGeneration = 0
   private var latestAppliedQuery = ""
@@ -180,6 +186,7 @@ final class QuickPanelState: ObservableObject {
   }
 
   func prepareForPresentation(openSelectionBehavior: QuickPanelOpenSelectionBehavior = .latestRecord) {
+    presentationGeneration += 1
     footerStatusSource = .refresh
     footerStatus = "Ready"
     actionPrompt = nil
@@ -193,8 +200,27 @@ final class QuickPanelState: ObservableObject {
   func refresh() async {
     repeat {
       let task = scheduleRefresh()
-      await task.value
+      _ = await task.value
     } while (latestAppliedQuery != query || latestAppliedContentFilter != contentFilter) && !Task.isCancelled
+  }
+
+  private func refreshForUserAction() async {
+    repeat {
+      refreshGeneration += 1
+      let generation = refreshGeneration
+      let querySnapshot = query
+      let filterSnapshot = contentFilter
+      refreshTask?.cancel()
+      let didApply = await applyRefresh(
+        querySnapshot: querySnapshot,
+        filterSnapshot: filterSnapshot,
+        generation: generation,
+        requireCurrentGeneration: false
+      )
+      if didApply {
+        return
+      }
+    } while !Task.isCancelled
   }
 
   var itemSections: [QuickPanelItemSection] {
@@ -227,6 +253,23 @@ final class QuickPanelState: ObservableObject {
   func selectVisibleItem(number: Int) {
     let index = number - 1
     selectItem(at: index)
+  }
+
+  func hasVisibleItem(number: Int) -> Bool {
+    items.indices.contains(number - 1)
+  }
+
+  func prepareVisibleItemPaste(number: Int) async -> Bool {
+    if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
+      await refreshForUserAction()
+    }
+
+    guard hasVisibleItem(number: number) else {
+      return false
+    }
+
+    selectVisibleItem(number: number)
+    return true
   }
 
   func reportAutoPasteRequiresAccessibilityPermission() {
@@ -271,18 +314,30 @@ final class QuickPanelState: ObservableObject {
   }
 
   func pastePlainText() async {
-    guard let (record, payload) = await currentRecordAndPayloadAfterRefresh() else {
+    guard let request = await preparePlainTextPaste() else {
       return
+    }
+
+    await pastePlainText(request)
+  }
+
+  func preparePlainTextPaste() async -> QuickPanelPlainTextPasteRequest? {
+    guard let (record, payload) = await currentRecordAndPayloadForUserAction() else {
+      return nil
     }
 
     guard let plainText = payload.plainTextForPaste else {
       setUserActionFooterStatus("Plain text paste is not supported for \(record.primaryType.rawValue)")
-      return
+      return nil
     }
 
+    return QuickPanelPlainTextPasteRequest(record: record, plainText: plainText)
+  }
+
+  func pastePlainText(_ request: QuickPanelPlainTextPasteRequest) async {
     let transaction = await pasteController.paste(
-      record: record,
-      payload: .text(plainText),
+      record: request.record,
+      payload: .text(request.plainText),
       autoPaste: true
     )
 
@@ -393,6 +448,55 @@ final class QuickPanelState: ObservableObject {
     selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
   }
 
+  private func currentRecordAndPayloadForUserAction() async -> (record: ClipboardRecord, payload: ClipboardPayload)? {
+    let selectionQuery = query
+    if latestAppliedQuery == query,
+       latestAppliedContentFilter == contentFilter,
+       let record = currentVisibleRecord() {
+      guard let payload = await loadPayloadForUserAction(record: record) else {
+        return nil
+      }
+      return (record, payload)
+    }
+
+    await refreshForUserAction()
+
+    guard selectionQuery == query else {
+      await refreshForUserAction()
+      setUserActionFooterStatus("Selection changed")
+      return nil
+    }
+
+    guard let record = currentVisibleRecord() else {
+      setUserActionFooterStatus("No clipboard item selected")
+      return nil
+    }
+
+    guard let payload = await loadPayloadForUserAction(record: record) else {
+      return nil
+    }
+
+    return (record, payload)
+  }
+
+  private func currentVisibleRecord() -> ClipboardRecord? {
+    guard let recordID = currentRecordID,
+          let record = items.first(where: { $0.id == recordID }) else {
+      return nil
+    }
+
+    return record
+  }
+
+  private func loadPayloadForUserAction(record: ClipboardRecord) async -> ClipboardPayload? {
+    guard let payload = try? await payloadStore.loadPayload(for: record.id) else {
+      setUserActionFooterStatus("Payload is unavailable in this session")
+      return nil
+    }
+
+    return payload
+  }
+
   private func currentRecordAndPayloadAfterRefresh() async -> (record: ClipboardRecord, payload: ClipboardPayload)? {
     let selectionQuery = query
     let recordID = currentRecordID
@@ -430,7 +534,7 @@ final class QuickPanelState: ObservableObject {
     let rawText: String = switch payload {
     case .text(let text):
       text
-    case .richText(let plainText, _):
+    case .richText(let plainText, _, _):
       plainText
     case .image:
       fallback.isEmpty ? "Image preview is available in the row." : fallback
@@ -458,7 +562,7 @@ final class QuickPanelState: ObservableObject {
   }
 
   @discardableResult
-  private func scheduleRefresh() -> Task<Void, Never> {
+  private func scheduleRefresh() -> Task<Bool, Never> {
     refreshGeneration += 1
     let generation = refreshGeneration
     let querySnapshot = query
@@ -467,9 +571,9 @@ final class QuickPanelState: ObservableObject {
 
     let task = Task { [weak self] in
       guard let self else {
-        return
+        return false
       }
-      await self.applyRefresh(querySnapshot: querySnapshot, filterSnapshot: filterSnapshot, generation: generation)
+      return await self.applyRefresh(querySnapshot: querySnapshot, filterSnapshot: filterSnapshot, generation: generation)
     }
     refreshTask = task
     return task
@@ -478,19 +582,23 @@ final class QuickPanelState: ObservableObject {
   private func applyRefresh(
     querySnapshot: String,
     filterSnapshot: QuickPanelContentFilter,
-    generation: Int
-  ) async {
-    await viewModel.refresh(query: querySnapshot, contentTypes: filterSnapshot.contentTypes)
+    generation: Int,
+    requireCurrentGeneration: Bool = true
+  ) async -> Bool {
+    let didRefreshViewModel = await viewModel.refresh(query: querySnapshot, contentTypes: filterSnapshot.contentTypes)
+    guard didRefreshViewModel else {
+      return false
+    }
 
     guard !Task.isCancelled else {
-      return
+      return false
     }
 
     guard !Task.isCancelled,
-          generation == refreshGeneration,
+          (!requireCurrentGeneration || generation == refreshGeneration),
           querySnapshot == query,
           filterSnapshot == contentFilter else {
-      return
+      return false
     }
 
     let selectionRecordID = selectedRecordID
@@ -520,6 +628,7 @@ final class QuickPanelState: ObservableObject {
     }
     latestAppliedQuery = querySnapshot
     latestAppliedContentFilter = filterSnapshot
+    return true
   }
 
   private func setUserActionFooterStatus(_ status: String) {

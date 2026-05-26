@@ -197,20 +197,182 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
     }
 
-    func testOptionNumberPastesVisibleItem() {
+    func testControlCommandNumberPastesVisibleItem() {
         XCTAssertEqual(
             QuickPanelKeyCaptureView.keyboardAction(
                 keyCode: UInt16(kVK_ANSI_1),
-                modifierFlags: [.option]
+                modifierFlags: [.control, .command]
             ),
             .pasteNumber(1)
         )
         XCTAssertEqual(
             QuickPanelKeyCaptureView.keyboardAction(
                 keyCode: UInt16(kVK_ANSI_9),
-                modifierFlags: [.option]
+                modifierFlags: [.control, .command]
             ),
             .pasteNumber(9)
+        )
+    }
+
+    func testControlCommandNumberUsesTrackedModifierFlagsWhenKeyDownDropsControl() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_6),
+                modifierFlags: [.command],
+                trackedModifierFlags: [.control, .command]
+            ),
+            .pasteNumber(6)
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.numberShortcutMode(
+                modifierFlags: [.command],
+                trackedModifierFlags: [.control, .command]
+            ),
+            .paste
+        )
+    }
+
+    func testNumberShortcutsIgnoreStaleTrackedModifiersWhenCurrentEventHasNoShortcutModifiers() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_6),
+                modifierFlags: [],
+                trackedModifierFlags: [.control, .command]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.numberShortcutMode(
+                modifierFlags: [],
+                trackedModifierFlags: [.control, .command]
+            )
+        )
+    }
+
+    func testModifierTrackerResetPreventsStaleControlFromPromotingCommandNumber() {
+        var tracker = QuickPanelModifierTracker()
+        tracker.observe([.control, .command])
+        let staleTrackedFlags = tracker.trackedModifierFlags(
+            eventModifierFlags: [.command],
+            globalModifierFlags: []
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_6),
+                modifierFlags: [.command],
+                trackedModifierFlags: staleTrackedFlags
+            ),
+            .pasteNumber(6)
+        )
+
+        XCTAssertTrue(tracker.resetIfNeeded(token: 1))
+        let resetTrackedFlags = tracker.trackedModifierFlags(
+            eventModifierFlags: [.command],
+            globalModifierFlags: []
+        )
+
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_6),
+                modifierFlags: [.command],
+                trackedModifierFlags: resetTrackedFlags
+            ),
+            .selectNumber(6)
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.numberShortcutMode(
+                modifierFlags: [.command],
+                trackedModifierFlags: resetTrackedFlags
+            ),
+            .select
+        )
+    }
+
+    func testOptionNumberIsNotCapturedForPaste() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.option]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_6),
+                modifierFlags: [.option]
+            )
+        )
+    }
+
+    func testNumberShortcutsIgnoreNonSemanticModifierNoise() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.control, .command, .numericPad]
+            ),
+            .pasteNumber(1)
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_9),
+                modifierFlags: [.command, .capsLock, .function]
+            ),
+            .selectNumber(9)
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.option, .command, .numericPad]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.control, .option, .command]
+            )
+        )
+    }
+
+    func testNumberShortcutHintModeTracksCommandAndControlCommandOnly() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.numberShortcutMode(modifierFlags: [.command, .capsLock]),
+            .select
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.numberShortcutMode(modifierFlags: [.control, .command, .numericPad]),
+            .paste
+        )
+        XCTAssertNil(QuickPanelKeyCaptureView.numberShortcutMode(modifierFlags: [.option, .numericPad]))
+        XCTAssertNil(QuickPanelKeyCaptureView.numberShortcutMode(modifierFlags: [.option, .shift]))
+        XCTAssertNil(QuickPanelKeyCaptureView.numberShortcutMode(modifierFlags: [.command, .option]))
+    }
+
+    func testReservedShortcutsPreemptMarkedTextInput() {
+        XCTAssertFalse(
+            QuickPanelKeyCaptureView.shouldDeferToMarkedTextInput(
+                keyCode: UInt16(kVK_ANSI_6),
+                modifierFlags: [.control, .command],
+                hasMarkedText: true
+            )
+        )
+        XCTAssertTrue(
+            QuickPanelKeyCaptureView.shouldDeferToMarkedTextInput(
+                keyCode: UInt16(kVK_ANSI_6),
+                modifierFlags: [.option],
+                hasMarkedText: true
+            )
+        )
+        XCTAssertTrue(
+            QuickPanelKeyCaptureView.shouldDeferToMarkedTextInput(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.option],
+                hasMarkedText: true
+            )
+        )
+        XCTAssertFalse(
+            QuickPanelKeyCaptureView.shouldDeferToMarkedTextInput(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.option],
+                hasMarkedText: false
+            )
         )
     }
 
@@ -241,6 +403,18 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
             QuickPanelKeyCaptureView.keyboardAction(
                 keyCode: UInt16(kVK_ANSI_1),
                 modifierFlags: [.shift, .option]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.control]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_1),
+                modifierFlags: [.shift, .control, .command]
             )
         )
     }

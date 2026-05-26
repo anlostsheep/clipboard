@@ -151,6 +151,46 @@ final class QuickPanelViewModelTests: XCTestCase {
     ])
   }
 
+  func testRefreshPreservesRecentHistoryWhenPinnedItemsExceedPageLimit() async throws {
+    let store = InMemoryHistoryStore()
+    for index in 0..<12 {
+      _ = try await store.upsert(makeRecord(
+        id: UUID(uuidString: "00000000-0000-0000-0000-0000000001\(String(format: "%02d", index))")!,
+        title: "pinned \(index)",
+        lastCopiedAt: TimeInterval(100 + index),
+        isPinned: true,
+        pinnedAt: TimeInterval(100 + index)
+      ))
+    }
+    for index in 0..<6 {
+      _ = try await store.upsert(makeRecord(
+        id: UUID(uuidString: "00000000-0000-0000-0000-0000000002\(String(format: "%02d", index))")!,
+        title: "history \(index)",
+        lastCopiedAt: TimeInterval(200 + index)
+      ))
+    }
+
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 10)
+    await viewModel.refresh(query: "")
+    let items = await viewModel.items
+
+    XCTAssertEqual(items.count, 10)
+    XCTAssertEqual(items.filter(\.isPinned).map(\.title), [
+      "pinned 11",
+      "pinned 10",
+      "pinned 9",
+      "pinned 8",
+      "pinned 7"
+    ])
+    XCTAssertEqual(items.filter { !$0.isPinned }.map(\.title), [
+      "history 5",
+      "history 4",
+      "history 3",
+      "history 2",
+      "history 1"
+    ])
+  }
+
   private func makeRecord(
     id: UUID,
     title: String,

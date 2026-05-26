@@ -6,6 +6,7 @@ import Foundation
 public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReading, PasteboardWriting, PasteEventPosting {
   private let pasteboard: NSPasteboard
   private let markerType: NSPasteboard.PasteboardType
+  private let htmlType = NSPasteboard.PasteboardType("public.html")
 
   public init(
     pasteboard: NSPasteboard = .general,
@@ -27,25 +28,29 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
     }
 
     let types = Set(items.flatMap { $0.types.map(\.rawValue) })
-    let app = NSWorkspace.shared.frontmostApplication
+    let source = sourceApplication(forPasteboardTypes: types)
     let now = Date()
 
     if let image = firstImagePayload(in: items) {
       return ClipboardCapture(
         payload: .image(data: image.data, uti: image.type.rawValue),
         pasteboardTypes: types,
-        sourceAppBundleId: app?.bundleIdentifier,
-        sourceAppName: app?.localizedName,
+        sourceAppBundleId: source.bundleID,
+        sourceAppName: source.name,
         capturedAt: now
       )
     }
 
     if let richText = firstRichTextPayload(in: items) {
       return ClipboardCapture(
-        payload: .richText(plainText: richText.plainText, rtfData: richText.rtfData),
+        payload: .richText(
+          plainText: richText.plainText,
+          rtfData: richText.rtfData,
+          htmlData: richText.htmlData
+        ),
         pasteboardTypes: types,
-        sourceAppBundleId: app?.bundleIdentifier,
-        sourceAppName: app?.localizedName,
+        sourceAppBundleId: source.bundleID,
+        sourceAppName: source.name,
         capturedAt: now
       )
     }
@@ -54,8 +59,8 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
       return ClipboardCapture(
         payload: .text(string),
         pasteboardTypes: types,
-        sourceAppBundleId: app?.bundleIdentifier,
-        sourceAppName: app?.localizedName,
+        sourceAppBundleId: source.bundleID,
+        sourceAppName: source.name,
         capturedAt: now
       )
     }
@@ -70,8 +75,8 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
       return ClipboardCapture(
         payload: .fileURLs(fileURLs),
         pasteboardTypes: types,
-        sourceAppBundleId: app?.bundleIdentifier,
-        sourceAppName: app?.localizedName,
+        sourceAppBundleId: source.bundleID,
+        sourceAppName: source.name,
         capturedAt: now
       )
     }
@@ -79,20 +84,32 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
     return nil
   }
 
-  private func firstRichTextPayload(in items: [NSPasteboardItem]) -> (plainText: String, rtfData: Data)? {
+  private func sourceApplication(forPasteboardTypes types: Set<String>) -> (bundleID: String?, name: String?) {
+    if types.contains("com.apple.is-remote-clipboard") {
+      return (nil, "Universal Clipboard")
+    }
+
+    let app = NSWorkspace.shared.frontmostApplication
+    return (app?.bundleIdentifier, app?.localizedName)
+  }
+
+  private func firstRichTextPayload(in items: [NSPasteboardItem]) -> (
+    plainText: String,
+    rtfData: Data?,
+    htmlData: Data?
+  )? {
     for item in items {
-      guard let rtfData = item.data(forType: .rtf), !rtfData.isEmpty else {
+      let rtfData = item.data(forType: .rtf).flatMap { $0.isEmpty ? nil : $0 }
+      let htmlData = item.data(forType: htmlType).flatMap { $0.isEmpty ? nil : $0 }
+      guard rtfData != nil || htmlData != nil else {
         continue
       }
 
       let plainText = item.string(forType: .string)
-        ?? NSAttributedString(rtf: rtfData, documentAttributes: nil)?.string
+        ?? rtfData.flatMap { NSAttributedString(rtf: $0, documentAttributes: nil)?.string }
         ?? ""
-      guard !plainText.isEmpty else {
-        continue
-      }
 
-      return (plainText, rtfData)
+      return (plainText, rtfData, htmlData)
     }
 
     return nil
@@ -201,14 +218,15 @@ public final class SystemPasteboardClient: @unchecked Sendable, PasteboardReadin
         return nil
       }
       return [item]
-    case let .richText(plainText, rtfData):
+    case let .richText(plainText, rtfData, htmlData):
       let item = NSPasteboardItem()
       guard setMarker(marker, on: item) else {
         return nil
       }
       let wroteText = item.setString(plainText, forType: .string)
-      let wroteRTF = item.setData(rtfData, forType: .rtf)
-      return wroteText || wroteRTF ? [item] : nil
+      let wroteRTF = rtfData.map { item.setData($0, forType: .rtf) } ?? false
+      let wroteHTML = htmlData.map { item.setData($0, forType: htmlType) } ?? false
+      return wroteText || wroteRTF || wroteHTML ? [item] : nil
     case let .image(data, uti):
       let item = NSPasteboardItem()
       guard setMarker(marker, on: item),

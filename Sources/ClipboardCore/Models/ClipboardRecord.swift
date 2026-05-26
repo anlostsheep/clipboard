@@ -2,7 +2,7 @@ import Foundation
 
 public enum ClipboardPayload: Equatable, Sendable {
   case text(String)
-  case richText(plainText: String, rtfData: Data)
+  case richText(plainText: String, rtfData: Data?, htmlData: Data? = nil)
   case image(data: Data, uti: String)
   case fileURLs([URL])
 }

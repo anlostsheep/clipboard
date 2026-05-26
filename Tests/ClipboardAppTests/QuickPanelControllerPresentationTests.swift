@@ -96,6 +96,212 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         XCTAssertFalse(eventPoster.didPostCommandV)
     }
 
+    func testPasteVisibleItemByNumberHidesPanelRestoresPreviousApplicationAndAutoPastes() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord()
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.text("number paste payload"), for: record.id)
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        )
+        var didRequestRestore = false
+        let controller = QuickPanelController(
+            state: state,
+            autoPasteEnabled: { false },
+            isAutoPasteAuthorized: { true },
+            activatePreviousApplication: { _ in
+                didRequestRestore = true
+            }
+        )
+
+        controller.show()
+        await state.refresh()
+        controller.pasteVisibleItem(number: 1)
+        try await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(pasteboard.lastText, "number paste payload")
+        XCTAssertTrue(eventPoster.didPostCommandV)
+        XCTAssertTrue(didRequestRestore)
+        XCTAssertFalse(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Number paste should close the QuickPanel before posting Command+V to the previous app."
+        )
+    }
+
+    func testPasteVisibleItemByNumberKeepsPanelVisibleWhenAutoPasteIsUnauthorized() async throws {
+        let state = makePresentationState()
+        let controller = QuickPanelController(
+            state: state,
+            isAutoPasteAuthorized: { false }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        controller.pasteVisibleItem(number: 1)
+
+        XCTAssertTrue(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Unauthorized explicit number paste should keep the QuickPanel visible for the authorization message."
+        )
+        XCTAssertEqual(state.footerStatus, "自动粘贴需要辅助功能权限，请在设置中授权")
+    }
+
+    func testPasteVisibleItemByOutOfRangeNumberKeepsPanelVisibleAndDoesNotPaste() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord()
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.text("number paste payload"), for: record.id)
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        )
+        var didRequestRestore = false
+        let controller = QuickPanelController(
+            state: state,
+            isAutoPasteAuthorized: { true },
+            activatePreviousApplication: { _ in
+                didRequestRestore = true
+            }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        controller.pasteVisibleItem(number: 9)
+        try await Task.sleep(nanoseconds: 80_000_000)
+
+        XCTAssertNil(pasteboard.lastText)
+        XCTAssertFalse(eventPoster.didPostCommandV)
+        XCTAssertFalse(didRequestRestore)
+        XCTAssertTrue(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Out-of-range number paste should not close the QuickPanel."
+        )
+    }
+
+    func testPastePlainTextSelectionHidesPanelRestoresPreviousApplicationAndAutoPastesPlainText() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord(type: .richText)
+        _ = try await store.upsert(record)
+        try await payloadStore.save(
+            .richText(plainText: "plain text payload", rtfData: Data("{\\rtf1 styled}".utf8)),
+            for: record.id
+        )
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        )
+        var didRequestRestore = false
+        let controller = QuickPanelController(
+            state: state,
+            isAutoPasteAuthorized: { true },
+            activatePreviousApplication: { _ in
+                didRequestRestore = true
+            }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        let pasteTask = controller.pastePlainTextSelection()
+        await pasteTask.value
+
+        XCTAssertEqual(pasteboard.lastText, "plain text payload")
+        XCTAssertTrue(eventPoster.didPostCommandV)
+        XCTAssertTrue(didRequestRestore)
+        XCTAssertFalse(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Plain-text paste should close the QuickPanel before posting Command+V to the previous app."
+        )
+    }
+
+    func testPastePlainTextSelectionFromFreshPanelHidesPanelAndAutoPastesPlainText() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord(type: .richText)
+        _ = try await store.upsert(record)
+        try await payloadStore.save(
+            .richText(plainText: "fresh panel plain text", rtfData: Data("{\\rtf1 styled}".utf8)),
+            for: record.id
+        )
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        )
+        var didRequestRestore = false
+        let controller = QuickPanelController(
+            state: state,
+            isAutoPasteAuthorized: { true },
+            activatePreviousApplication: { _ in
+                didRequestRestore = true
+            }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        let pasteTask = controller.pastePlainTextSelection()
+        await pasteTask.value
+
+        XCTAssertEqual(pasteboard.lastText, "fresh panel plain text")
+        XCTAssertTrue(eventPoster.didPostCommandV)
+        XCTAssertTrue(didRequestRestore)
+        XCTAssertFalse(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Plain-text paste should close the QuickPanel even when invoked immediately after presentation."
+        )
+    }
+
+    func testPastePlainTextSelectionKeepsPanelVisibleForUnsupportedPayload() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord(type: .image)
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.image(data: Data([1, 2, 3]), uti: "public.png"), for: record.id)
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            eventPoster: eventPoster
+        )
+        let controller = QuickPanelController(
+            state: state,
+            isAutoPasteAuthorized: { true }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        let pasteTask = controller.pastePlainTextSelection()
+        await pasteTask.value
+
+        XCTAssertFalse(eventPoster.didPostCommandV)
+        XCTAssertEqual(state.footerStatus, "Plain text paste is not supported for image")
+        XCTAssertTrue(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Unsupported plain-text paste should keep the QuickPanel visible for the status message."
+        )
+    }
+
     func testAuthorizationPromptButtonCanBeInjected() async throws {
         let state = makePresentationState()
         var didRequestAuthorization = false
@@ -186,13 +392,18 @@ private final class PresentationTestPasteEventPoster: PasteEventPosting, @unchec
         didPostCommandV = true
         return true
     }
+
+    func postCommandV(marker: String, pasteboard: any PasteboardWriting) async -> PasteEventResult {
+        didPostCommandV = true
+        return .posted
+    }
 }
 
-private func makePresentationRecord() -> ClipboardRecord {
+private func makePresentationRecord(type: ClipboardContentType = .text) -> ClipboardRecord {
     ClipboardRecord(
         id: UUID(),
         contentHash: "presentation",
-        primaryType: .text,
+        primaryType: type,
         title: "Presentation",
         plainTextPreview: "Presentation",
         sourceAppBundleId: nil,

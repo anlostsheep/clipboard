@@ -53,11 +53,11 @@ swift run ClipboardManualProbe read-once
 
 ## 粘贴行为
 
-- [ ] `Enter` 默认自动粘贴到普通文本框
-- [ ] `Enter` 默认自动粘贴到富文本编辑器
-- [ ] `Enter` 默认自动粘贴到 Terminal
-- [ ] `Enter` 默认自动粘贴到浏览器地址栏
-- [ ] 设置为“仅复制”后，`Enter` 只写入剪贴板，不模拟 `Cmd+V`
+- [x] `Enter` 默认自动粘贴到普通文本框
+- [x] `Enter` 默认自动粘贴到富文本编辑器
+- [x] `Enter` 默认自动粘贴到 Terminal
+- [x] `Enter` 默认自动粘贴到浏览器地址栏
+- [x] 设置为“仅复制”后，`Enter` 只写入剪贴板，不模拟 `Cmd+V`
 - [ ] 运行期撤销辅助功能权限后，自动粘贴阻断并提示重新授权
 
 ## QuickPanel 快捷键
@@ -73,9 +73,9 @@ swift run ClipboardManualProbe read-once
 - [x] 按 `Down` / `Up` 移动选中项后，按 `Command+F` 可重新聚焦搜索框并继续输入
 - [x] 鼠标单击某条历史记录只选中该记录；鼠标双击遵循与 `Return` 相同的复制/粘贴语义
 - [x] 在 QuickPanel 中按 `Command+,` 可打开设置窗口
-- [ ] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，记录被复制并自动粘贴
-- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，目标文本框不立即粘贴
-- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，按 `Return` 或双击记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
+- [x] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，记录被复制并自动粘贴
+- [x] 勾选 `选择历史项时仅复制，不自动粘贴` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，目标文本框不立即粘贴
+- [x] 勾选 `选择历史项时仅复制，不自动粘贴` 后，按 `Return` 或双击记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
 - [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，QuickPanel footer 显示 `单击选择  Return/双击复制  Cmd+V 粘贴  Esc 关闭`
 - [ ] 重启 app 后，`选择历史项时仅复制，不自动粘贴` 勾选状态保持不变
 - [x] 未开启辅助功能权限且处于自动粘贴模式时，按 `Return` 不静默失败，QuickPanel 显示授权提示并保持打开
@@ -125,21 +125,22 @@ swift run ClipboardManualProbe read-once
 
 ## Maccy B-Level Daily Replacement
 
-- [ ] 普通文本框中，QuickPanel `Return` 自动粘贴当前选中项
-- [ ] 普通文本框中，QuickPanel 双击自动粘贴当前记录
-- [ ] 富文本编辑器中，QuickPanel `Return` 自动粘贴当前选中项
-- [ ] Terminal 中，QuickPanel `Return` 自动粘贴当前选中项
-- [ ] 浏览器地址栏中，QuickPanel `Return` 自动粘贴当前选中项
-- [ ] 仅复制模式下，`Return` 和双击只写入系统剪贴板，不自动粘贴
-- [ ] 仅复制模式下，随后手动 `Command+V` 能粘贴刚选中的记录
-- [ ] `Option+Shift+Enter` 对富文本记录执行无格式粘贴
-- [ ] `Option+Shift+Enter` 对文本和链接记录执行纯文本粘贴
+- [x] 普通文本框中，QuickPanel `Return` 自动粘贴当前选中项
+- [x] 普通文本框中，QuickPanel 双击自动粘贴当前记录
+- [x] 富文本编辑器中，QuickPanel `Return` 自动粘贴当前选中项
+- [x] Terminal 中，QuickPanel `Return` 自动粘贴当前选中项
+- [x] 浏览器地址栏中，QuickPanel `Return` 自动粘贴当前选中项
+- [x] 仅复制模式下，`Return` 和双击只写入系统剪贴板，不自动粘贴
+- [x] 仅复制模式下，随后手动 `Command+V` 能粘贴刚选中的记录
+- [x] `Option+Shift+Enter` 对富文本记录执行无格式粘贴
+- [x] `Option+Shift+Enter` 对文本和链接记录执行纯文本粘贴
 - [ ] `Option+Shift+Enter` 对图片或文件记录显示不支持无格式粘贴的状态
-- [ ] `Command+1...9` 选择当前可见列表中的第 N 条记录
-- [ ] `Option+1...9` 自动粘贴当前可见列表中的第 N 条记录
-- [ ] 开启仅复制模式后，`Option+1...9` 仍作为显式自动粘贴命令执行
-- [ ] 搜索和类型过滤后，数字快捷键对应过滤后的可见顺序
-- [ ] pinned/history 混排时，数字快捷键按视觉顺序定位记录
+- [x] `Command+1...9` 选择当前可见列表中的第 N 条记录
+- [x] `Control+Command+1...9` 自动粘贴当前可见列表中的第 N 条记录，并关闭 QuickPanel 回到目标 App
+- [x] 开启仅复制模式后，`Control+Command+1...9` 仍作为显式自动粘贴命令执行
+- [x] `Option+1...9` 不再触发 QuickPanel 数字粘贴快捷键
+- [x] 搜索和类型过滤后，数字快捷键对应过滤后的可见顺序
+- [x] pinned/history 混排时，数字快捷键按视觉顺序定位记录
 - [ ] 详情预览可查看安全大小文本记录的完整内容
 - [ ] 详情预览对大文本保持摘要优先，不在 QuickPanel 首帧加载全文
 - [ ] 暂停采集后复制 3 条内容，历史数量不增长
@@ -147,7 +148,7 @@ swift run ClipboardManualProbe read-once
 - [ ] 触发“忽略下一次复制”后，第一条复制不入库，第二条复制正常入库
 - [ ] 添加 Maccy baseline 后，benchmark 报告输出 per-metric comparison
 - [ ] benchmark comparison 只使用 `better` / `same` / `worse` / `not_comparable`
-- [ ] 本轮真实 UI 验收使用的 app bundle 签名包含 `Authority=ClipboardApp Local Code Signing`
+- [x] 本轮真实 UI 验收使用的 app bundle 签名包含 `Authority=ClipboardApp Local Code Signing`
 
 ## 记录格式
 
@@ -399,4 +400,83 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 问题: 未发现问题
 截图/录屏: 未采集；以用户真实 UI 验收反馈和自动化命令输出作为证据。
 结论: PASS，QuickPanel Tab 类型切换功能完成真实 UI 验收。
+```
+
+## QuickPanel 数字快捷键验收记录（2026-05-25）
+
+```text
+日期: 2026-05-25
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: codex/maccy-core-parity-tab-cycling 分支 QuickPanel 数字快捷键真实 UI 验收，覆盖 Command+数字选择与 Control+Command+数字强制自动粘贴
+命令:
+  - swift test --filter QuickPanelKeyCaptureTests
+  - swift test --filter QuickPanel
+  - swift test
+  - git diff --check -- Sources/ClipboardApp/QuickPanel/QuickPanelKeyCaptureView.swift Tests/ClipboardAppTests/QuickPanelKeyCaptureTests.swift
+  - CODE_SIGN_KEYCHAIN="$HOME/Library/Keychains/clipboard-signing.keychain-db" LOCAL_CODE_SIGN_IDENTITY="ClipboardApp Local Code Signing" REQUIRE_STABLE_CODE_SIGNING=1 Scripts/build-app-bundle.sh
+  - codesign -dv --verbose=4 .build/app-bundles/release/ClipboardApp.app
+  - 用户手动打开 QuickPanel，验证 Command+数字选择记录、Control+Command+数字自动粘贴记录，并验证先按 Control 再按 Command、先按 Command 再按 Control 两种顺序都可触发自动粘贴
+结果:
+  - QuickPanelKeyCaptureTests 通过：25 tests, 0 failures
+  - QuickPanel 聚合测试通过：97 tests, 0 failures
+  - 全量 swift test 通过：296 tests, 0 failures
+  - git diff --check 通过
+  - 稳定签名 app bundle 构建成功：.build/app-bundles/release/ClipboardApp.app
+  - codesign 输出包含 Authority=ClipboardApp Local Code Signing
+  - 用户手动验收通过：Control+Command+数字两种按键顺序都能关闭 QuickPanel 并自动粘贴到目标 App
+问题: 未发现问题
+截图/录屏: 未采集；以用户真实 UI 验收反馈、自动化测试、稳定签名构建和 codesign 输出作为证据。
+结论: PASS，QuickPanel 数字快捷键选择与强制自动粘贴核心行为完成真实 UI 验收。
+```
+
+## Maccy B-Level P0 验收记录（2026-05-25）
+
+```text
+日期: 2026-05-25
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: codex/maccy-core-parity-tab-cycling 分支 Maccy B-Level P0 真实 UI 验收，覆盖自动粘贴矩阵、仅复制模式和数字快捷键剩余项
+命令:
+  - 用户手动打开 QuickPanel，分别在普通文本框、富文本编辑器、Terminal、浏览器地址栏验证 Return 自动粘贴
+  - 用户手动验证普通文本框中双击自动粘贴
+  - 用户手动开启仅复制模式，验证 Return 和双击只写入系统剪贴板、不自动粘贴，随后 Command+V 可粘贴刚选中的记录
+  - 用户手动验证仅复制模式下 Control+Command+数字仍强制自动粘贴
+  - 用户手动验证 Option+数字不再触发 QuickPanel 数字粘贴快捷键且不污染搜索框
+  - 用户手动验证搜索和类型过滤后，Command+数字 / Control+Command+数字 对应过滤后的可见顺序
+  - 用户手动验证 pinned/history 混排时，数字快捷键按视觉顺序定位记录
+结果:
+  - 自动粘贴矩阵 P0 项全部通过
+  - 仅复制模式 P0 项全部通过
+  - 数字快捷键剩余 P0 项全部通过
+问题: 未发现问题
+截图/录屏: 未采集；以用户真实 UI 验收反馈作为证据。
+结论: PASS，Maccy B-Level P0 必测项完成真实 UI 验收。
+```
+
+## HTML/RTF 富文本与无格式粘贴验收记录（2026-05-26）
+
+```text
+日期: 2026-05-26
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: codex/maccy-core-parity-tab-cycling 分支 HTML/RTF 富文本捕获写回、无格式粘贴与 QuickPanel 快捷键回归真实 UI 验收
+命令:
+  - swift test
+  - git diff --check
+  - CODE_SIGN_KEYCHAIN="$HOME/Library/Keychains/clipboard-signing.keychain-db" LOCAL_CODE_SIGN_IDENTITY="ClipboardApp Local Code Signing" REQUIRE_STABLE_CODE_SIGNING=1 Scripts/build-app-bundle.sh
+  - codesign -dv --verbose=4 .build/app-bundles/release/ClipboardApp.app
+  - 用户使用稳定签名构建物进行真实 UI 验收，验证富文本粘贴、Option+Shift+Enter 无格式粘贴、Command+数字选择、Control+Command+数字强制自动粘贴
+结果:
+  - 全量 swift test 通过：308 tests, 0 failures
+  - git diff --check 通过
+  - 稳定签名 app bundle 构建成功：.build/app-bundles/release/ClipboardApp.app
+  - codesign 输出包含 Authority=ClipboardApp Local Code Signing
+  - 用户真实 UI 验收通过：富文本粘贴正常，无格式粘贴正常，Command+数字和 Control+Command+数字等其他操作正常
+问题: 未发现问题
+截图/录屏: 未采集；以用户真实 UI 验收反馈、自动化测试、稳定签名构建和 codesign 输出作为证据。
+结论: PASS，HTML/RTF 富文本粘贴、无格式粘贴与 QuickPanel 快捷键回归完成真实 UI 验收。
 ```

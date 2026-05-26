@@ -102,11 +102,13 @@ final class QuickPanelController {
             onClose: { [weak self] in self?.cancel() },
             onSubmit: { [weak self] in self?.submitSelection() },
             onCopyOnly: { [weak self] in self?.copySelectionOnly() },
+            onPasteNumber: { [weak self] number in self?.pasteVisibleItem(number: number) },
+            onPastePlainText: { [weak self] in self?.pastePlainTextSelection() },
             onRequestAccessibilityAuthorization: { [weak self] in self?.requestAccessibilityAuthorization() },
             onQuit: { [weak self] in self?.quitApplication() }
         )
         let panel = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
+            contentRect: NSRect(origin: .zero, size: QuickPanelLayoutMetrics.panelSize),
             styleMask: [.titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -218,6 +220,45 @@ final class QuickPanelController {
         activatePreviousApplication(targetApplication)
         Task { @MainActor in
             await state.selectCurrent(autoPaste: false)
+        }
+    }
+
+    func pasteVisibleItem(number: Int) {
+        guard isAutoPasteAuthorized() else {
+            state.reportAutoPasteRequiresAccessibilityPermission()
+            return
+        }
+
+        Task { @MainActor in
+            guard await state.prepareVisibleItemPaste(number: number) else {
+                return
+            }
+
+            let targetApplication = previousApplication
+            hide()
+            activatePreviousApplication(targetApplication)
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            await state.pasteVisibleItem(number: number)
+        }
+    }
+
+    @discardableResult
+    func pastePlainTextSelection() -> Task<Void, Never> {
+        Task { @MainActor in
+            guard let request = await state.preparePlainTextPaste() else {
+                return
+            }
+
+            guard isAutoPasteAuthorized() else {
+                state.reportAutoPasteRequiresAccessibilityPermission()
+                return
+            }
+
+            let targetApplication = previousApplication
+            hide()
+            activatePreviousApplication(targetApplication)
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            await state.pastePlainText(request)
         }
     }
 

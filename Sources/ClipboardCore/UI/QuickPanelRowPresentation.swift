@@ -22,6 +22,31 @@ public struct QuickPanelRowPresentation: Sendable {
     true
   }
 
+  public static func sourceName(for record: ClipboardRecord) -> String {
+    if record.sourceDeviceHint == .universalClipboard {
+      return "Universal Clipboard"
+    }
+
+    return record.sourceAppName ?? "Unknown"
+  }
+
+  public static func sourceFallbackSymbolName(for record: ClipboardRecord) -> String {
+    if record.sourceDeviceHint == .universalClipboard {
+      return "iphone"
+    }
+
+    switch record.primaryType {
+    case .text, .richText:
+      return "doc.text"
+    case .link:
+      return "link"
+    case .image:
+      return "photo"
+    case .file:
+      return "doc"
+    }
+  }
+
   public static func primaryContentText(for record: ClipboardRecord) -> String {
     if let preview = record.plainTextPreview?.trimmingCharacters(in: .whitespacesAndNewlines),
        !preview.isEmpty {

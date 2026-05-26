@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 public enum ClipboardIngestError: Error, Equatable {
@@ -48,12 +47,21 @@ public struct ClipboardIngestService: Sendable {
     switch capture.payload {
     case let .text(text):
       return makeTextRecord(text: text, capture: capture, primaryType: primaryType(forText: text))
-    case let .richText(plainText, _):
-      return makeTextRecord(text: plainText, capture: capture, primaryType: .richText)
+    case let .richText(plainText, rtfData, htmlData):
+      return makeTextRecord(
+        text: plainText,
+        capture: capture,
+        primaryType: .richText,
+        contentHash: ClipboardContentHasher.hashRichText(
+          plainText: plainText,
+          rtfData: rtfData,
+          htmlData: htmlData
+        )
+      )
     case let .image(data, _):
       return ClipboardRecord(
         id: UUID(),
-        contentHash: hashData(data),
+        contentHash: ClipboardContentHasher.hashData(data),
         primaryType: .image,
         title: "Image \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))",
         plainTextPreview: nil,
@@ -79,7 +87,8 @@ public struct ClipboardIngestService: Sendable {
   private func makeTextRecord(
     text: String,
     capture: ClipboardCapture,
-    primaryType: ClipboardContentType = .text
+    primaryType: ClipboardContentType = .text,
+    contentHash: String? = nil
   ) -> ClipboardRecord {
     let classification = largeTextPolicy.classify(text: text)
     let preview = classification.metadata?.previewExcerpt ?? String(text.prefix(2_048))
@@ -88,7 +97,7 @@ public struct ClipboardIngestService: Sendable {
 
     return ClipboardRecord(
       id: UUID(),
-      contentHash: hashText(text),
+      contentHash: contentHash ?? ClipboardContentHasher.hashText(text),
       primaryType: primaryType,
       title: title.isEmpty ? "Text" : title,
       plainTextPreview: preview,
@@ -105,10 +114,6 @@ public struct ClipboardIngestService: Sendable {
       metadata: classification.metadata,
       pasteboardTypes: capture.pasteboardTypes
     )
-  }
-
-  private func hashData(_ data: Data) -> String {
-    digestHex(SHA256.hash(data: data))
   }
 
   private func primaryType(forText text: String) -> ClipboardContentType {
@@ -128,34 +133,4 @@ public struct ClipboardIngestService: Sendable {
     return true
   }
 
-  private func hashText(_ text: String) -> String {
-    var hasher = SHA256()
-    let didHashContiguousStorage = text.utf8.withContiguousStorageIfAvailable { buffer in
-      hasher.update(bufferPointer: UnsafeRawBufferPointer(buffer))
-      return true
-    } ?? false
-
-    if !didHashContiguousStorage {
-      var chunk: [UInt8] = []
-      chunk.reserveCapacity(16 * 1024)
-
-      for byte in text.utf8 {
-        chunk.append(byte)
-        if chunk.count == 16 * 1024 {
-          hasher.update(data: chunk)
-          chunk.removeAll(keepingCapacity: true)
-        }
-      }
-
-      if !chunk.isEmpty {
-        hasher.update(data: chunk)
-      }
-    }
-
-    return digestHex(hasher.finalize())
-  }
-
-  private func digestHex<D: Sequence>(_ digest: D) -> String where D.Element == UInt8 {
-    digest.map { String(format: "%02x", $0) }.joined()
-  }
 }

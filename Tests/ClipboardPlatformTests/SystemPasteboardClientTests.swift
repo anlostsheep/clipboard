@@ -46,20 +46,24 @@ final class SystemPasteboardClientTests: XCTestCase {
 
     XCTAssertEqual(capture.payload, .text("from phone"))
     XCTAssertTrue(capture.isUniversalClipboard)
+    XCTAssertNil(capture.sourceAppBundleId)
+    XCTAssertEqual(capture.sourceAppName, "Universal Clipboard")
   }
 
   func testRichTextWritePreservesPlainTextAndRTF() async throws {
     let pasteboard = makePasteboard()
     let client = SystemPasteboardClient(pasteboard: pasteboard)
     let rtf = Data("{\\rtf1\\ansi hello}".utf8)
+    let html = Data("<p><strong>hello</strong></p>".utf8)
 
-    let wrote = await client.write(payload: .richText(plainText: "hello", rtfData: rtf), marker: "rtf-marker")
+    let wrote = await client.write(payload: .richText(plainText: "hello", rtfData: rtf, htmlData: html), marker: "rtf-marker")
     let hasMarker = await client.containsMarker("rtf-marker")
 
     XCTAssertTrue(wrote)
     let item = try XCTUnwrap(pasteboard.pasteboardItems?.first)
     XCTAssertEqual(item.string(forType: .string), "hello")
     XCTAssertEqual(item.data(forType: .rtf), rtf)
+    XCTAssertEqual(item.data(forType: NSPasteboard.PasteboardType("public.html")), html)
     XCTAssertTrue(hasMarker)
   }
 
@@ -79,6 +83,62 @@ final class SystemPasteboardClientTests: XCTestCase {
 
     XCTAssertEqual(capture.payload, .richText(plainText: "rich text", rtfData: rtf))
     XCTAssertTrue(capture.pasteboardTypes.contains(NSPasteboard.PasteboardType.rtf.rawValue))
+  }
+
+  func testExternalHTMLOnlyRichTextCanBeCapturedWithHTMLData() async throws {
+    let pasteboard = makePasteboard()
+    let client = SystemPasteboardClient(pasteboard: pasteboard)
+    let html = Data("<h1>Heading</h1><p><strong>Body</strong></p>".utf8)
+    let item = NSPasteboardItem()
+
+    XCTAssertTrue(item.setString("Heading\nBody", forType: .string))
+    XCTAssertTrue(item.setData(html, forType: NSPasteboard.PasteboardType("public.html")))
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+
+    let captured = await client.readCurrentCapture()
+    let capture = try XCTUnwrap(captured)
+
+    XCTAssertEqual(capture.payload, .richText(plainText: "Heading\nBody", rtfData: nil, htmlData: html))
+    XCTAssertTrue(capture.pasteboardTypes.contains("public.html"))
+  }
+
+  func testExternalRichTextWithoutDerivedPlainTextIsStillCaptured() async throws {
+    let pasteboard = makePasteboard()
+    let client = SystemPasteboardClient(pasteboard: pasteboard)
+    let html = Data("<span></span>".utf8)
+    let item = NSPasteboardItem()
+
+    XCTAssertTrue(item.setData(html, forType: NSPasteboard.PasteboardType("public.html")))
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+
+    let captured = await client.readCurrentCapture()
+    let capture = try XCTUnwrap(captured)
+
+    XCTAssertEqual(capture.payload, .richText(plainText: "", rtfData: nil, htmlData: html))
+    XCTAssertTrue(capture.pasteboardTypes.contains("public.html"))
+  }
+
+  func testExternalRichTextPreservesRTFAndHTMLTogether() async throws {
+    let pasteboard = makePasteboard()
+    let client = SystemPasteboardClient(pasteboard: pasteboard)
+    let rtf = Data("{\\rtf1\\ansi heading}".utf8)
+    let html = Data("<h1>Heading</h1>".utf8)
+    let item = NSPasteboardItem()
+
+    XCTAssertTrue(item.setString("Heading", forType: .string))
+    XCTAssertTrue(item.setData(rtf, forType: .rtf))
+    XCTAssertTrue(item.setData(html, forType: NSPasteboard.PasteboardType("public.html")))
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+
+    let captured = await client.readCurrentCapture()
+    let capture = try XCTUnwrap(captured)
+
+    XCTAssertEqual(capture.payload, .richText(plainText: "Heading", rtfData: rtf, htmlData: html))
+    XCTAssertTrue(capture.pasteboardTypes.contains(NSPasteboard.PasteboardType.rtf.rawValue))
+    XCTAssertTrue(capture.pasteboardTypes.contains("public.html"))
   }
 
   func testFileURLWriteCreatesOnePasteboardItemPerURL() async throws {

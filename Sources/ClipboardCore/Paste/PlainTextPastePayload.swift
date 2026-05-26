@@ -5,7 +5,7 @@ public extension ClipboardPayload {
     switch self {
     case .text(let value):
       return value
-    case .richText(let plainText, _):
+    case .richText(let plainText, _, _):
       return plainText
     case .image, .fileURLs:
       return nil

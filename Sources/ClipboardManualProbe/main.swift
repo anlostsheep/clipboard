@@ -85,10 +85,11 @@ struct ClipboardManualProbe {
       print("payload: text")
       print("textBytes: \(text.utf8.count)")
       print("textPreview: \(String(text.prefix(120)))")
-    case let .richText(plainText, rtfData):
+    case let .richText(plainText, rtfData, htmlData):
       print("payload: richText")
       print("plainTextBytes: \(plainText.utf8.count)")
-      print("rtfBytes: \(rtfData.count)")
+      print("rtfBytes: \(rtfData?.count ?? 0)")
+      print("htmlBytes: \(htmlData?.count ?? 0)")
     case let .image(data, uti):
       print("payload: image")
       print("uti: \(uti)")

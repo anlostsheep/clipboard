@@ -107,6 +107,49 @@ final class ClipboardCaptureCoordinatorTests: XCTestCase {
     XCTAssertEqual(storeCount, 1)
     XCTAssertEqual(payloadSaveCount, 1)
   }
+
+  func testRichTextCaptureWithSamePlainTextAsPlainTextCreatesDistinctPayloadRecord() async throws {
+    let textCapture = ClipboardCapture(
+      payload: .text("same visible text"),
+      pasteboardTypes: ["public.utf8-plain-text"],
+      sourceAppBundleId: "com.example.Source",
+      sourceAppName: "Source App",
+      capturedAt: Date(timeIntervalSince1970: 1)
+    )
+    let html = Data("<p><strong>same visible text</strong></p>".utf8)
+    let richPayload = ClipboardPayload.richText(plainText: "same visible text", rtfData: nil, htmlData: html)
+    let richCapture = ClipboardCapture(
+      payload: richPayload,
+      pasteboardTypes: ["public.utf8-plain-text", "public.html"],
+      sourceAppBundleId: "com.example.Source",
+      sourceAppName: "Source App",
+      capturedAt: Date(timeIntervalSince1970: 2)
+    )
+    let reader = SequencePasteboardReader(captures: [textCapture, richCapture])
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let coordinator = ClipboardCaptureCoordinator(
+      monitor: ClipboardMonitor(reader: reader),
+      ingestService: ClipboardIngestService(
+        store: store,
+        privacyPolicy: .standard,
+        largeTextPolicy: .default
+      ),
+      payloadStore: payloadStore,
+      failureHandler: NoopFailureHandler()
+    )
+
+    let first = try await coordinator.captureLatestChange()
+    let second = try await coordinator.captureLatestChange()
+    let records = try await store.fetchAll()
+    let richRecord = try XCTUnwrap(records.first { $0.primaryType == .richText })
+    let storedRichPayload = try await payloadStore.loadPayload(for: richRecord.id)
+
+    XCTAssertEqual(first?.primaryType, .text)
+    XCTAssertEqual(second?.primaryType, .richText)
+    XCTAssertEqual(records.count, 2)
+    XCTAssertEqual(storedRichPayload, richPayload)
+  }
 }
 
 private struct NoopFailureHandler: StorageFailureHandler {
@@ -129,6 +172,27 @@ private final class FakePasteboardReader: PasteboardReading {
 
   func readCurrentCapture() async -> ClipboardCapture? {
     capture
+  }
+}
+
+private final class SequencePasteboardReader: PasteboardReading, @unchecked Sendable {
+  private var captures: [ClipboardCapture]
+  private var index = 0
+
+  init(captures: [ClipboardCapture]) {
+    self.captures = captures
+  }
+
+  func currentChangeCount() async -> Int {
+    index + 1
+  }
+
+  func readCurrentCapture() async -> ClipboardCapture? {
+    guard captures.indices.contains(index) else {
+      return nil
+    }
+    defer { index += 1 }
+    return captures[index]
   }
 }
 

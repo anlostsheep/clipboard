@@ -35,9 +35,30 @@ final class SQLitePayloadStoreTests: XCTestCase {
     let store = try SQLitePayloadStore(payloadsDirectory: tempDir)
     let id = UUID()
     let rtf = Data("rtf-bytes".utf8)
-    try await store.save(.richText(plainText: "plain", rtfData: rtf), for: id)
+    let html = Data("<p>plain</p>".utf8)
+    try await store.save(.richText(plainText: "plain", rtfData: rtf, htmlData: html), for: id)
     let loaded = try await store.loadPayload(for: id)
-    XCTAssertEqual(loaded, .richText(plainText: "plain", rtfData: rtf))
+    XCTAssertEqual(loaded, .richText(plainText: "plain", rtfData: rtf, htmlData: html))
+  }
+
+  func testRoundTripHTMLOnlyRichText() async throws {
+    let store = try SQLitePayloadStore(payloadsDirectory: tempDir)
+    let id = UUID()
+    let html = Data("<h1>plain</h1>".utf8)
+    try await store.save(.richText(plainText: "plain", rtfData: nil, htmlData: html), for: id)
+    let loaded = try await store.loadPayload(for: id)
+    XCTAssertEqual(loaded, .richText(plainText: "plain", rtfData: nil, htmlData: html))
+  }
+
+  func testLoadLegacyRichTextEnvelopeDefaultsMissingHTMLToNil() async throws {
+    let store = try SQLitePayloadStore(payloadsDirectory: tempDir)
+    let id = UUID()
+    let legacyEnvelope = #"{"kind":"richText","richTextPlain":"legacy","richTextRTF":"cnRmLWJ5dGVz"}"#
+    try Data(legacyEnvelope.utf8).write(to: tempDir.appendingPathComponent("\(id.uuidString).rtf"))
+
+    let loaded = try await store.loadPayload(for: id)
+
+    XCTAssertEqual(loaded, .richText(plainText: "legacy", rtfData: Data("rtf-bytes".utf8), htmlData: nil))
   }
 
   func testSaveReplacingPayloadKindRemovesStaleFilesForRecordID() async throws {
@@ -52,7 +73,7 @@ final class SQLitePayloadStoreTests: XCTestCase {
     XCTAssertEqual(loaded, .richText(plainText: "same", rtfData: rtf))
     let files = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
       .filter { $0.hasPrefix(id.uuidString) && !$0.hasSuffix(".tmp") }
-    XCTAssertEqual(files, ["\(id.uuidString).rtf"])
+    XCTAssertEqual(files, ["\(id.uuidString).richtext.json"])
   }
 
   func testLoadPayloadPrefersNewestFileWhenStaleSameIDFileExists() async throws {

@@ -22,11 +22,12 @@ public actor QuickPanelViewModel {
     self.pageLimit = pageLimit
   }
 
+  @discardableResult
   public func refresh(
     query: String,
     contentTypes: Set<ClipboardContentType> = [],
     groupIDs: Set<String> = []
-  ) async {
+  ) async -> Bool {
     refreshGeneration += 1
     let generation = refreshGeneration
     let historyQuery = HistoryQuery(text: query, contentTypes: contentTypes, groupIDs: groupIDs)
@@ -35,11 +36,12 @@ public actor QuickPanelViewModel {
       .sorted(by: Self.quickPanelSort)
 
     guard generation == refreshGeneration else {
-      return
+      return false
     }
 
-    items = Array(refreshedItems.prefix(max(0, pageLimit)))
+    items = QuickPanelListPolicy.limitedItems(refreshedItems, limit: pageLimit)
     selectedIndex = items.isEmpty ? 0 : min(selectedIndex, items.count - 1)
+    return true
   }
 
   private static func quickPanelSort(_ lhs: ClipboardRecord, _ rhs: ClipboardRecord) -> Bool {

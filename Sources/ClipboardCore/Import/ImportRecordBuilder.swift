@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 public struct ImportRecordBuilder: Sendable {
@@ -30,14 +29,14 @@ public struct ImportRecordBuilder: Sendable {
   public func contentHash(for payload: ClipboardPayload) -> String {
     switch payload {
     case let .text(text):
-      return hash(Data(text.utf8))
-    case let .richText(plainText, _):
-      return hash(Data(plainText.utf8))
+      return ClipboardContentHasher.hashText(text)
+    case let .richText(plainText, rtfData, htmlData):
+      return ClipboardContentHasher.hashRichText(plainText: plainText, rtfData: rtfData, htmlData: htmlData)
     case let .image(data, _):
-      return hash(data)
+      return ClipboardContentHasher.hashData(data)
     case let .fileURLs(urls):
       let joinedURLs = urls.map(\.absoluteString).joined(separator: "\n")
-      return hash(Data(joinedURLs.utf8))
+      return ClipboardContentHasher.hashText(joinedURLs)
     }
   }
 
@@ -66,9 +65,5 @@ public struct ImportRecordBuilder: Sendable {
     case .file:
       return "Files"
     }
-  }
-
-  private func hash(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 }

@@ -17,6 +17,22 @@ final class QuickPanelRowPresentationTests: XCTestCase {
     XCTAssertTrue(QuickPanelRowPresentation.showsSourceName(for: makeRecord(primaryType: .image)))
   }
 
+  func testUniversalClipboardSourceNameOverridesStaleForegroundAppName() {
+    let record = makeRecord(
+      primaryType: .text,
+      sourceAppName: "VS Code",
+      sourceDeviceHint: .universalClipboard
+    )
+
+    XCTAssertEqual(QuickPanelRowPresentation.sourceName(for: record), "Universal Clipboard")
+  }
+
+  func testUniversalClipboardUsesDeviceFallbackSymbol() {
+    let record = makeRecord(primaryType: .text, sourceDeviceHint: .universalClipboard)
+
+    XCTAssertEqual(QuickPanelRowPresentation.sourceFallbackSymbolName(for: record), "iphone")
+  }
+
   func testPrimaryContentTextPrefersPreviewOverTitle() {
     let record = makeRecord(
       primaryType: .text,
@@ -40,7 +56,9 @@ final class QuickPanelRowPresentationTests: XCTestCase {
   private func makeRecord(
     primaryType: ClipboardContentType,
     title: String? = nil,
-    plainTextPreview: String? = nil
+    plainTextPreview: String? = nil,
+    sourceAppName: String? = nil,
+    sourceDeviceHint: ClipboardSourceDeviceHint = .local
   ) -> ClipboardRecord {
     ClipboardRecord(
       id: UUID(),
@@ -49,8 +67,8 @@ final class QuickPanelRowPresentationTests: XCTestCase {
       title: title ?? primaryType.rawValue,
       plainTextPreview: plainTextPreview,
       sourceAppBundleId: nil,
-      sourceAppName: nil,
-      sourceDeviceHint: .local,
+      sourceAppName: sourceAppName,
+      sourceDeviceHint: sourceDeviceHint,
       createdAt: Date(timeIntervalSince1970: 1),
       lastCopiedAt: Date(timeIntervalSince1970: 1),
       copyCount: 1,

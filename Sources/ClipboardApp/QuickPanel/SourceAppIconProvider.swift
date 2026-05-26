@@ -7,6 +7,10 @@ final class SourceAppIconProvider {
   private var iconsByBundleID: [String: NSImage] = [:]
 
   func icon(for record: ClipboardRecord) -> NSImage? {
+    guard record.sourceDeviceHint != .universalClipboard else {
+      return nil
+    }
+
     guard let bundleID = record.sourceAppBundleId?.trimmingCharacters(in: .whitespacesAndNewlines),
           !bundleID.isEmpty
     else {

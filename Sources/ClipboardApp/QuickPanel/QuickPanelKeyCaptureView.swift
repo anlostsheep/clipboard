@@ -2,6 +2,11 @@ import AppKit
 import Carbon
 import SwiftUI
 
+enum QuickPanelNumberShortcutMode: Equatable {
+  case select
+  case paste
+}
+
 struct QuickPanelKeyCaptureView: NSViewRepresentable {
   enum KeyboardAction: Equatable {
     case cancel
@@ -36,6 +41,8 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
   var onPasteNumber: ((Int) -> Void)? = nil
   var onPastePlainText: (() -> Void)? = nil
   var onShowDetailPreview: (() -> Void)? = nil
+  var onNumberShortcutModeChanged: (QuickPanelNumberShortcutMode?) -> Void = { _ in }
+  var modifierTrackingResetToken = 0
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
@@ -53,13 +60,15 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onSelectNumber: onSelectNumber,
       onPasteNumber: onPasteNumber,
       onPastePlainText: onPastePlainText,
-      onShowDetailPreview: onShowDetailPreview
+      onShowDetailPreview: onShowDetailPreview,
+      onNumberShortcutModeChanged: onNumberShortcutModeChanged
     )
   }
 
   func makeNSView(context: Context) -> KeyCaptureNSView {
     let view = KeyCaptureNSView()
     context.coordinator.observedView = view
+    context.coordinator.resetModifierTrackingIfNeeded(token: modifierTrackingResetToken)
     context.coordinator.installMonitor()
     return view
   }
@@ -81,6 +90,8 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     context.coordinator.onPasteNumber = onPasteNumber
     context.coordinator.onPastePlainText = onPastePlainText
     context.coordinator.onShowDetailPreview = onShowDetailPreview
+    context.coordinator.onNumberShortcutModeChanged = onNumberShortcutModeChanged
+    context.coordinator.resetModifierTrackingIfNeeded(token: modifierTrackingResetToken)
     context.coordinator.installMonitor()
   }
 
@@ -105,9 +116,11 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     var onPasteNumber: ((Int) -> Void)?
     var onPastePlainText: (() -> Void)?
     var onShowDetailPreview: (() -> Void)?
+    var onNumberShortcutModeChanged: (QuickPanelNumberShortcutMode?) -> Void
     weak var observedView: KeyCaptureNSView?
 
     private var monitor: Any?
+    private var modifierTracker = QuickPanelModifierTracker()
 
     init(
       onMove: @escaping (Int) -> Void,
@@ -124,7 +137,8 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onSelectNumber: ((Int) -> Void)?,
       onPasteNumber: ((Int) -> Void)?,
       onPastePlainText: (() -> Void)?,
-      onShowDetailPreview: (() -> Void)?
+      onShowDetailPreview: (() -> Void)?,
+      onNumberShortcutModeChanged: @escaping (QuickPanelNumberShortcutMode?) -> Void
     ) {
       self.onMove = onMove
       self.onSubmit = onSubmit
@@ -141,6 +155,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       self.onPasteNumber = onPasteNumber
       self.onPastePlainText = onPastePlainText
       self.onShowDetailPreview = onShowDetailPreview
+      self.onNumberShortcutModeChanged = onNumberShortcutModeChanged
     }
 
     func installMonitor() {
@@ -148,7 +163,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
         return
       }
 
-      monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+      monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
         self?.handle(event) ?? event
       }
     }
@@ -163,15 +178,46 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     }
 
     private func handle(_ event: NSEvent) -> NSEvent? {
-      guard let observedView, observedView.window != nil, event.window === observedView.window else {
+      guard let observedView,
+            let observedWindow = observedView.window,
+            event.window == nil || event.window === observedWindow else {
         return event
       }
 
-      if event.window?.firstResponder?.hasMarkedTextInput == true {
+      if event.type == .flagsChanged {
+        modifierTracker.observe(event.modifierFlags)
+        onNumberShortcutModeChanged(
+          QuickPanelKeyCaptureView.numberShortcutMode(modifierFlags: modifierTracker.observedModifierFlags)
+        )
         return event
       }
 
-      switch QuickPanelKeyCaptureView.keyboardAction(keyCode: event.keyCode, modifierFlags: event.modifierFlags) {
+      let trackedModifierFlags = modifierTracker.trackedModifierFlags(
+        eventModifierFlags: event.modifierFlags,
+        globalModifierFlags: NSEvent.modifierFlags
+      )
+      let action = QuickPanelKeyCaptureView.keyboardAction(
+        keyCode: event.keyCode,
+        modifierFlags: event.modifierFlags,
+        trackedModifierFlags: trackedModifierFlags
+      )
+      if QuickPanelKeyCaptureView.shouldDeferToMarkedTextInput(
+        keyCode: event.keyCode,
+        modifierFlags: event.modifierFlags,
+        trackedModifierFlags: trackedModifierFlags,
+        hasMarkedText: event.window?.firstResponder?.hasMarkedTextInput == true
+      ) {
+        return event
+      }
+
+      onNumberShortcutModeChanged(
+        QuickPanelKeyCaptureView.numberShortcutMode(
+          modifierFlags: event.modifierFlags,
+          trackedModifierFlags: trackedModifierFlags
+        )
+      )
+
+      switch action {
       case .cancel:
         onCancel()
         return nil
@@ -237,6 +283,14 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       }
     }
 
+    func resetModifierTrackingIfNeeded(token: Int) {
+      guard modifierTracker.resetIfNeeded(token: token) else {
+        return
+      }
+
+      onNumberShortcutModeChanged(nil)
+    }
+
     deinit {
       removeMonitor()
     }
@@ -246,7 +300,32 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     keyCode: UInt16,
     modifierFlags: NSEvent.ModifierFlags
   ) -> KeyboardAction? {
-    let modifiers = modifierFlags.intersection(.deviceIndependentFlagsMask)
+    let modifiers = normalizedShortcutModifiers(modifierFlags)
+    return keyboardAction(keyCode: keyCode, shortcutModifiers: modifiers)
+  }
+
+  static func keyboardAction(
+    keyCode: UInt16,
+    modifierFlags: NSEvent.ModifierFlags,
+    trackedModifierFlags: NSEvent.ModifierFlags
+  ) -> KeyboardAction? {
+    if let number = number(for: keyCode) {
+      return numberShortcutAction(
+        number: number,
+        modifiers: effectiveNumberShortcutModifiers(
+          eventModifierFlags: modifierFlags,
+          trackedModifierFlags: trackedModifierFlags
+        )
+      )
+    }
+
+    return keyboardAction(keyCode: keyCode, modifierFlags: modifierFlags)
+  }
+
+  private static func keyboardAction(
+    keyCode: UInt16,
+    shortcutModifiers modifiers: NSEvent.ModifierFlags
+  ) -> KeyboardAction? {
     if keyCode == UInt16(kVK_Tab) {
       if modifiers.isEmpty {
         return .cycleContentFilter(1)
@@ -257,13 +336,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       return nil
     }
     if let number = number(for: keyCode) {
-      if modifiers == [.command] {
-        return .selectNumber(number)
-      }
-      if modifiers == [.option] {
-        return .pasteNumber(number)
-      }
-      return nil
+      return numberShortcutAction(number: number, modifiers: modifiers)
     }
     if keyCode == UInt16(kVK_Delete), modifiers == [.shift, .option, .command] {
       return .clearAll
@@ -307,6 +380,83 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     }
   }
 
+  static func numberShortcutMode(modifierFlags: NSEvent.ModifierFlags) -> QuickPanelNumberShortcutMode? {
+    switch normalizedShortcutModifiers(modifierFlags) {
+    case [.command]:
+      .select
+    case [.control, .command]:
+      .paste
+    default:
+      nil
+    }
+  }
+
+  static func numberShortcutMode(
+    modifierFlags: NSEvent.ModifierFlags,
+    trackedModifierFlags: NSEvent.ModifierFlags
+  ) -> QuickPanelNumberShortcutMode? {
+    switch effectiveNumberShortcutModifiers(
+      eventModifierFlags: modifierFlags,
+      trackedModifierFlags: trackedModifierFlags
+    ) {
+    case [.command]:
+      .select
+    case [.control, .command]:
+      .paste
+    default:
+      nil
+    }
+  }
+
+  static func shouldDeferToMarkedTextInput(
+    keyCode: UInt16,
+    modifierFlags: NSEvent.ModifierFlags,
+    hasMarkedText: Bool
+  ) -> Bool {
+    hasMarkedText && keyboardAction(keyCode: keyCode, modifierFlags: modifierFlags) == nil
+  }
+
+  static func shouldDeferToMarkedTextInput(
+    keyCode: UInt16,
+    modifierFlags: NSEvent.ModifierFlags,
+    trackedModifierFlags: NSEvent.ModifierFlags,
+    hasMarkedText: Bool
+  ) -> Bool {
+    hasMarkedText && keyboardAction(
+      keyCode: keyCode,
+      modifierFlags: modifierFlags,
+      trackedModifierFlags: trackedModifierFlags
+    ) == nil
+  }
+
+  static func normalizedShortcutModifiers(_ modifierFlags: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags {
+    modifierFlags.intersection([.shift, .control, .option, .command])
+  }
+
+  private static func effectiveNumberShortcutModifiers(
+    eventModifierFlags: NSEvent.ModifierFlags,
+    trackedModifierFlags: NSEvent.ModifierFlags
+  ) -> NSEvent.ModifierFlags {
+    let eventModifiers = normalizedShortcutModifiers(eventModifierFlags)
+    guard !eventModifiers.isEmpty else {
+      return []
+    }
+    return eventModifiers.union(normalizedShortcutModifiers(trackedModifierFlags))
+  }
+
+  private static func numberShortcutAction(
+    number: Int,
+    modifiers: NSEvent.ModifierFlags
+  ) -> KeyboardAction? {
+    if modifiers == [.control, .command] {
+      return .pasteNumber(number)
+    }
+    if modifiers == [.command] {
+      return .selectNumber(number)
+    }
+    return nil
+  }
+
   private static func number(for keyCode: UInt16) -> Int? {
     switch keyCode {
     case UInt16(kVK_ANSI_1): return 1
@@ -324,6 +474,34 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
 }
 
 final class KeyCaptureNSView: NSView {}
+
+struct QuickPanelModifierTracker {
+  private(set) var observedModifierFlags: NSEvent.ModifierFlags = []
+  private var resetToken: Int?
+
+  mutating func resetIfNeeded(token: Int) -> Bool {
+    guard resetToken != token else {
+      return false
+    }
+
+    resetToken = token
+    observedModifierFlags = []
+    return true
+  }
+
+  mutating func observe(_ modifierFlags: NSEvent.ModifierFlags) {
+    observedModifierFlags = QuickPanelKeyCaptureView.normalizedShortcutModifiers(modifierFlags)
+  }
+
+  func trackedModifierFlags(
+    eventModifierFlags: NSEvent.ModifierFlags,
+    globalModifierFlags: NSEvent.ModifierFlags
+  ) -> NSEvent.ModifierFlags {
+    observedModifierFlags
+      .union(eventModifierFlags)
+      .union(globalModifierFlags)
+  }
+}
 
 private extension NSResponder {
   var hasMarkedTextInput: Bool {

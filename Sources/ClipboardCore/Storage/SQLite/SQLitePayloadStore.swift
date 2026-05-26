@@ -118,6 +118,7 @@ private struct PayloadEnvelope: Codable {
   let textPlain: String?
   let richTextPlain: String?
   let richTextRTF: Data?
+  let richTextHTML: Data?
   let imageData: Data?
   let imageUTI: String?
   let fileURLStrings: [String]?
@@ -134,13 +135,13 @@ private struct PayloadEnvelope: Codable {
     case .text(let s):
       kind = .text
       textPlain = s
-      richTextPlain = nil; richTextRTF = nil
+      richTextPlain = nil; richTextRTF = nil; richTextHTML = nil
       imageData = nil; imageUTI = nil
       fileURLStrings = nil
 
-    case .richText(let plain, let rtf):
+    case .richText(let plain, let rtf, let html):
       kind = .richText
-      richTextPlain = plain; richTextRTF = rtf
+      richTextPlain = plain; richTextRTF = rtf; richTextHTML = html
       textPlain = nil
       imageData = nil; imageUTI = nil
       fileURLStrings = nil
@@ -149,14 +150,14 @@ private struct PayloadEnvelope: Codable {
       kind = .image
       imageData = data; imageUTI = uti
       textPlain = nil
-      richTextPlain = nil; richTextRTF = nil
+      richTextPlain = nil; richTextRTF = nil; richTextHTML = nil
       fileURLStrings = nil
 
     case .fileURLs(let urls):
       kind = .fileURLs
       fileURLStrings = urls.map(\.absoluteString)
       textPlain = nil
-      richTextPlain = nil; richTextRTF = nil
+      richTextPlain = nil; richTextRTF = nil; richTextHTML = nil
       imageData = nil; imageUTI = nil
     }
   }
@@ -165,7 +166,7 @@ private struct PayloadEnvelope: Codable {
   var fileExtension: String {
     switch kind {
     case .text:    return "txt"
-    case .richText: return "rtf"
+    case .richText: return "richtext.json"
     case .image:
       switch imageUTI {
       case "public.jpeg": return "jpg"
@@ -189,7 +190,8 @@ private struct PayloadEnvelope: Codable {
     case .richText:
       return .richText(
         plainText: envelope.richTextPlain ?? "",
-        rtfData: envelope.richTextRTF ?? Data()
+        rtfData: envelope.richTextRTF,
+        htmlData: envelope.richTextHTML
       )
     case .image:
       return .image(
