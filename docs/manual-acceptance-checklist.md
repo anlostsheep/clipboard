@@ -15,7 +15,7 @@
 
 - [x] `Scripts/verify.sh` 通过
 - [x] `swift run ClipboardManualProbe self-check` 输出 `write: ok`
-- [ ] `swift run ClipboardManualProbe accessibility` 输出 `accessibility: authorized`
+- [x] `swift run ClipboardManualProbe accessibility` 输出 `accessibility: authorized`
 - [ ] 如果输出 `accessibility: required`，先在系统设置中授权，再重新验证
 
 ## 复制来源覆盖
@@ -28,18 +28,18 @@ swift run ClipboardManualProbe read-once
 
 记录 `types`、`payload`、`textBytes` 或 `imageBytes`。
 
-- [ ] Safari 文本
-- [ ] Safari 链接
+- [x] Safari 文本
+- [x] Safari 链接
 - [ ] Safari Copy Image
-- [ ] Chrome 文本
-- [ ] Chrome 地址栏 URL
+- [x] Chrome 文本
+- [x] Chrome 地址栏 URL
 - [ ] 微信文本
 - [ ] 飞书文本
-- [ ] VS Code 代码片段
-- [ ] Xcode 代码片段
-- [ ] Finder 单文件
-- [ ] Finder 多文件
-- [ ] Terminal 文本
+- [x] VS Code 代码片段
+- [x] Xcode 代码片段
+- [x] Finder 单文件
+- [x] Finder 多文件
+- [x] Terminal 文本
 - [ ] Word 富文本
 - [ ] Pages 富文本
 - [ ] 远程桌面内复制文本
@@ -58,17 +58,17 @@ swift run ClipboardManualProbe read-once
 - [x] `Enter` 默认自动粘贴到 Terminal
 - [x] `Enter` 默认自动粘贴到浏览器地址栏
 - [x] 设置为“仅复制”后，`Enter` 只写入剪贴板，不模拟 `Cmd+V`
-- [ ] 运行期撤销辅助功能权限后，自动粘贴阻断并提示重新授权
+- [x] 运行期撤销辅助功能权限后，自动粘贴阻断并提示重新授权
 
 ## QuickPanel 快捷键
 
-- [ ] 启动 app 并授权辅助功能后，复制 3 条不同文本，主窗口 Session items 增长
-- [ ] 按 `Command+Shift+V` 后浮动 QuickPanel 出现在当前屏幕中心附近
-- [ ] QuickPanel 首屏显示最近复制的 session 历史，最新记录排在最上方
-- [ ] QuickPanel 每行左侧显示来源 App 图标；无法识别来源 App 时回退为内容类型图标
-- [ ] 输入搜索关键词后，列表只保留匹配标题、摘要或来源 App 的记录
-- [ ] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
-- [ ] 按 `Escape` 关闭 QuickPanel
+- [x] 启动 app 并授权辅助功能后，复制 3 条不同文本，主窗口 Session items 增长
+- [x] 按 `Command+Shift+V` 后浮动 QuickPanel 出现在当前屏幕中心附近
+- [x] QuickPanel 首屏显示最近复制的 session 历史，最新记录排在最上方
+- [x] QuickPanel 每行左侧显示来源 App 图标；无法识别来源 App 时回退为内容类型图标
+- [x] 输入搜索关键词后，列表只保留匹配标题、摘要或来源 App 的记录
+- [x] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
+- [x] 按 `Escape` 关闭 QuickPanel
 - [x] 打开过设置页后，切到其他 App 呼出 QuickPanel，再按 `Escape` 关闭，焦点保留在呼出前的 App，不重新弹出设置页
 - [x] 按 `Down` / `Up` 移动选中项后，按 `Command+F` 可重新聚焦搜索框并继续输入
 - [x] 鼠标单击某条历史记录只选中该记录；鼠标双击遵循与 `Return` 相同的复制/粘贴语义
@@ -76,8 +76,8 @@ swift run ClipboardManualProbe read-once
 - [x] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，记录被复制并自动粘贴
 - [x] 勾选 `选择历史项时仅复制，不自动粘贴` 后，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，目标文本框不立即粘贴
 - [x] 勾选 `选择历史项时仅复制，不自动粘贴` 后，按 `Return` 或双击记录会把该记录写入系统剪贴板；随后手动按 `Command+V` 能粘贴该记录
-- [ ] 勾选 `选择历史项时仅复制，不自动粘贴` 后，QuickPanel footer 显示 `单击选择  Return/双击复制  Cmd+V 粘贴  Esc 关闭`
-- [ ] 重启 app 后，`选择历史项时仅复制，不自动粘贴` 勾选状态保持不变
+- [x] 勾选 `选择历史项时仅复制，不自动粘贴` 后，QuickPanel footer 显示 `单击选择  Return/双击复制  Cmd+V 粘贴  Esc 关闭`
+- [x] 重启 app 后，`选择历史项时仅复制，不自动粘贴` 勾选状态保持不变
 - [x] 未开启辅助功能权限且处于自动粘贴模式时，按 `Return` 不静默失败，QuickPanel 显示授权提示并保持打开
 - [x] 未开启辅助功能权限且处于自动粘贴模式时，鼠标双击记录不静默失败，QuickPanel 显示授权提示并保持打开
 - [x] 切换“打开快捷面板时选中：最新记录 / 上次选中项”后，重新打开 QuickPanel 的初始选中项符合设置
@@ -110,12 +110,13 @@ swift run ClipboardManualProbe read-once
 
 ## Maccy Replacement Privacy And Performance
 
-- [ ] 暂停采集后复制 3 条内容，历史数量不增长
-- [ ] 恢复采集后复制 1 条内容，历史数量增长
-- [ ] 触发“忽略下一次复制”后，第一条复制不入库，第二条复制正常入库
+- [x] 暂停采集后复制 3 条内容，历史数量不增长
+- [x] 恢复采集后复制 1 条内容，历史数量增长
+- [x] 触发“忽略下一次复制”后，第一条复制不入库，第二条复制正常入库
 - [ ] 开启忽略 Universal Clipboard 后，带 `com.apple.is-remote-clipboard` 的内容不入库
-- [ ] 添加 ignored pasteboard type 后，对应 type 的 capture 不入库
-- [ ] 添加 ignored app bundle id 后，对应来源 App 的 capture 不入库
+- [ ] 展开“高级：排除自定义剪贴板类型”并添加 ignored pasteboard type 后，对应 type 的 capture 不入库
+- [ ] 点击“选择应用...”添加应用后，列表显示应用图标和名称，而不是要求手输 bundle id
+- [ ] 选择 Safari/Chrome/Terminal 等应用后，对应来源 App 的 capture 不入库；移除该应用后恢复采集
 - [ ] QuickPanel `Option+Delete` 删除当前项，列表刷新且 payload 清理
 - [ ] QuickPanel `Option+P` 置顶/取消置顶当前项
 - [ ] QuickPanel `Option+Command+Delete` 清除未置顶项，置顶项保留
@@ -143,9 +144,9 @@ swift run ClipboardManualProbe read-once
 - [x] pinned/history 混排时，数字快捷键按视觉顺序定位记录
 - [ ] 详情预览可查看安全大小文本记录的完整内容
 - [ ] 详情预览对大文本保持摘要优先，不在 QuickPanel 首帧加载全文
-- [ ] 暂停采集后复制 3 条内容，历史数量不增长
-- [ ] 恢复采集后复制 1 条内容，历史数量增长
-- [ ] 触发“忽略下一次复制”后，第一条复制不入库，第二条复制正常入库
+- [x] 暂停采集后复制 3 条内容，历史数量不增长
+- [x] 恢复采集后复制 1 条内容，历史数量增长
+- [x] 触发“忽略下一次复制”后，第一条复制不入库，第二条复制正常入库
 - [ ] 添加 Maccy baseline 后，benchmark 报告输出 per-metric comparison
 - [ ] benchmark comparison 只使用 `better` / `same` / `worse` / `not_comparable`
 - [x] 本轮真实 UI 验收使用的 app bundle 签名包含 `Authority=ClipboardApp Local Code Signing`
@@ -170,12 +171,12 @@ CPU/内存:
 
 ## 菜单栏图标和导航（v2 新增）
 
-- [ ] 启动后菜单栏右上角出现 Clipboard 图标
-- [ ] 左键点击图标，快捷面板在图标下方弹出
-- [ ] 右键点击图标，显示包含"退出 Clipboard"的菜单
-- [ ] 点击"退出 Clipboard"，应用正常退出（Activity Monitor 中进程消失）
-- [ ] 打开快捷面板后按 Cmd+Q，应用正常退出（Activity Monitor 中进程消失）
-- [ ] Dock 中无 Clipboard 图标
+- [x] 启动后菜单栏右上角出现 Clipboard 图标
+- [x] 左键点击图标，快捷面板在图标下方弹出
+- [x] 右键点击图标，显示包含"退出 Clipboard"的菜单
+- [x] 点击"退出 Clipboard"，应用正常退出（Activity Monitor 中进程消失）
+- [x] 打开快捷面板后按 Cmd+Q，应用正常退出（Activity Monitor 中进程消失）
+- [x] Dock 中无 Clipboard 图标
 
 ## 快捷键配置（v2 新增）
 
@@ -242,9 +243,9 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 ## 持久化存储（2026-05-08 引入）
 
 ### 基础持久化
-- [ ] 首次启动 → 复制 5 条不同内容 → 退出应用 → 重启 → QuickPanel 应显示全部 5 条
+- [x] 首次启动 → 复制 5 条不同内容 → 退出应用 → 重启 → QuickPanel 应显示全部 5 条
 - [x] 退出后查看 `~/Library/Application Support/<bundle-id>/clipboard.sqlite` 文件存在
-- [ ] 复制图片 → 退出 → 重启 → 选择该图片粘贴成功
+- [x] 复制图片 → 退出 → 重启 → 选择该图片粘贴成功
 
 ### 双堡垒淘汰
 - [x] 设置 maxCount = 50 → 复制 60 条 → 重启 → count 应为 50（前 10 条最旧的被删）
@@ -264,7 +265,7 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [ ] HistorySettingsView 显示绿色"持久化正常"徽标
 - [ ] 修改 maxCount stepper → 下次复制时生效
 - [ ] "在 Finder 中显示"按钮打开 Application Support 目录
-- [ ] "清除全部历史" → DB 清空，count 归零
+- [x] "清除全部历史" → DB 清空，count 归零
 - [ ] 失败策略 picker 切换"暂停剪贴板监控" → 模拟磁盘满 → ClipboardMonitor 应停止
 
 ### 性能
@@ -479,4 +480,59 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 问题: 未发现问题
 截图/录屏: 未采集；以用户真实 UI 验收反馈、自动化测试、稳定签名构建和 codesign 输出作为证据。
 结论: PASS，HTML/RTF 富文本粘贴、无格式粘贴与 QuickPanel 快捷键回归完成真实 UI 验收。
+```
+
+## 内测发包前必做手工验收记录（2026-05-27）
+
+```text
+日期: 2026-05-27
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: 少量开发者内测发包前手工验收补录，覆盖安装首次启动、菜单栏、核心复制来源、QuickPanel 主流程、基础持久化和权限异常提示
+命令:
+  - 用户确认最终稳定签名 app 包已完成安装与首次启动验收：解压后放入 /Applications，按自签名流程首次打开，并完成辅助功能授权
+  - 用户确认菜单栏图标、左键打开 QuickPanel、右键菜单、退出路径和 Dock 隐藏行为已通过
+  - 用户确认开发者高频复制来源已通过：Safari 文本/链接、Chrome 文本/地址栏 URL、VS Code、Xcode、Terminal、Finder 单文件/多文件
+  - 用户确认 QuickPanel 主流程已通过：Cmd+Shift+V 呼出、最近记录排序、来源图标、搜索、上下键、Esc、Return/双击、仅复制模式、数字快捷键回归
+  - 用户确认基础持久化已通过：复制 5 条内容后重启仍可见，图片重启后可粘贴，清除全部历史可用
+  - 用户确认运行期撤销辅助功能权限后，自动粘贴会阻断并提示重新授权
+结果:
+  - 内测发包前必做手工验收项已同步勾选
+  - 未同步勾选第二批来源、完整环境矩阵、Maccy/Clipaste 真实导入、长时间性能和 Maccy baseline
+问题: 未发现新的阻塞问题
+截图/录屏: 未采集；以用户本轮确认作为手工验收补录依据。
+结论: PASS，少量开发者内测发包前必做手工验收项已补录完成。
+```
+
+## 采集控制验收记录（2026-05-27）
+
+```text
+日期: 2026-05-27
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: 内测前补齐隐私设置页采集控制入口，并验证暂停采集、恢复采集、忽略下一次复制
+命令:
+  - swift test --filter PrivacySettingsViewTests
+  - swift test --filter CaptureControlServiceTests
+  - swift test --filter StatusBarControllerTests
+  - swift build --product ClipboardApp
+  - git diff --check
+  - Scripts/verify.sh
+  - CODE_SIGN_KEYCHAIN="$HOME/Library/Keychains/clipboard-signing.keychain-db" LOCAL_CODE_SIGN_IDENTITY="ClipboardApp Local Code Signing" REQUIRE_STABLE_CODE_SIGNING=1 Scripts/build-app-bundle.sh
+  - codesign -dv --verbose=4 .build/app-bundles/release/ClipboardApp.app
+  - 使用 Computer Use 打开稳定签名 release 包的 Settings -> 隐私，确认显示"采集控制"、"暂停采集"、"忽略下一次复制"
+  - 点击"暂停采集"后状态变为"已暂停"，按钮变为"恢复采集"，"忽略下一次复制"禁用
+  - 点击"恢复采集"后状态恢复为"正在采集"，"忽略下一次复制"恢复可用
+  - 用户确认采集控制功能验证无问题
+结果:
+  - 隐私设置页采集控制入口已可见
+  - 暂停采集、恢复采集、忽略下一次复制的服务层行为和 UI 状态均已验证
+  - 稳定签名 release app bundle 构建成功：.build/app-bundles/release/ClipboardApp.app
+  - codesign 输出包含 Authority=ClipboardApp Local Code Signing
+问题:
+  - 首次验证时用户打开的是旧 release bundle；已通过 swift package clean 后重新构建稳定签名 release 包解决
+截图/录屏: 未采集；以 Computer Use UI 状态、自动化测试、稳定签名构建和用户确认作为证据。
+结论: PASS，采集控制相关 checklist 项已同步勾选。
 ```
