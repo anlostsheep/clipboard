@@ -53,9 +53,23 @@ enum QuickPanelActionPrompt: Equatable {
   case autoPasteRequiresAccessibilityPermission
 }
 
+struct QuickPanelRowShortcut: Equatable {
+  let label: String
+  let accessibilityLabel: String
+
+  static func historyNumber(_ number: Int) -> QuickPanelRowShortcut {
+    QuickPanelRowShortcut(label: "\(number)", accessibilityLabel: "Shortcut \(number)")
+  }
+
+  static func pinnedLetter(_ letter: String) -> QuickPanelRowShortcut {
+    QuickPanelRowShortcut(label: "⌘\(letter)", accessibilityLabel: "Shortcut Command \(letter)")
+  }
+}
+
 struct QuickPanelItemRow: Identifiable, Equatable {
   let index: Int
   let record: ClipboardRecord
+  let shortcut: QuickPanelRowShortcut?
 
   var id: UUID { record.id }
 }
@@ -71,6 +85,8 @@ struct QuickPanelItemSection: Identifiable, Equatable {
     case history
   }
 
+  static let pinnedShortcutLetters = ["A", "S", "D", "F", "G", "H", "J", "K", "L"]
+
   let kind: Kind
   let title: String
   let rows: [QuickPanelItemRow]
@@ -78,11 +94,28 @@ struct QuickPanelItemSection: Identifiable, Equatable {
   var id: Kind { kind }
 
   static func make(from items: [ClipboardRecord]) -> [QuickPanelItemSection] {
-    let rows = items.enumerated().map { index, record in
-      QuickPanelItemRow(index: index, record: record)
+    let indexedItems = items.enumerated().map { index, record in
+      (index: index, record: record)
     }
-    let pinnedRows = rows.filter { $0.record.isPinned }
-    let historyRows = rows.filter { !$0.record.isPinned }
+    let pinnedItems = indexedItems.filter { $0.record.isPinned }
+    let historyItems = indexedItems.filter { !$0.record.isPinned }
+
+    let pinnedRows = pinnedItems.enumerated().map { localIndex, item in
+      QuickPanelItemRow(
+        index: item.index,
+        record: item.record,
+        shortcut: pinnedShortcutLetters.indices.contains(localIndex)
+          ? .pinnedLetter(pinnedShortcutLetters[localIndex])
+          : nil
+      )
+    }
+    let historyRows = historyItems.enumerated().map { localIndex, item in
+      QuickPanelItemRow(
+        index: item.index,
+        record: item.record,
+        shortcut: localIndex < 9 ? .historyNumber(localIndex + 1) : nil
+      )
+    }
 
     var sections: [QuickPanelItemSection] = []
     if !pinnedRows.isEmpty {

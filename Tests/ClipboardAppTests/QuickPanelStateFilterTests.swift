@@ -407,6 +407,74 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.itemSections[1].rows.map(\.index), [1, 2])
   }
 
+  func testItemSectionsAssignPinnedLettersAndHistoryNumbersSeparately() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned-a",
+      title: "Pinned A",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned-s",
+      title: "Pinned S",
+      type: .text,
+      lastCopiedAt: 2,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(hash: "history-1", title: "History 1", type: .text, lastCopiedAt: 4))
+    _ = try await store.upsert(makePanelRecord(hash: "history-2", title: "History 2", type: .text, lastCopiedAt: 3))
+    let state = makeState(store: store)
+
+    await state.refresh()
+
+    XCTAssertEqual(state.itemSections.map(\.kind), [.pinned, .history])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.record.title), ["Pinned S", "Pinned A"])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.shortcut?.label), ["⌘A", "⌘S"])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.shortcut?.accessibilityLabel), ["Shortcut Command A", "Shortcut Command S"])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.record.title), ["History 1", "History 2"])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.shortcut?.label), ["1", "2"])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.shortcut?.accessibilityLabel), ["Shortcut 1", "Shortcut 2"])
+  }
+
+  func testItemSectionsDoNotAssignHistoryNumberBeyondNine() async throws {
+    let store = InMemoryHistoryStore()
+    for index in 1...10 {
+      _ = try await store.upsert(makePanelRecord(
+        hash: "history-\(index)",
+        title: "History \(index)",
+        type: .text,
+        lastCopiedAt: TimeInterval(20 - index)
+      ))
+    }
+    let state = makeState(store: store)
+
+    await state.refresh()
+
+    let historyRows = try XCTUnwrap(state.itemSections.first { $0.kind == .history }?.rows)
+    XCTAssertEqual(historyRows.map(\.shortcut?.label), ["1", "2", "3", "4", "5", "6", "7", "8", "9", nil])
+  }
+
+  func testItemSectionsDoNotAssignPinnedLetterBeyondLeftHandSlots() async throws {
+    let store = InMemoryHistoryStore()
+    for index in 1...10 {
+      _ = try await store.upsert(makePanelRecord(
+        hash: "pinned-\(index)",
+        title: "Pinned \(index)",
+        type: .text,
+        lastCopiedAt: TimeInterval(index),
+        isPinned: true
+      ))
+    }
+    let state = makeState(store: store)
+
+    await state.refresh()
+
+    let pinnedRows = try XCTUnwrap(state.itemSections.first { $0.kind == .pinned }?.rows)
+    XCTAssertEqual(pinnedRows.map(\.shortcut?.label), ["⌘A", "⌘S", "⌘D", "⌘F", "⌘G", "⌘H", "⌘J", "⌘K", "⌘L", nil])
+  }
+
   func testShowDetailPreviewLoadsSafeTextPayload() async throws {
     let store = InMemoryHistoryStore()
     let payloadStore = InMemoryPayloadStore()
