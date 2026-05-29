@@ -225,8 +225,8 @@ final class QuickPanelState: ObservableObject {
     actionPrompt = nil
     pendingOpenSelectionBehavior = openSelectionBehavior
     if openSelectionBehavior == .latestRecord {
-      selectedIndex = 0
-      selectedRecordID = items.first?.id
+      selectedIndex = defaultSelectionIndex(in: items)
+      selectedRecordID = nil
     }
   }
 
@@ -481,6 +481,10 @@ final class QuickPanelState: ObservableObject {
     selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
   }
 
+  private func defaultSelectionIndex(in records: [ClipboardRecord]) -> Int {
+    records.firstIndex { !$0.isPinned } ?? (records.isEmpty ? 0 : 0)
+  }
+
   private func currentRecordAndPayloadForUserAction() async -> (record: ClipboardRecord, payload: ClipboardPayload)? {
     let selectionQuery = query
     if latestAppliedQuery == query,
@@ -635,19 +639,18 @@ final class QuickPanelState: ObservableObject {
     }
 
     let selectionRecordID = selectedRecordID
-    if pendingOpenSelectionBehavior == .latestRecord {
-      await viewModel.setSelection(index: 0)
-    }
-
     let refreshedItems = await viewModel.items
     let refreshedSelectedIndex: Int
-    if let selectionRecordID,
-       let matchingIndex = refreshedItems.firstIndex(where: { $0.id == selectionRecordID }) {
+    if pendingOpenSelectionBehavior == .latestRecord {
+      refreshedSelectedIndex = defaultSelectionIndex(in: refreshedItems)
+      await viewModel.setSelection(index: refreshedSelectedIndex)
+    } else if let selectionRecordID,
+              let matchingIndex = refreshedItems.firstIndex(where: { $0.id == selectionRecordID }) {
       refreshedSelectedIndex = matchingIndex
       await viewModel.setSelection(index: matchingIndex)
     } else if selectionRecordID != nil {
-      refreshedSelectedIndex = 0
-      await viewModel.setSelection(index: 0)
+      refreshedSelectedIndex = defaultSelectionIndex(in: refreshedItems)
+      await viewModel.setSelection(index: refreshedSelectedIndex)
     } else {
       refreshedSelectedIndex = await viewModel.selectedIndex
     }

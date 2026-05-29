@@ -279,6 +279,45 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.items.first?.title, "Newer")
   }
 
+  func testPrepareForPresentationSelectsFirstHistoryItemWhenPinnedItemsExist() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned",
+      title: "Pinned",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(hash: "history-newer", title: "History Newer", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "history-older", title: "History Older", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    state.prepareForPresentation(openSelectionBehavior: .latestRecord)
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["Pinned", "History Newer", "History Older"])
+    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "History Newer")
+  }
+
+  func testPrepareForPresentationSelectsPinnedItemWhenOnlyPinnedItemsExist() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned",
+      title: "Pinned",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    let state = makeState(store: store)
+
+    state.prepareForPresentation(openSelectionBehavior: .latestRecord)
+    await state.refresh()
+
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Pinned")
+  }
+
   func testPrepareForPresentationCanPreservePreviousSelectionOnNextRefresh() async throws {
     let store = InMemoryHistoryStore()
     _ = try await store.upsert(makePanelRecord(hash: "older", title: "Older", type: .text, lastCopiedAt: 1))
@@ -292,6 +331,24 @@ final class QuickPanelStateFilterTests: XCTestCase {
 
     XCTAssertEqual(state.selectedIndex, 1)
     XCTAssertEqual(state.items[state.selectedIndex].title, "Older")
+  }
+
+  func testPreviousSelectionFallbackUsesFirstHistoryItemWhenPreviousRecordDisappears() async throws {
+    let store = InMemoryHistoryStore()
+    let oldPinned = makePanelRecord(hash: "old-pinned", title: "Old Pinned", type: .text, lastCopiedAt: 1, isPinned: true)
+    _ = try await store.upsert(oldPinned)
+    _ = try await store.upsert(makePanelRecord(hash: "history", title: "History", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectItem(at: 0)
+    _ = try await store.deleteRecord(id: oldPinned.id)
+    state.prepareForPresentation(openSelectionBehavior: .previousSelection)
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["History"])
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "History")
   }
 
   func testUnchangedQueryDoesNotClearUserActionFooterStatus() async throws {
