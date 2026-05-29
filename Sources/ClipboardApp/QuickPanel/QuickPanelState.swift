@@ -283,14 +283,18 @@ final class QuickPanelState: ObservableObject {
     }
   }
 
-  func selectHistoryShortcut(number: Int) {
+  func selectHistoryShortcut(number: Int) async {
+    await refreshForShortcutIfNeeded()
+
     guard let index = historyShortcutIndex(number: number) else {
       return
     }
     selectItem(at: index)
   }
 
-  func selectPinnedShortcut(slot: Int) {
+  func selectPinnedShortcut(slot: Int) async {
+    await refreshForShortcutIfNeeded()
+
     guard let index = pinnedShortcutIndex(slot: slot) else {
       return
     }
@@ -298,9 +302,7 @@ final class QuickPanelState: ObservableObject {
   }
 
   func prepareHistoryShortcutPaste(number: Int) async -> Bool {
-    if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
-      await refreshForUserAction()
-    }
+    await refreshForShortcutIfNeeded()
 
     guard let index = historyShortcutIndex(number: number) else {
       return false
@@ -482,6 +484,12 @@ final class QuickPanelState: ObservableObject {
 
   private var currentRecordID: UUID? {
     selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
+  }
+
+  private func refreshForShortcutIfNeeded() async {
+    if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
+      await refreshForUserAction()
+    }
   }
 
   private func historyShortcutIndex(number: Int) -> Int? {

@@ -180,7 +180,7 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
     }
 
-    func testCommandNumberSelectsVisibleItem() {
+    func testCommandNumberSelectsHistoryShortcut() {
         XCTAssertEqual(
             QuickPanelKeyCaptureView.keyboardAction(
                 keyCode: UInt16(kVK_ANSI_1),
@@ -246,6 +246,22 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
                 modifierFlags: [.option, .command]
             )
         )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_F),
+                modifierFlags: [.shift, .command]
+            )
+        )
+    }
+
+    func testTrackedControlCommandPinnedLetterDoesNotFallBackToCommandSelection() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.command],
+                trackedModifierFlags: [.control, .command]
+            )
+        )
     }
 
     func testCommandQAndCommandCommaKeepReservedQuickPanelActions() {
@@ -265,7 +281,7 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
     }
 
-    func testControlCommandNumberPastesVisibleItem() {
+    func testControlCommandNumberPastesHistoryShortcut() {
         XCTAssertEqual(
             QuickPanelKeyCaptureView.keyboardAction(
                 keyCode: UInt16(kVK_ANSI_1),

@@ -322,6 +322,9 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     modifierFlags: NSEvent.ModifierFlags,
     trackedModifierFlags: NSEvent.ModifierFlags
   ) -> KeyboardAction? {
+    let eventModifiers = normalizedShortcutModifiers(modifierFlags)
+    let trackedModifiers = normalizedShortcutModifiers(trackedModifierFlags)
+
     if let number = number(for: keyCode) {
       return numberShortcutAction(
         number: number,
@@ -330,6 +333,14 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
           trackedModifierFlags: trackedModifierFlags
         )
       )
+    }
+
+    if let pinnedSlot = pinnedShortcutSlot(for: keyCode) {
+      guard eventModifiers == [.command],
+            trackedModifiers.intersection([.shift, .control, .option]).isEmpty else {
+        return nil
+      }
+      return .selectPinnedShortcut(pinnedSlot)
     }
 
     return keyboardAction(keyCode: keyCode, modifierFlags: modifierFlags)
@@ -365,9 +376,6 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     }
     if keyCode == UInt16(kVK_ANSI_P), modifiers == [.option] {
       return .togglePinned
-    }
-    if keyCode == UInt16(kVK_ANSI_F), modifiers.contains(.command) {
-      return .focusSearch
     }
     if keyCode == UInt16(kVK_ANSI_Comma), modifiers.contains(.command) {
       return .openSettings

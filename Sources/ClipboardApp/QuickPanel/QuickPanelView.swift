@@ -507,12 +507,16 @@ struct QuickPanelView: View {
         focusSearch()
       },
       onSelectNumber: { number in
-        state.selectHistoryShortcut(number: number)
-        focusSearch()
+        Task { @MainActor in
+          await state.selectHistoryShortcut(number: number)
+          focusSearch()
+        }
       },
       onSelectPinnedShortcut: { slot in
-        state.selectPinnedShortcut(slot: slot)
-        focusSearch()
+        Task { @MainActor in
+          await state.selectPinnedShortcut(slot: slot)
+          focusSearch()
+        }
       },
       onPasteNumber: { number in
         onPasteNumber(number)

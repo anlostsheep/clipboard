@@ -70,7 +70,7 @@ swift run ClipboardManualProbe read-once
 - [x] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
 - [x] 按 `Escape` 关闭 QuickPanel
 - [x] 打开过设置页后，切到其他 App 呼出 QuickPanel，再按 `Escape` 关闭，焦点保留在呼出前的 App，不重新弹出设置页
-- [x] 按 `Down` / `Up` 移动选中项后，按 `Command+F` 可重新聚焦搜索框并继续输入
+- [x] pinned/history 混排时，`Command+F` 选择第 4 个 pinned 项；搜索框保持可继续输入
 - [x] 鼠标单击某条历史记录只选中该记录；鼠标双击遵循与 `Return` 相同的复制/粘贴语义
 - [x] 在 QuickPanel 中按 `Command+,` 可打开设置窗口
 - [x] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，记录被复制并自动粘贴
@@ -556,10 +556,10 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
   - codesign -dv --verbose=4 .build/app-bundles/release/ClipboardApp.app
   - 启动稳定签名 release 包，并写入 3 条 qp-accept-* 测试记录；将其中 1 条本地 fixture 标记为 pinned，准备混合 pinned/history UI 场景
 结果:
-  - QuickPanelStateFilterTests 通过：41 tests, 0 failures
+  - QuickPanelStateFilterTests 通过：43 tests, 0 failures
   - QuickPanelControllerPresentationTests 通过：13 tests, 0 failures
-  - QuickPanelKeyCaptureTests 通过：30 tests, 0 failures
-  - QuickPanel 聚合测试通过：114 tests, 0 failures
+  - QuickPanelKeyCaptureTests 通过：31 tests, 0 failures
+  - QuickPanel 聚合测试通过：117 tests, 0 failures
   - git diff --check 通过
   - release app bundle 构建成功：.build/app-bundles/release/ClipboardApp.app
   - codesign 输出包含 Authority=ClipboardApp Local Code Signing
