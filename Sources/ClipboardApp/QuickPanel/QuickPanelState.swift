@@ -283,26 +283,43 @@ final class QuickPanelState: ObservableObject {
     }
   }
 
-  func selectVisibleItem(number: Int) {
-    let index = number - 1
+  func selectHistoryShortcut(number: Int) {
+    guard let index = historyShortcutIndex(number: number) else {
+      return
+    }
     selectItem(at: index)
   }
 
-  func hasVisibleItem(number: Int) -> Bool {
-    items.indices.contains(number - 1)
+  func selectPinnedShortcut(slot: Int) {
+    guard let index = pinnedShortcutIndex(slot: slot) else {
+      return
+    }
+    selectItem(at: index)
   }
 
-  func prepareVisibleItemPaste(number: Int) async -> Bool {
+  func selectVisibleItem(number: Int) {
+    selectHistoryShortcut(number: number)
+  }
+
+  func hasVisibleItem(number: Int) -> Bool {
+    historyShortcutIndex(number: number) != nil
+  }
+
+  func prepareHistoryShortcutPaste(number: Int) async -> Bool {
     if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
       await refreshForUserAction()
     }
 
-    guard hasVisibleItem(number: number) else {
+    guard let index = historyShortcutIndex(number: number) else {
       return false
     }
 
-    selectVisibleItem(number: number)
+    selectItem(at: index)
     return true
+  }
+
+  func prepareVisibleItemPaste(number: Int) async -> Bool {
+    await prepareHistoryShortcutPaste(number: number)
   }
 
   func reportAutoPasteRequiresAccessibilityPermission() {
@@ -336,14 +353,16 @@ final class QuickPanelState: ObservableObject {
     )
   }
 
-  func pasteVisibleItem(number: Int) async {
-    let index = number - 1
-    guard items.indices.contains(index) else {
+  func pasteHistoryShortcut(number: Int) async {
+    guard await prepareHistoryShortcutPaste(number: number) else {
       return
     }
 
-    selectItem(at: index)
     await selectCurrent(autoPaste: true)
+  }
+
+  func pasteVisibleItem(number: Int) async {
+    await pasteHistoryShortcut(number: number)
   }
 
   func pastePlainText() async {
@@ -479,6 +498,29 @@ final class QuickPanelState: ObservableObject {
 
   private var currentRecordID: UUID? {
     selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
+  }
+
+  private func historyShortcutIndex(number: Int) -> Int? {
+    guard (1...9).contains(number) else {
+      return nil
+    }
+    let historyRows = itemSections.first { $0.kind == .history }?.rows ?? []
+    let localIndex = number - 1
+    guard historyRows.indices.contains(localIndex) else {
+      return nil
+    }
+    return historyRows[localIndex].index
+  }
+
+  private func pinnedShortcutIndex(slot: Int) -> Int? {
+    guard QuickPanelItemSection.pinnedShortcutLetters.indices.contains(slot) else {
+      return nil
+    }
+    let pinnedRows = itemSections.first { $0.kind == .pinned }?.rows ?? []
+    guard pinnedRows.indices.contains(slot) else {
+      return nil
+    }
+    return pinnedRows[slot].index
   }
 
   private func defaultSelectionIndex(in records: [ClipboardRecord]) -> Int {
