@@ -21,6 +21,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     case clearAll
     case cycleContentFilter(Int)
     case selectNumber(Int)
+    case selectPinnedShortcut(Int)
     case pasteNumber(Int)
     case pastePlainText
     case showDetailPreview
@@ -38,6 +39,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
   let onClearAll: () -> Void
   var onCycleContentFilter: ((Int) -> Void)? = nil
   var onSelectNumber: ((Int) -> Void)? = nil
+  var onSelectPinnedShortcut: ((Int) -> Void)? = nil
   var onPasteNumber: ((Int) -> Void)? = nil
   var onPastePlainText: (() -> Void)? = nil
   var onShowDetailPreview: (() -> Void)? = nil
@@ -58,6 +60,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onClearAll: onClearAll,
       onCycleContentFilter: onCycleContentFilter,
       onSelectNumber: onSelectNumber,
+      onSelectPinnedShortcut: onSelectPinnedShortcut,
       onPasteNumber: onPasteNumber,
       onPastePlainText: onPastePlainText,
       onShowDetailPreview: onShowDetailPreview,
@@ -87,6 +90,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     context.coordinator.onClearAll = onClearAll
     context.coordinator.onCycleContentFilter = onCycleContentFilter
     context.coordinator.onSelectNumber = onSelectNumber
+    context.coordinator.onSelectPinnedShortcut = onSelectPinnedShortcut
     context.coordinator.onPasteNumber = onPasteNumber
     context.coordinator.onPastePlainText = onPastePlainText
     context.coordinator.onShowDetailPreview = onShowDetailPreview
@@ -113,6 +117,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     var onClearAll: () -> Void
     var onCycleContentFilter: ((Int) -> Void)?
     var onSelectNumber: ((Int) -> Void)?
+    var onSelectPinnedShortcut: ((Int) -> Void)?
     var onPasteNumber: ((Int) -> Void)?
     var onPastePlainText: (() -> Void)?
     var onShowDetailPreview: (() -> Void)?
@@ -135,6 +140,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       onClearAll: @escaping () -> Void,
       onCycleContentFilter: ((Int) -> Void)?,
       onSelectNumber: ((Int) -> Void)?,
+      onSelectPinnedShortcut: ((Int) -> Void)?,
       onPasteNumber: ((Int) -> Void)?,
       onPastePlainText: (() -> Void)?,
       onShowDetailPreview: (() -> Void)?,
@@ -152,6 +158,7 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
       self.onClearAll = onClearAll
       self.onCycleContentFilter = onCycleContentFilter
       self.onSelectNumber = onSelectNumber
+      self.onSelectPinnedShortcut = onSelectPinnedShortcut
       self.onPasteNumber = onPasteNumber
       self.onPastePlainText = onPastePlainText
       self.onShowDetailPreview = onShowDetailPreview
@@ -260,6 +267,12 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
         }
         onSelectNumber(number)
         return nil
+      case .selectPinnedShortcut(let slot):
+        guard let onSelectPinnedShortcut else {
+          return event
+        }
+        onSelectPinnedShortcut(slot)
+        return nil
       case .pasteNumber(let number):
         guard let onPasteNumber else {
           return event
@@ -337,6 +350,9 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     }
     if let number = number(for: keyCode) {
       return numberShortcutAction(number: number, modifiers: modifiers)
+    }
+    if let pinnedSlot = pinnedShortcutSlot(for: keyCode), modifiers == [.command] {
+      return .selectPinnedShortcut(pinnedSlot)
     }
     if keyCode == UInt16(kVK_Delete), modifiers == [.shift, .option, .command] {
       return .clearAll
@@ -468,6 +484,21 @@ struct QuickPanelKeyCaptureView: NSViewRepresentable {
     case UInt16(kVK_ANSI_7): return 7
     case UInt16(kVK_ANSI_8): return 8
     case UInt16(kVK_ANSI_9): return 9
+    default: return nil
+    }
+  }
+
+  private static func pinnedShortcutSlot(for keyCode: UInt16) -> Int? {
+    switch keyCode {
+    case UInt16(kVK_ANSI_A): return 0
+    case UInt16(kVK_ANSI_S): return 1
+    case UInt16(kVK_ANSI_D): return 2
+    case UInt16(kVK_ANSI_F): return 3
+    case UInt16(kVK_ANSI_G): return 4
+    case UInt16(kVK_ANSI_H): return 5
+    case UInt16(kVK_ANSI_J): return 6
+    case UInt16(kVK_ANSI_K): return 7
+    case UInt16(kVK_ANSI_L): return 8
     default: return nil
     }
   }
