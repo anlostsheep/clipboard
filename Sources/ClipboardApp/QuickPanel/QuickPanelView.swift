@@ -321,7 +321,7 @@ struct QuickPanelView: View {
     QuickPanelRow(
       record: row.record,
       isSelected: row.index == state.selectedIndex,
-      numberShortcut: numberShortcut(for: row.index),
+      shortcut: shortcut(for: row),
       sourceIcon: sourceAppIconProvider.icon(for: row.record),
       imagePreviewLoader: { record in
         await state.imagePreview(for: record)
@@ -344,13 +344,12 @@ struct QuickPanelView: View {
     }
   }
 
-  private func numberShortcut(for index: Int) -> Int? {
-    guard numberShortcutMode != nil else {
+  private func shortcut(for row: QuickPanelItemRow) -> QuickPanelRowShortcut? {
+    guard numberShortcutMode != nil || row.record.isPinned else {
       return nil
     }
 
-    let number = index + 1
-    return number <= 9 ? number : nil
+    return row.shortcut
   }
 
   private func scrollIfPresent(
@@ -508,7 +507,11 @@ struct QuickPanelView: View {
         focusSearch()
       },
       onSelectNumber: { number in
-        state.selectVisibleItem(number: number)
+        state.selectHistoryShortcut(number: number)
+        focusSearch()
+      },
+      onSelectPinnedShortcut: { slot in
+        state.selectPinnedShortcut(slot: slot)
         focusSearch()
       },
       onPasteNumber: { number in
@@ -549,7 +552,7 @@ private struct QuickPanelSectionHeader: View {
 private struct QuickPanelRow: View {
   let record: ClipboardRecord
   let isSelected: Bool
-  let numberShortcut: Int?
+  let shortcut: QuickPanelRowShortcut?
   let sourceIcon: NSImage?
   let imagePreviewLoader: (ClipboardRecord) async -> NSImage?
   @State private var imagePreview: NSImage?
@@ -584,8 +587,8 @@ private struct QuickPanelRow: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      if let numberShortcut {
-        QuickPanelNumberShortcutBadge(number: numberShortcut, isSelected: isSelected)
+      if let shortcut {
+        QuickPanelShortcutBadge(shortcut: shortcut, isSelected: isSelected)
       } else if record.isPinned {
         Image(systemName: "pin.fill")
           .font(.caption.weight(.semibold))
@@ -611,21 +614,22 @@ private struct QuickPanelRow: View {
   }
 }
 
-private struct QuickPanelNumberShortcutBadge: View {
-  let number: Int
+private struct QuickPanelShortcutBadge: View {
+  let shortcut: QuickPanelRowShortcut
   let isSelected: Bool
 
   var body: some View {
-    Text("\(number)")
+    Text(shortcut.label)
       .font(.caption.weight(.bold))
       .monospacedDigit()
       .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-      .frame(width: 22, height: 22)
+      .frame(minWidth: 22, minHeight: 22)
+      .padding(.horizontal, shortcut.label.count > 1 ? 5 : 0)
       .background(
-        Circle()
+        Capsule()
           .fill(isSelected ? Color.white.opacity(0.92) : Color.secondary.opacity(0.16))
       )
-      .accessibilityLabel("Shortcut \(number)")
+      .accessibilityLabel(shortcut.accessibilityLabel)
   }
 }
 

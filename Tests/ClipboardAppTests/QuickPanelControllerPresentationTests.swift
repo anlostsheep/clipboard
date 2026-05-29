@@ -96,14 +96,17 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         XCTAssertFalse(eventPoster.didPostCommandV)
     }
 
-    func testPasteVisibleItemByNumberHidesPanelRestoresPreviousApplicationAndAutoPastes() async throws {
+    func testPasteHistoryShortcutHidesPanelRestoresPreviousApplicationAndAutoPastesHistoryItem() async throws {
         let store = InMemoryHistoryStore()
         let payloadStore = InMemoryPayloadStore()
         let pasteboard = PresentationTestPasteboardWriter()
         let eventPoster = PresentationTestPasteEventPoster()
-        let record = makePresentationRecord()
-        _ = try await store.upsert(record)
-        try await payloadStore.save(.text("number paste payload"), for: record.id)
+        let pinned = makePresentationRecord(title: "Pinned", isPinned: true)
+        let history = makePresentationRecord(title: "History")
+        _ = try await store.upsert(pinned)
+        _ = try await store.upsert(history)
+        try await payloadStore.save(.text("pinned payload"), for: pinned.id)
+        try await payloadStore.save(.text("history payload"), for: history.id)
         let state = makePresentationState(
             store: store,
             payloadStore: payloadStore,
@@ -122,19 +125,19 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
 
         controller.show()
         await state.refresh()
-        controller.pasteVisibleItem(number: 1)
+        controller.pasteHistoryShortcut(number: 1)
         try await Task.sleep(nanoseconds: 180_000_000)
 
-        XCTAssertEqual(pasteboard.lastText, "number paste payload")
+        XCTAssertEqual(pasteboard.lastText, "history payload")
         XCTAssertTrue(eventPoster.didPostCommandV)
         XCTAssertTrue(didRequestRestore)
         XCTAssertFalse(
             NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
-            "Number paste should close the QuickPanel before posting Command+V to the previous app."
+            "History shortcut paste should close the QuickPanel before posting Command+V to the previous app."
         )
     }
 
-    func testPasteVisibleItemByNumberKeepsPanelVisibleWhenAutoPasteIsUnauthorized() async throws {
+    func testPasteHistoryShortcutKeepsPanelVisibleWhenAutoPasteIsUnauthorized() async throws {
         let state = makePresentationState()
         let controller = QuickPanelController(
             state: state,
@@ -143,16 +146,16 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
 
         controller.show()
         defer { controller.hide() }
-        controller.pasteVisibleItem(number: 1)
+        controller.pasteHistoryShortcut(number: 1)
 
         XCTAssertTrue(
             NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
-            "Unauthorized explicit number paste should keep the QuickPanel visible for the authorization message."
+            "Unauthorized History shortcut paste should keep the QuickPanel visible for the authorization message."
         )
         XCTAssertEqual(state.footerStatus, "自动粘贴需要辅助功能权限，请在设置中授权")
     }
 
-    func testPasteVisibleItemByOutOfRangeNumberKeepsPanelVisibleAndDoesNotPaste() async throws {
+    func testPasteHistoryShortcutByOutOfRangeNumberKeepsPanelVisibleAndDoesNotPaste() async throws {
         let store = InMemoryHistoryStore()
         let payloadStore = InMemoryPayloadStore()
         let pasteboard = PresentationTestPasteboardWriter()
@@ -178,7 +181,7 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         controller.show()
         defer { controller.hide() }
         await state.refresh()
-        controller.pasteVisibleItem(number: 9)
+        controller.pasteHistoryShortcut(number: 9)
         try await Task.sleep(nanoseconds: 80_000_000)
 
         XCTAssertNil(pasteboard.lastText)
@@ -186,7 +189,7 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         XCTAssertFalse(didRequestRestore)
         XCTAssertTrue(
             NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
-            "Out-of-range number paste should not close the QuickPanel."
+            "Out-of-range History shortcut paste should not close the QuickPanel."
         )
     }
 
@@ -399,23 +402,27 @@ private final class PresentationTestPasteEventPoster: PasteEventPosting, @unchec
     }
 }
 
-private func makePresentationRecord(type: ClipboardContentType = .text) -> ClipboardRecord {
+private func makePresentationRecord(
+    title: String = "Presentation",
+    type: ClipboardContentType = .text,
+    isPinned: Bool = false
+) -> ClipboardRecord {
     ClipboardRecord(
         id: UUID(),
-        contentHash: "presentation",
+        contentHash: title,
         primaryType: type,
-        title: "Presentation",
-        plainTextPreview: "Presentation",
+        title: title,
+        plainTextPreview: title,
         sourceAppBundleId: nil,
         sourceAppName: "App",
         sourceDeviceHint: .local,
         createdAt: Date(timeIntervalSince1970: 1),
-        lastCopiedAt: Date(timeIntervalSince1970: 1),
+        lastCopiedAt: Date(timeIntervalSince1970: isPinned ? 1 : 2),
         copyCount: 1,
-        isPinned: false,
+        isPinned: isPinned,
         isFavorite: false,
         groupIds: [],
-        retentionExempt: false,
+        retentionExempt: isPinned,
         metadata: nil,
         pasteboardTypes: []
     )
