@@ -335,8 +335,15 @@ final class QuickPanelStateFilterTests: XCTestCase {
 
   func testPreviousSelectionFallbackUsesFirstHistoryItemWhenPreviousRecordDisappears() async throws {
     let store = InMemoryHistoryStore()
-    let oldPinned = makePanelRecord(hash: "old-pinned", title: "Old Pinned", type: .text, lastCopiedAt: 1, isPinned: true)
+    let oldPinned = makePanelRecord(hash: "old-pinned", title: "Old Pinned", type: .text, lastCopiedAt: 4, isPinned: true)
     _ = try await store.upsert(oldPinned)
+    _ = try await store.upsert(makePanelRecord(
+      hash: "remaining-pinned",
+      title: "Remaining Pinned",
+      type: .text,
+      lastCopiedAt: 3,
+      isPinned: true
+    ))
     _ = try await store.upsert(makePanelRecord(hash: "history", title: "History", type: .text, lastCopiedAt: 2))
     let state = makeState(store: store)
 
@@ -346,8 +353,8 @@ final class QuickPanelStateFilterTests: XCTestCase {
     state.prepareForPresentation(openSelectionBehavior: .previousSelection)
     await state.refresh()
 
-    XCTAssertEqual(state.items.map(\.title), ["History"])
-    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items.map(\.title), ["Remaining Pinned", "History"])
+    XCTAssertEqual(state.selectedIndex, 1)
     XCTAssertEqual(state.items[state.selectedIndex].title, "History")
   }
 
