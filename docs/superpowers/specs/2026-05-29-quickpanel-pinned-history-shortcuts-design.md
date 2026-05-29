@@ -1,58 +1,58 @@
-# QuickPanel Pinned/History Shortcut Separation Design
+# QuickPanel 固定项/历史项快捷键分离设计
 
-## Goal
+## 目标
 
-Make QuickPanel easier to operate when pinned items exist, without removing the existing pinned/history section structure.
+在保留现有 pinned/history 分区结构的前提下，让存在固定项时的 QuickPanel 更容易操作。
 
-The current panel correctly keeps pinned items visible above normal history, but that also means pinned rows take the initial selection and consume the existing `Command+1...9` row shortcuts. The new behavior keeps pinned items visually prominent while making normal history the default keyboard target.
+当前面板会正确地把固定项展示在普通历史上方，但这也导致固定项拿走打开面板时的初始选中位置，并占用现有的 `Command+1...9` 行快捷键。新行为应继续让固定项保持可见和靠前，同时把普通历史作为默认键盘目标。
 
-## Current Code Facts
+## 当前代码事实
 
-- `QuickPanelViewModel.refresh` sorts pinned records before unpinned records.
-- `QuickPanelListPolicy.limitedItems` preserves some unpinned history when pinned items exceed the page limit.
-- `QuickPanelItemSection.make` splits the already sorted `items` array into `.pinned` and `.history` sections while preserving each row's global item index.
-- `QuickPanelState.prepareForPresentation` and `QuickPanelState.applyRefresh` own the open-time selected index behavior.
-- `QuickPanelKeyCaptureView` maps `Command+1...9` to visible-row selection and `Control+Command+1...9` to visible-row paste.
-- `QuickPanelView.numberShortcut(for:)` currently displays number badges by global row index, so pinned rows can take the first number badges.
+- `QuickPanelViewModel.refresh` 会先按 pinned 状态排序，再排列未固定记录。
+- `QuickPanelListPolicy.limitedItems` 会在固定项超过页限制时保留一部分未固定历史。
+- `QuickPanelItemSection.make` 会把已经排序后的 `items` 拆成 `.pinned` 和 `.history` 两个 section，同时保留每一行的全局 item index。
+- `QuickPanelState.prepareForPresentation` 和 `QuickPanelState.applyRefresh` 负责打开面板时的选中索引行为。
+- `QuickPanelKeyCaptureView` 当前把 `Command+1...9` 映射为可见行选择，把 `Control+Command+1...9` 映射为可见行粘贴。
+- `QuickPanelView.numberShortcut(for:)` 当前按全局行索引显示数字 badge，因此 pinned 行会拿到前几个数字 badge。
 
-## Chosen Direction
+## 已确认方向
 
-Keep two visual sections:
+保留两个视觉分区：
 
-1. Pinned section remains above History.
-2. History section remains below Pinned.
-3. Opening the panel prefers selecting the first History row.
-4. Pinned and History use separate keyboard spaces.
+1. Pinned section 继续位于 History 上方。
+2. History section 继续位于 Pinned 下方。
+3. 打开面板时优先选中第一条 History 行。
+4. Pinned 和 History 使用两套独立的键盘空间。
 
-This avoids a larger layout rewrite while fixing the main interaction problem: pinned rows should be visible and reachable, but they should not displace the high-frequency recent-history keyboard flow.
+这个方向避免较大的布局重写，同时解决主要交互问题：固定项应该保持可见和可访问，但不应该挤占高频普通历史的键盘流程。
 
-## Interaction Rules
+## 交互规则
 
-### Open Selection
+### 打开时选中
 
-When QuickPanel opens:
+QuickPanel 打开时：
 
-- If at least one unpinned History item is visible, select the first visible History row.
-- If no History item is visible and pinned items exist, select the first pinned row.
-- If the user setting is "previous selection", keep the previous-selection behavior when the previous selected record is still visible.
-- If the previous selected record is no longer visible, fall back to the same History-first rule above.
+- 如果至少有一条可见的未固定 History 项，选中第一条可见 History 行。
+- 如果没有可见 History 项，但存在 pinned 项，选中第一条 pinned 行。
+- 如果用户设置为“上次选中项”，且上次选中的记录仍然可见，则保留现有 previous-selection 行为。
+- 如果上次选中的记录已经不可见，则回退到同一套 History-first 规则。
 
-This means "latest record" becomes "latest normal history when normal history exists" for the mixed pinned/history case. Pinned-only lists still work naturally.
+这意味着在 pinned/history 混合场景下，“最新记录”语义会变成“存在普通历史时选中最新普通历史”。只有 pinned 的列表仍然自然选中 pinned 第一项。
 
-### History Shortcuts
+### History 快捷键
 
-History rows use numeric shortcuts only:
+History 行只使用数字快捷键：
 
-- `Command+1...9` selects the first through ninth visible History rows.
-- `Control+Command+1...9` pastes the first through ninth visible History rows.
-- Numeric shortcuts do not select or paste pinned rows.
-- The design intentionally does not add `Command+0` for the tenth History row in this iteration.
+- `Command+1...9` 选择可见 History 的第 1 到第 9 行。
+- `Control+Command+1...9` 粘贴可见 History 的第 1 到第 9 行。
+- 数字快捷键不选择、也不粘贴 pinned 行。
+- 本轮设计刻意不增加 `Command+0` 作为第 10 条 History 的快捷键。
 
-The visible shortcut badges in History should show `1...9` based on History-local row order, not global list order.
+History 中可见的快捷键 badge 应按 History 局部顺序显示 `1...9`，不再按全局列表顺序显示。
 
-### Pinned Shortcuts
+### Pinned 快捷键
 
-Pinned rows use letter shortcuts:
+Pinned 行使用字母快捷键：
 
 - `Command+A`
 - `Command+S`
@@ -64,112 +64,112 @@ Pinned rows use letter shortcuts:
 - `Command+K`
 - `Command+L`
 
-The mapping is automatic by pinned row order. The first visible pinned row gets `A`, the second gets `S`, and so on.
+映射按 pinned 行可见顺序自动分配。第一条可见 pinned 行使用 `A`，第二条使用 `S`，依此类推。
 
-If there are more visible pinned rows than available letters, the extra pinned rows remain selectable by mouse and arrow navigation but do not receive a letter shortcut in this iteration.
+如果可见 pinned 行多于可用字母，超出的 pinned 行仍然可以通过鼠标和方向键选择，但本轮不分配字母快捷键。
 
-Pinned rows should show a compact `⌘A`-style badge where the numeric badge currently appears. If a pinned row has no assigned shortcut, it can keep the existing pin icon.
+Pinned 行应在当前数字 badge 的位置显示紧凑的 `⌘A` 样式 badge。如果某条 pinned 行没有分配快捷键，可以继续显示现有 pin 图标。
 
-### Search And Filtering
+### 搜索和过滤
 
-Shortcut assignment follows the current visible filtered sections:
+快捷键分配跟随当前可见且已过滤后的 section：
 
-- Searching or changing type filter recomputes visible Pinned and History sections.
-- History numbers apply to the filtered History section.
-- Pinned letters apply to the filtered Pinned section.
-- A shortcut for a missing local index does nothing.
+- 搜索或切换类型过滤后，重新计算可见的 Pinned 和 History section。
+- History 数字应用到过滤后的 History section。
+- Pinned 字母应用到过滤后的 Pinned section。
+- 缺失局部索引对应的快捷键不执行任何动作。
 
-This keeps behavior consistent with the current filtered visible-row shortcut model, but splits the index space by section.
+这保持了现有“按过滤后的可见顺序触发快捷键”的行为，只是把索引空间按 section 拆开。
 
-## Non-Goals
+## 非目标
 
-- Do not redesign QuickPanel into a single unified list.
-- Do not introduce custom per-pinned-item shortcut assignment yet.
-- Do not add `Command+0` for the tenth History item yet.
-- Do not add pinned direct-paste letter shortcuts yet.
-- Do not change persistence schema for pinned records.
-- Do not change global QuickPanel open hotkey behavior.
-- Do not change Return, double-click, copy-only mode, or plain-text paste semantics.
+- 不把 QuickPanel 重设计为单一统一列表。
+- 暂不引入每条 pinned 项自定义快捷键。
+- 暂不增加 `Command+0` 作为第 10 条 History 的快捷键。
+- 暂不增加 pinned 字母直接粘贴快捷键。
+- 不修改 pinned 记录的持久化 schema。
+- 不修改 QuickPanel 的全局呼出快捷键行为。
+- 不修改 Return、双击、仅复制模式或无格式粘贴语义。
 
-## Implementation Shape
+## 实现形态
 
-### Section-Local Shortcut Mapping
+### Section 局部快捷键映射
 
-Introduce a small section-local mapping layer near QuickPanel presentation/state code:
+在 QuickPanel presentation/state 代码附近引入一个小的 section 局部映射层：
 
-- History local index `0...8` maps to numbers `1...9`.
-- Pinned local index `0...8` maps to letters `A/S/D/F/G/H/J/K/L`.
+- History 局部索引 `0...8` 映射为数字 `1...9`。
+- Pinned 局部索引 `0...8` 映射为字母 `A/S/D/F/G/H/J/K/L`。
 
-This mapping should be deterministic and testable without depending on SwiftUI rendering.
+该映射应是确定性的，并且可以在不依赖 SwiftUI 渲染的情况下测试。
 
-### Keyboard Capture
+### 键盘捕获
 
-Extend `QuickPanelKeyCaptureView.KeyboardAction` with pinned letter selection actions, for example:
+扩展 `QuickPanelKeyCaptureView.KeyboardAction`，增加 pinned 字母选择动作，例如：
 
 - `selectPinnedShortcut(Int)`
 
-For this iteration, keep the modifier model aligned with existing shortcuts:
+本轮保持与现有快捷键一致的 modifier 模型：
 
-- `Command+letter` selects the pinned item.
-- Do not add `Control+Command+letter` pinned direct paste yet. The existing `Control+Command+1...9` direct paste remains History-only.
+- `Command+letter` 选择 pinned 项。
+- 暂不增加 `Control+Command+letter` pinned 直接粘贴；现有 `Control+Command+1...9` 直接粘贴保持为 History-only。
 
-### State Semantics
+### State 语义
 
-`QuickPanelState` should resolve shortcuts by section-local order rather than global row order:
+`QuickPanelState` 应按 section 局部顺序解析快捷键，而不是按全局行顺序解析：
 
 - `selectHistoryShortcut(number:)`
 - `pasteHistoryShortcut(number:)`
 - `selectPinnedShortcut(slot:)`
 
-These methods should refresh before user actions using the existing stale-query guard pattern where necessary.
+这些方法在用户动作前应沿用现有 stale-query guard 模式，必要时先 refresh 再执行。
 
-### View Rendering
+### View 渲染
 
-`QuickPanelView` should pass section-local shortcut metadata into row rendering instead of deriving numeric badges from global `row.index`.
+`QuickPanelView` 应把 section 局部快捷键信息传给 row rendering，而不是继续从全局 `row.index` 推导数字 badge。
 
-Rows should remain compact. App icon and source app name can stay as-is for this iteration unless verification shows the panel cannot display enough History rows after shortcut separation. The first implementation should avoid combining row-density changes with shortcut behavior changes.
+本轮行样式保持紧凑即可。App 图标和来源 App 名称先保持现状，除非验证发现快捷键分离后面板仍无法展示足够多的 History 行。第一轮实现应避免把行密度调整和快捷键语义调整混在一起。
 
-## Testing
+## 测试
 
-Focused tests should cover:
+重点测试应覆盖：
 
-- Mixed pinned/history list opens with the first History row selected under latest-record behavior.
-- Pinned-only list still opens with the first pinned row selected.
-- Previous-selection behavior keeps a visible previous selection.
-- Previous-selection fallback uses History-first when the previous record is gone.
-- `Command+1...9` maps only to History local order.
-- `Control+Command+1...9` pastes only History local order.
-- `Command+A/S/D...` maps to Pinned local order.
-- Search/type filtering recomputes section-local shortcut assignments.
-- Out-of-range number or letter shortcuts do nothing and do not crash.
-- Existing QuickPanel keyboard tests for Return, Escape, Tab, destructive shortcuts, plain-text paste, and detail preview still pass.
+- pinned/history 混合列表在 latest-record 行为下打开时选中第一条 History 行。
+- pinned-only 列表打开时仍选中第一条 pinned 行。
+- previous-selection 行为在上次选中记录仍可见时保持该选择。
+- previous-selection 在上次记录不可见时按 History-first 规则回退。
+- `Command+1...9` 只按 History 局部顺序映射。
+- `Control+Command+1...9` 只按 History 局部顺序粘贴。
+- `Command+A/S/D...` 按 Pinned 局部顺序映射。
+- 搜索和类型过滤后会重新计算 section 局部快捷键分配。
+- 超出范围的数字或字母快捷键不执行动作、不崩溃。
+- 现有 QuickPanel 键盘测试中 Return、Escape、Tab、危险操作快捷键、无格式粘贴、详情预览仍然通过。
 
-Recommended verification command:
+推荐验证命令：
 
 ```bash
 swift test --filter QuickPanel
 ```
 
-If implementation touches keyboard capture broadly, also run:
+如果实现广泛触碰键盘捕获，也需要单独运行：
 
 ```bash
 swift test --filter QuickPanelKeyCaptureTests
 ```
 
-## Manual Acceptance
+## 手工验收
 
-Add or update a dated entry in `docs/manual-acceptance-checklist.md` after a signed or locally runnable build is verified:
+在已签名或本地可运行构建验证后，向 `docs/manual-acceptance-checklist.md` 增加或更新带日期的记录：
 
-- With both pinned and normal history visible, opening QuickPanel selects the first normal History row.
-- `Command+1...9` selects normal History rows only.
-- `Control+Command+1...9` pastes normal History rows only.
-- `Command+A/S/D...` selects pinned rows in visible order.
-- Searching or type filtering preserves the same section-local shortcut behavior.
-- Existing Return, double-click, copy-only mode, and plain-text paste behavior still work.
+- 同时存在 pinned 和普通 history 时，打开 QuickPanel 选中第一条普通 History 行。
+- `Command+1...9` 只选择普通 History 行。
+- `Control+Command+1...9` 只粘贴普通 History 行。
+- `Command+A/S/D...` 按可见顺序选择 pinned 行。
+- 搜索或类型过滤后仍保持同样的 section 局部快捷键行为。
+- 现有 Return、双击、仅复制模式和无格式粘贴行为仍然正常。
 
-## Risks
+## 风险
 
-- `Command+H` is a common macOS hide shortcut. Because QuickPanel captures local events only while focused, this is acceptable for the initial left-hand mapping, but implementation should verify it does not hide the app unexpectedly.
-- Letter shortcuts may conflict with text input expectations. They must only fire with exact `Command` modifiers and only inside QuickPanel.
-- Changing default selection can surprise users who intentionally use pinned items as the first target. The fallback keeps pinned-only behavior, and the existing previous-selection preference gives users a way to keep a pinned item selected across opens.
-- Row-density concerns are real but should be handled as a separate iteration after shortcut semantics are stable.
+- `Command+H` 是常见 macOS 隐藏快捷键。由于 QuickPanel 只在自身聚焦时捕获本地事件，初版左手映射可以接受，但实现后应验证它不会意外隐藏应用。
+- 字母快捷键可能和文本输入预期冲突。它们必须只在 QuickPanel 内部、且只在精确 `Command` modifier 下触发。
+- 默认选中行为变化可能影响习惯把 pinned 项作为第一目标的用户。pinned-only 场景保留原有自然行为，现有 previous-selection 偏好也能让用户在多次打开时保持 pinned 选择。
+- 行密度问题确实存在，但应在快捷键语义稳定后作为独立迭代处理。
