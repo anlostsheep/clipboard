@@ -297,16 +297,6 @@ final class QuickPanelState: ObservableObject {
     selectItem(at: index)
   }
 
-  // Temporary compatibility: keep global visible-row semantics until QuickPanelView/Controller rewire to History-local APIs.
-  func selectVisibleItem(number: Int) {
-    let index = number - 1
-    selectItem(at: index)
-  }
-
-  func hasVisibleItem(number: Int) -> Bool {
-    items.indices.contains(number - 1)
-  }
-
   func prepareHistoryShortcutPaste(number: Int) async -> Bool {
     if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
       await refreshForUserAction()
@@ -317,19 +307,6 @@ final class QuickPanelState: ObservableObject {
     }
 
     selectItem(at: index)
-    return true
-  }
-
-  func prepareVisibleItemPaste(number: Int) async -> Bool {
-    if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
-      await refreshForUserAction()
-    }
-
-    guard hasVisibleItem(number: number) else {
-      return false
-    }
-
-    selectVisibleItem(number: number)
     return true
   }
 
@@ -369,16 +346,6 @@ final class QuickPanelState: ObservableObject {
       return
     }
 
-    await selectCurrent(autoPaste: true)
-  }
-
-  func pasteVisibleItem(number: Int) async {
-    let index = number - 1
-    guard items.indices.contains(index) else {
-      return
-    }
-
-    selectItem(at: index)
     await selectCurrent(autoPaste: true)
   }
 

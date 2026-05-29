@@ -36,32 +36,6 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.items[state.selectedIndex].title, "History Older")
   }
 
-  func testVisibleNumberSelectionRemainsGlobalWhileHistoryShortcutIsHistoryLocal() async throws {
-    let store = InMemoryHistoryStore()
-    _ = try await store.upsert(makePanelRecord(
-      hash: "pinned",
-      title: "Pinned",
-      type: .text,
-      lastCopiedAt: 1,
-      isPinned: true
-    ))
-    _ = try await store.upsert(makePanelRecord(hash: "history-newer", title: "History Newer", type: .text, lastCopiedAt: 3))
-    _ = try await store.upsert(makePanelRecord(hash: "history-older", title: "History Older", type: .text, lastCopiedAt: 2))
-    let state = makeState(store: store)
-
-    await state.refresh()
-    state.selectVisibleItem(number: 1)
-
-    XCTAssertEqual(state.items.map(\.title), ["Pinned", "History Newer", "History Older"])
-    XCTAssertEqual(state.selectedIndex, 0)
-    XCTAssertEqual(state.items[state.selectedIndex].title, "Pinned")
-
-    state.selectHistoryShortcut(number: 1)
-
-    XCTAssertEqual(state.selectedIndex, 1)
-    XCTAssertEqual(state.items[state.selectedIndex].title, "History Newer")
-  }
-
   func testSelectHistoryShortcutIgnoresOutOfRangeNumbers() async throws {
     let store = InMemoryHistoryStore()
     _ = try await store.upsert(makePanelRecord(hash: "history", title: "History", type: .text, lastCopiedAt: 1))
