@@ -16,67 +16,146 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.selectedIndex, 1)
   }
 
-  func testSelectVisibleItemByNumberUsesOneBasedVisibleOrder() async throws {
+  func testSelectHistoryShortcutUsesHistoryLocalOrderAndSkipsPinnedRows() async throws {
     let store = InMemoryHistoryStore()
-    _ = try await store.upsert(makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 3))
-    _ = try await store.upsert(makePanelRecord(hash: "second", title: "Second", type: .text, lastCopiedAt: 2))
-    _ = try await store.upsert(makePanelRecord(hash: "third", title: "Third", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned",
+      title: "Pinned",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(hash: "history-newer", title: "History Newer", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "history-older", title: "History Older", type: .text, lastCopiedAt: 2))
     let state = makeState(store: store)
 
     await state.refresh()
-    state.selectVisibleItem(number: 2)
+    await state.selectHistoryShortcut(number: 2)
 
-    XCTAssertEqual(state.selectedIndex, 1)
-    XCTAssertEqual(state.items[state.selectedIndex].title, "Second")
+    XCTAssertEqual(state.selectedIndex, 2)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "History Older")
   }
 
-  func testSelectVisibleItemByNumberIgnoresOutOfRangeNumbers() async throws {
+  func testSelectHistoryShortcutIgnoresOutOfRangeNumbers() async throws {
     let store = InMemoryHistoryStore()
-    _ = try await store.upsert(makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "history", title: "History", type: .text, lastCopiedAt: 1))
     let state = makeState(store: store)
 
     await state.refresh()
-    state.selectVisibleItem(number: 9)
+    await state.selectHistoryShortcut(number: 9)
 
     XCTAssertEqual(state.selectedIndex, 0)
-    XCTAssertEqual(state.items[state.selectedIndex].title, "First")
+    XCTAssertEqual(state.items[state.selectedIndex].title, "History")
   }
 
-  func testNumberSelectionFollowsFilteredVisibleOrder() async throws {
+  func testHistoryShortcutSelectionFollowsFilteredHistoryOrder() async throws {
     let store = InMemoryHistoryStore()
-    _ = try await store.upsert(makePanelRecord(hash: "alpha-text", title: "Alpha Text", type: .text, lastCopiedAt: 3))
-    _ = try await store.upsert(makePanelRecord(hash: "alpha-image", title: "Alpha Image", type: .image, lastCopiedAt: 2))
-    _ = try await store.upsert(makePanelRecord(hash: "beta-text", title: "Beta Text", type: .text, lastCopiedAt: 1))
+    _ = try await store.upsert(makePanelRecord(hash: "alpha-text", title: "Alpha Text", type: .text, lastCopiedAt: 4))
+    _ = try await store.upsert(makePanelRecord(hash: "alpha-image", title: "Alpha Image", type: .image, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "beta-text", title: "Beta Text", type: .text, lastCopiedAt: 2))
+    _ = try await store.upsert(makePanelRecord(hash: "alpha-pinned", title: "Alpha Pinned", type: .text, lastCopiedAt: 1, isPinned: true))
     let state = makeState(store: store)
 
     state.updateQuery("Alpha")
     await state.refresh()
-    state.selectVisibleItem(number: 2)
+    await state.selectHistoryShortcut(number: 2)
 
-    XCTAssertEqual(state.items.map(\.title), ["Alpha Text", "Alpha Image"])
-    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items.map(\.title), ["Alpha Pinned", "Alpha Text", "Alpha Image"])
+    XCTAssertEqual(state.selectedIndex, 2)
     XCTAssertEqual(state.items[state.selectedIndex].title, "Alpha Image")
   }
 
-  func testPasteVisibleItemByNumberAutoPastesEvenWhenCopyOnlyWouldBeUsed() async throws {
+  func testSelectHistoryShortcutRefreshesPendingQueryBeforeResolvingLocalNumber() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "beta", title: "Beta History", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "alpha", title: "Alpha History", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.updateQuery("Alpha")
+    await state.selectHistoryShortcut(number: 1)
+
+    XCTAssertEqual(state.items.map(\.title), ["Alpha History"])
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Alpha History")
+  }
+
+  func testPasteHistoryShortcutAutoPastesHistoryItemAndSkipsPinnedRows() async throws {
     let store = InMemoryHistoryStore()
     let payloadStore = InMemoryPayloadStore()
     let pasteboard = AppTestPasteboardWriter()
     let poster = AppTestPasteEventPoster()
-    let first = makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 2)
-    let second = makePanelRecord(hash: "second", title: "Second", type: .text, lastCopiedAt: 1)
+    let pinned = makePanelRecord(hash: "pinned", title: "Pinned", type: .text, lastCopiedAt: 1, isPinned: true)
+    let first = makePanelRecord(hash: "first", title: "First", type: .text, lastCopiedAt: 3)
+    let second = makePanelRecord(hash: "second", title: "Second", type: .text, lastCopiedAt: 2)
+    _ = try await store.upsert(pinned)
     _ = try await store.upsert(first)
     _ = try await store.upsert(second)
+    try await payloadStore.save(.text("pinned payload"), for: pinned.id)
     try await payloadStore.save(.text("first payload"), for: first.id)
     try await payloadStore.save(.text("second payload"), for: second.id)
     let state = makeState(store: store, payloadStore: payloadStore, pasteboard: pasteboard, eventPoster: poster)
 
     await state.refresh()
-    await state.pasteVisibleItem(number: 2)
+    await state.pasteHistoryShortcut(number: 2)
 
     XCTAssertEqual(pasteboard.lastText, "second payload")
     XCTAssertEqual(poster.postCount, 1)
     XCTAssertEqual(state.footerStatus, "Pasted text")
+  }
+
+  func testSelectPinnedShortcutUsesPinnedLocalOrder() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "history", title: "History", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "pinned-a", title: "Pinned A", type: .text, lastCopiedAt: 1, isPinned: true))
+    _ = try await store.upsert(makePanelRecord(hash: "pinned-s", title: "Pinned S", type: .text, lastCopiedAt: 2, isPinned: true))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    await state.selectPinnedShortcut(slot: 1)
+
+    XCTAssertEqual(state.items.map(\.title), ["Pinned S", "Pinned A", "History"])
+    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Pinned A")
+  }
+
+  func testSelectPinnedShortcutRefreshesPendingQueryBeforeResolvingLocalSlot() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(
+      hash: "beta-pinned",
+      title: "Beta Pinned",
+      type: .text,
+      lastCopiedAt: 3,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(
+      hash: "alpha-pinned",
+      title: "Alpha Pinned",
+      type: .text,
+      lastCopiedAt: 2,
+      isPinned: true
+    ))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.updateQuery("Alpha")
+    await state.selectPinnedShortcut(slot: 0)
+
+    XCTAssertEqual(state.items.map(\.title), ["Alpha Pinned"])
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Alpha Pinned")
+  }
+
+  func testSelectPinnedShortcutIgnoresOutOfRangeSlots() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(hash: "pinned", title: "Pinned", type: .text, lastCopiedAt: 1, isPinned: true))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    await state.selectPinnedShortcut(slot: 8)
+
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Pinned")
   }
 
   func testPastePlainTextUsesRichTextPlainText() async throws {
@@ -279,6 +358,45 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.items.first?.title, "Newer")
   }
 
+  func testPrepareForPresentationSelectsFirstHistoryItemWhenPinnedItemsExist() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned",
+      title: "Pinned",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(hash: "history-newer", title: "History Newer", type: .text, lastCopiedAt: 3))
+    _ = try await store.upsert(makePanelRecord(hash: "history-older", title: "History Older", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    state.prepareForPresentation(openSelectionBehavior: .latestRecord)
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["Pinned", "History Newer", "History Older"])
+    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "History Newer")
+  }
+
+  func testPrepareForPresentationSelectsPinnedItemWhenOnlyPinnedItemsExist() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned",
+      title: "Pinned",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    let state = makeState(store: store)
+
+    state.prepareForPresentation(openSelectionBehavior: .latestRecord)
+    await state.refresh()
+
+    XCTAssertEqual(state.selectedIndex, 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Pinned")
+  }
+
   func testPrepareForPresentationCanPreservePreviousSelectionOnNextRefresh() async throws {
     let store = InMemoryHistoryStore()
     _ = try await store.upsert(makePanelRecord(hash: "older", title: "Older", type: .text, lastCopiedAt: 1))
@@ -292,6 +410,31 @@ final class QuickPanelStateFilterTests: XCTestCase {
 
     XCTAssertEqual(state.selectedIndex, 1)
     XCTAssertEqual(state.items[state.selectedIndex].title, "Older")
+  }
+
+  func testPreviousSelectionFallbackUsesFirstHistoryItemWhenPreviousRecordDisappears() async throws {
+    let store = InMemoryHistoryStore()
+    let oldPinned = makePanelRecord(hash: "old-pinned", title: "Old Pinned", type: .text, lastCopiedAt: 4, isPinned: true)
+    _ = try await store.upsert(oldPinned)
+    _ = try await store.upsert(makePanelRecord(
+      hash: "remaining-pinned",
+      title: "Remaining Pinned",
+      type: .text,
+      lastCopiedAt: 3,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(hash: "history", title: "History", type: .text, lastCopiedAt: 2))
+    let state = makeState(store: store)
+
+    await state.refresh()
+    state.selectItem(at: 0)
+    _ = try await store.deleteRecord(id: oldPinned.id)
+    state.prepareForPresentation(openSelectionBehavior: .previousSelection)
+    await state.refresh()
+
+    XCTAssertEqual(state.items.map(\.title), ["Remaining Pinned", "History"])
+    XCTAssertEqual(state.selectedIndex, 1)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "History")
   }
 
   func testUnchangedQueryDoesNotClearUserActionFooterStatus() async throws {
@@ -405,6 +548,74 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.itemSections[0].rows.map(\.index), [0])
     XCTAssertEqual(state.itemSections[1].rows.map(\.record.title), ["Newer", "Middle"])
     XCTAssertEqual(state.itemSections[1].rows.map(\.index), [1, 2])
+  }
+
+  func testItemSectionsAssignPinnedLettersAndHistoryNumbersSeparately() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned-a",
+      title: "Pinned A",
+      type: .text,
+      lastCopiedAt: 1,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(
+      hash: "pinned-s",
+      title: "Pinned S",
+      type: .text,
+      lastCopiedAt: 2,
+      isPinned: true
+    ))
+    _ = try await store.upsert(makePanelRecord(hash: "history-1", title: "History 1", type: .text, lastCopiedAt: 4))
+    _ = try await store.upsert(makePanelRecord(hash: "history-2", title: "History 2", type: .text, lastCopiedAt: 3))
+    let state = makeState(store: store)
+
+    await state.refresh()
+
+    XCTAssertEqual(state.itemSections.map(\.kind), [.pinned, .history])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.record.title), ["Pinned S", "Pinned A"])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.shortcut?.label), ["⌘A", "⌘S"])
+    XCTAssertEqual(state.itemSections[0].rows.map(\.shortcut?.accessibilityLabel), ["Shortcut Command A", "Shortcut Command S"])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.record.title), ["History 1", "History 2"])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.shortcut?.label), ["1", "2"])
+    XCTAssertEqual(state.itemSections[1].rows.map(\.shortcut?.accessibilityLabel), ["Shortcut 1", "Shortcut 2"])
+  }
+
+  func testItemSectionsDoNotAssignHistoryNumberBeyondNine() async throws {
+    let store = InMemoryHistoryStore()
+    for index in 1...10 {
+      _ = try await store.upsert(makePanelRecord(
+        hash: "history-\(index)",
+        title: "History \(index)",
+        type: .text,
+        lastCopiedAt: TimeInterval(20 - index)
+      ))
+    }
+    let state = makeState(store: store)
+
+    await state.refresh()
+
+    let historyRows = try XCTUnwrap(state.itemSections.first { $0.kind == .history }?.rows)
+    XCTAssertEqual(historyRows.map(\.shortcut?.label), ["1", "2", "3", "4", "5", "6", "7", "8", "9", nil])
+  }
+
+  func testItemSectionsDoNotAssignPinnedLetterBeyondLeftHandSlots() async throws {
+    let store = InMemoryHistoryStore()
+    for index in 1...10 {
+      _ = try await store.upsert(makePanelRecord(
+        hash: "pinned-\(index)",
+        title: "Pinned \(index)",
+        type: .text,
+        lastCopiedAt: TimeInterval(index),
+        isPinned: true
+      ))
+    }
+    let state = makeState(store: store)
+
+    await state.refresh()
+
+    let pinnedRows = try XCTUnwrap(state.itemSections.first { $0.kind == .pinned }?.rows)
+    XCTAssertEqual(pinnedRows.map(\.shortcut?.label), ["⌘A", "⌘S", "⌘D", "⌘F", "⌘G", "⌘H", "⌘J", "⌘K", "⌘L", nil])
   }
 
   func testShowDetailPreviewLoadsSafeTextPayload() async throws {

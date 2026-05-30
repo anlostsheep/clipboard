@@ -70,7 +70,7 @@ swift run ClipboardManualProbe read-once
 - [x] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
 - [x] 按 `Escape` 关闭 QuickPanel
 - [x] 打开过设置页后，切到其他 App 呼出 QuickPanel，再按 `Escape` 关闭，焦点保留在呼出前的 App，不重新弹出设置页
-- [x] 按 `Down` / `Up` 移动选中项后，按 `Command+F` 可重新聚焦搜索框并继续输入
+- [x] pinned/history 混排时，`Command+F` 选择第 4 个 pinned 项；搜索框保持可继续输入
 - [x] 鼠标单击某条历史记录只选中该记录；鼠标双击遵循与 `Return` 相同的复制/粘贴语义
 - [x] 在 QuickPanel 中按 `Command+,` 可打开设置窗口
 - [x] 未勾选 `选择历史项时仅复制，不自动粘贴` 时，在普通文本框中按 `Command+Shift+V` 打开 QuickPanel，按 `Return` 或双击记录后，记录被复制并自动粘贴
@@ -136,12 +136,13 @@ swift run ClipboardManualProbe read-once
 - [x] `Option+Shift+Enter` 对富文本记录执行无格式粘贴
 - [x] `Option+Shift+Enter` 对文本和链接记录执行纯文本粘贴
 - [ ] `Option+Shift+Enter` 对图片或文件记录显示不支持无格式粘贴的状态
-- [x] `Command+1...9` 选择当前可见列表中的第 N 条记录
-- [x] `Control+Command+1...9` 自动粘贴当前可见列表中的第 N 条记录，并关闭 QuickPanel 回到目标 App
-- [x] 开启仅复制模式后，`Control+Command+1...9` 仍作为显式自动粘贴命令执行
+- [x] `Command+1...9` 选择 History 分区中可见的第 1 到第 9 条记录，不选择 pinned 行
+- [x] `Control+Command+1...9` 自动粘贴 History 分区中可见的第 1 到第 9 条记录，并关闭 QuickPanel 回到目标 App
+- [x] 开启仅复制模式后，`Control+Command+1...9` 仍作为 History 显式自动粘贴命令执行
 - [x] `Option+1...9` 不再触发 QuickPanel 数字粘贴快捷键
-- [x] 搜索和类型过滤后，数字快捷键对应过滤后的可见顺序
-- [x] pinned/history 混排时，数字快捷键按视觉顺序定位记录
+- [x] 搜索和类型过滤后，数字快捷键对应过滤后的 History 局部可见顺序
+- [x] pinned/history 混排时，打开 QuickPanel 默认选中第一条普通 History
+- [x] pinned/history 混排时，pinned 行使用 `Command+A/S/D/F/G/H/J/K/L` 按可见顺序选择
 - [ ] 详情预览可查看安全大小文本记录的完整内容
 - [ ] 详情预览对大文本保持摘要优先，不在 QuickPanel 首帧加载全文
 - [x] 暂停采集后复制 3 条内容，历史数量不增长
@@ -535,4 +536,37 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
   - 首次验证时用户打开的是旧 release bundle；已通过 swift package clean 后重新构建稳定签名 release 包解决
 截图/录屏: 未采集；以 Computer Use UI 状态、自动化测试、稳定签名构建和用户确认作为证据。
 结论: PASS，采集控制相关 checklist 项已同步勾选。
+```
+
+## QuickPanel 固定项/历史项快捷键分离验收记录（2026-05-29）
+
+```text
+日期: 2026-05-29
+机器: 本机 Apple Silicon
+系统: macOS 26.5 (25F71)
+架构: arm64
+场景: codex/quickpanel-shortcut-separation 分支 QuickPanel 保留 pinned/history 分区，同时默认选中普通 History，并分离 pinned 字母快捷键与 History 数字快捷键
+命令:
+  - swift test --filter QuickPanelStateFilterTests
+  - swift test --filter QuickPanelControllerPresentationTests
+  - swift test --filter QuickPanelKeyCaptureTests
+  - swift test --filter QuickPanel
+  - git diff --check 57fe92a..HEAD -- Sources/ClipboardApp/QuickPanel Tests/ClipboardAppTests docs/superpowers
+  - Scripts/build-app-bundle.sh
+  - codesign -dv --verbose=4 .build/app-bundles/release/ClipboardApp.app
+  - 启动稳定签名 release 包，并写入 3 条 qp-accept-* 测试记录；将其中 1 条本地 fixture 标记为 pinned，准备混合 pinned/history UI 场景
+结果:
+  - QuickPanelStateFilterTests 通过：43 tests, 0 failures
+  - QuickPanelControllerPresentationTests 通过：13 tests, 0 failures
+  - QuickPanelKeyCaptureTests 通过：31 tests, 0 failures
+  - QuickPanel 聚合测试通过：117 tests, 0 failures
+  - git diff --check 通过
+  - release app bundle 构建成功：.build/app-bundles/release/ClipboardApp.app
+  - codesign 输出包含 Authority=ClipboardApp Local Code Signing
+  - 自动化覆盖已验证：打开时 History-first 选中、History 仅分配 1...9、pinned 分配 Command+A/S/D/F/G/H/J/K/L、数字选择/粘贴跳过 pinned、字母快捷键选择 pinned
+问题:
+  - 真实 UI 验收被当前桌面锁屏阻断；截图只显示登录界面，不能输入密码，也不能继续验证 QuickPanel 面板视觉状态。
+  - 因锁屏阻断，未能在本轮由 Codex 直接完成真实 UI 验证；需要解锁后按上方 checklist 复验混合 pinned/history 场景。
+截图/录屏: /tmp/clipboard-quickpanel-acceptance.png 仅证明 UI 自动化被锁屏阻断，不作为功能通过证据。
+结论: AUTO PASS / UI BLOCKED，代码级行为、构建和签名通过；真实 QuickPanel 视觉与键盘交互需解锁后补验。
 ```

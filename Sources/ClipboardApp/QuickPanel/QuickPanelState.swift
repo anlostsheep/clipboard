@@ -53,9 +53,23 @@ enum QuickPanelActionPrompt: Equatable {
   case autoPasteRequiresAccessibilityPermission
 }
 
+struct QuickPanelRowShortcut: Equatable {
+  let label: String
+  let accessibilityLabel: String
+
+  static func historyNumber(_ number: Int) -> QuickPanelRowShortcut {
+    QuickPanelRowShortcut(label: "\(number)", accessibilityLabel: "Shortcut \(number)")
+  }
+
+  static func pinnedLetter(_ letter: String) -> QuickPanelRowShortcut {
+    QuickPanelRowShortcut(label: "⌘\(letter)", accessibilityLabel: "Shortcut Command \(letter)")
+  }
+}
+
 struct QuickPanelItemRow: Identifiable, Equatable {
   let index: Int
   let record: ClipboardRecord
+  let shortcut: QuickPanelRowShortcut?
 
   var id: UUID { record.id }
 }
@@ -71,6 +85,8 @@ struct QuickPanelItemSection: Identifiable, Equatable {
     case history
   }
 
+  static let pinnedShortcutLetters = ["A", "S", "D", "F", "G", "H", "J", "K", "L"]
+
   let kind: Kind
   let title: String
   let rows: [QuickPanelItemRow]
@@ -78,11 +94,28 @@ struct QuickPanelItemSection: Identifiable, Equatable {
   var id: Kind { kind }
 
   static func make(from items: [ClipboardRecord]) -> [QuickPanelItemSection] {
-    let rows = items.enumerated().map { index, record in
-      QuickPanelItemRow(index: index, record: record)
+    let indexedItems = items.enumerated().map { index, record in
+      (index: index, record: record)
     }
-    let pinnedRows = rows.filter { $0.record.isPinned }
-    let historyRows = rows.filter { !$0.record.isPinned }
+    let pinnedItems = indexedItems.filter { $0.record.isPinned }
+    let historyItems = indexedItems.filter { !$0.record.isPinned }
+
+    let pinnedRows = pinnedItems.enumerated().map { localIndex, item in
+      QuickPanelItemRow(
+        index: item.index,
+        record: item.record,
+        shortcut: pinnedShortcutLetters.indices.contains(localIndex)
+          ? .pinnedLetter(pinnedShortcutLetters[localIndex])
+          : nil
+      )
+    }
+    let historyRows = historyItems.enumerated().map { localIndex, item in
+      QuickPanelItemRow(
+        index: item.index,
+        record: item.record,
+        shortcut: localIndex < 9 ? .historyNumber(localIndex + 1) : nil
+      )
+    }
 
     var sections: [QuickPanelItemSection] = []
     if !pinnedRows.isEmpty {
@@ -192,8 +225,8 @@ final class QuickPanelState: ObservableObject {
     actionPrompt = nil
     pendingOpenSelectionBehavior = openSelectionBehavior
     if openSelectionBehavior == .latestRecord {
-      selectedIndex = 0
-      selectedRecordID = items.first?.id
+      selectedIndex = defaultSelectionIndex(in: items)
+      selectedRecordID = nil
     }
   }
 
@@ -250,25 +283,32 @@ final class QuickPanelState: ObservableObject {
     }
   }
 
-  func selectVisibleItem(number: Int) {
-    let index = number - 1
+  func selectHistoryShortcut(number: Int) async {
+    await refreshForShortcutIfNeeded()
+
+    guard let index = historyShortcutIndex(number: number) else {
+      return
+    }
     selectItem(at: index)
   }
 
-  func hasVisibleItem(number: Int) -> Bool {
-    items.indices.contains(number - 1)
+  func selectPinnedShortcut(slot: Int) async {
+    await refreshForShortcutIfNeeded()
+
+    guard let index = pinnedShortcutIndex(slot: slot) else {
+      return
+    }
+    selectItem(at: index)
   }
 
-  func prepareVisibleItemPaste(number: Int) async -> Bool {
-    if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
-      await refreshForUserAction()
-    }
+  func prepareHistoryShortcutPaste(number: Int) async -> Bool {
+    await refreshForShortcutIfNeeded()
 
-    guard hasVisibleItem(number: number) else {
+    guard let index = historyShortcutIndex(number: number) else {
       return false
     }
 
-    selectVisibleItem(number: number)
+    selectItem(at: index)
     return true
   }
 
@@ -303,13 +343,11 @@ final class QuickPanelState: ObservableObject {
     )
   }
 
-  func pasteVisibleItem(number: Int) async {
-    let index = number - 1
-    guard items.indices.contains(index) else {
+  func pasteHistoryShortcut(number: Int) async {
+    guard await prepareHistoryShortcutPaste(number: number) else {
       return
     }
 
-    selectItem(at: index)
     await selectCurrent(autoPaste: true)
   }
 
@@ -446,6 +484,39 @@ final class QuickPanelState: ObservableObject {
 
   private var currentRecordID: UUID? {
     selectedRecordID ?? (items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil)
+  }
+
+  private func refreshForShortcutIfNeeded() async {
+    if items.isEmpty || latestAppliedQuery != query || latestAppliedContentFilter != contentFilter {
+      await refreshForUserAction()
+    }
+  }
+
+  private func historyShortcutIndex(number: Int) -> Int? {
+    guard (1...9).contains(number) else {
+      return nil
+    }
+    let historyRows = itemSections.first { $0.kind == .history }?.rows ?? []
+    let localIndex = number - 1
+    guard historyRows.indices.contains(localIndex) else {
+      return nil
+    }
+    return historyRows[localIndex].index
+  }
+
+  private func pinnedShortcutIndex(slot: Int) -> Int? {
+    guard QuickPanelItemSection.pinnedShortcutLetters.indices.contains(slot) else {
+      return nil
+    }
+    let pinnedRows = itemSections.first { $0.kind == .pinned }?.rows ?? []
+    guard pinnedRows.indices.contains(slot) else {
+      return nil
+    }
+    return pinnedRows[slot].index
+  }
+
+  private func defaultSelectionIndex(in records: [ClipboardRecord]) -> Int {
+    records.firstIndex { !$0.isPinned } ?? (records.isEmpty ? 0 : 0)
   }
 
   private func currentRecordAndPayloadForUserAction() async -> (record: ClipboardRecord, payload: ClipboardPayload)? {
@@ -602,19 +673,18 @@ final class QuickPanelState: ObservableObject {
     }
 
     let selectionRecordID = selectedRecordID
-    if pendingOpenSelectionBehavior == .latestRecord {
-      await viewModel.setSelection(index: 0)
-    }
-
     let refreshedItems = await viewModel.items
     let refreshedSelectedIndex: Int
-    if let selectionRecordID,
-       let matchingIndex = refreshedItems.firstIndex(where: { $0.id == selectionRecordID }) {
+    if pendingOpenSelectionBehavior == .latestRecord {
+      refreshedSelectedIndex = defaultSelectionIndex(in: refreshedItems)
+      await viewModel.setSelection(index: refreshedSelectedIndex)
+    } else if let selectionRecordID,
+              let matchingIndex = refreshedItems.firstIndex(where: { $0.id == selectionRecordID }) {
       refreshedSelectedIndex = matchingIndex
       await viewModel.setSelection(index: matchingIndex)
     } else if selectionRecordID != nil {
-      refreshedSelectedIndex = 0
-      await viewModel.setSelection(index: 0)
+      refreshedSelectedIndex = defaultSelectionIndex(in: refreshedItems)
+      await viewModel.setSelection(index: refreshedSelectedIndex)
     } else {
       refreshedSelectedIndex = await viewModel.selectedIndex
     }

@@ -4,13 +4,13 @@ import XCTest
 @testable import ClipboardApp
 
 final class QuickPanelKeyCaptureTests: XCTestCase {
-    func testCommandFRequestsSearchFocus() {
+    func testCommandFSelectsFourthPinnedShortcutInsideQuickPanel() {
         let action = QuickPanelKeyCaptureView.keyboardAction(
             keyCode: UInt16(kVK_ANSI_F),
             modifierFlags: [.command]
         )
 
-        XCTAssertEqual(action, .focusSearch)
+        XCTAssertEqual(action, .selectPinnedShortcut(3))
     }
 
     func testCommandCommaRequestsSettings() {
@@ -180,7 +180,7 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
     }
 
-    func testCommandNumberSelectsVisibleItem() {
+    func testCommandNumberSelectsHistoryShortcut() {
         XCTAssertEqual(
             QuickPanelKeyCaptureView.keyboardAction(
                 keyCode: UInt16(kVK_ANSI_1),
@@ -197,7 +197,91 @@ final class QuickPanelKeyCaptureTests: XCTestCase {
         )
     }
 
-    func testControlCommandNumberPastesVisibleItem() {
+    func testCommandLettersSelectPinnedShortcutSlots() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.command]
+            ),
+            .selectPinnedShortcut(0)
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_S),
+                modifierFlags: [.command]
+            ),
+            .selectPinnedShortcut(1)
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_L),
+                modifierFlags: [.command]
+            ),
+            .selectPinnedShortcut(8)
+        )
+    }
+
+    func testPinnedLetterShortcutsRequireExactCommandModifier() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: []
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.shift, .command]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.control, .command]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.option, .command]
+            )
+        )
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_F),
+                modifierFlags: [.shift, .command]
+            )
+        )
+    }
+
+    func testTrackedControlCommandPinnedLetterDoesNotFallBackToCommandSelection() {
+        XCTAssertNil(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_A),
+                modifierFlags: [.command],
+                trackedModifierFlags: [.control, .command]
+            )
+        )
+    }
+
+    func testCommandQAndCommandCommaKeepReservedQuickPanelActions() {
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_Q),
+                modifierFlags: [.command]
+            ),
+            .quit
+        )
+        XCTAssertEqual(
+            QuickPanelKeyCaptureView.keyboardAction(
+                keyCode: UInt16(kVK_ANSI_Comma),
+                modifierFlags: [.command]
+            ),
+            .openSettings
+        )
+    }
+
+    func testControlCommandNumberPastesHistoryShortcut() {
         XCTAssertEqual(
             QuickPanelKeyCaptureView.keyboardAction(
                 keyCode: UInt16(kVK_ANSI_1),

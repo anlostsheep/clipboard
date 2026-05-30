@@ -102,7 +102,7 @@ final class QuickPanelController {
             onClose: { [weak self] in self?.cancel() },
             onSubmit: { [weak self] in self?.submitSelection() },
             onCopyOnly: { [weak self] in self?.copySelectionOnly() },
-            onPasteNumber: { [weak self] number in self?.pasteVisibleItem(number: number) },
+            onPasteNumber: { [weak self] number in self?.pasteHistoryShortcut(number: number) },
             onPastePlainText: { [weak self] in self?.pastePlainTextSelection() },
             onRequestAccessibilityAuthorization: { [weak self] in self?.requestAccessibilityAuthorization() },
             onQuit: { [weak self] in self?.quitApplication() }
@@ -223,14 +223,14 @@ final class QuickPanelController {
         }
     }
 
-    func pasteVisibleItem(number: Int) {
+    func pasteHistoryShortcut(number: Int) {
         guard isAutoPasteAuthorized() else {
             state.reportAutoPasteRequiresAccessibilityPermission()
             return
         }
 
         Task { @MainActor in
-            guard await state.prepareVisibleItemPaste(number: number) else {
+            guard await state.prepareHistoryShortcutPaste(number: number) else {
                 return
             }
 
@@ -238,7 +238,7 @@ final class QuickPanelController {
             hide()
             activatePreviousApplication(targetApplication)
             try? await Task.sleep(nanoseconds: 120_000_000)
-            await state.pasteVisibleItem(number: number)
+            await state.pasteHistoryShortcut(number: number)
         }
     }
 
