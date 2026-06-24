@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  verify:
+    name: Verify SwiftPM package
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Verify
+        run: Scripts/verify.sh
+
+      - name: Build ad-hoc app bundle
+        run: CODE_SIGN_IDENTITY=- Scripts/build-app-bundle.sh
