@@ -60,7 +60,15 @@ Expected:
 
 ## Distribution notes
 
-For GitHub Releases or a website download, package the signed app as a zip or dmg. Users should install it into `/Applications`.
+For GitHub Releases or a website download, package the signed app as a zip with a SHA-256 checksum:
+
+```bash
+VERSION=0.1.0 Scripts/package-release.sh
+```
+
+The package script runs the verification gate, builds the stable signed app, writes `dist/ClipboardApp-v0.1.0-macos.zip`, writes `dist/ClipboardApp-v0.1.0-macos.zip.sha256`, and prints signing details for inspection. More maintainer steps are documented in [docs/release-process.md](release-process.md).
+
+Users should install the app into `/Applications`. Full user-facing instructions are documented in [docs/install.md](install.md).
 
 Because this is not notarized, first launch requires one of these user actions:
 

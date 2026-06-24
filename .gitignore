@@ -1,5 +1,7 @@
 .worktrees/
 .build/
+.codegraph/
+dist/
 .DS_Store
 *.o
 *.d
