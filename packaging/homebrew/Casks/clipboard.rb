@@ -4,7 +4,7 @@ cask "clipboard" do
 
   url "https://github.com/anlostsheep/clipboard/releases/download/v#{version}/ClipboardApp-v#{version}-macos.zip"
   name "Clipboard"
-  desc "Native macOS clipboard manager"
+  desc "Menu bar clipboard history manager"
   homepage "https://github.com/anlostsheep/clipboard"
 
   livecheck do
@@ -12,7 +12,7 @@ cask "clipboard" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "ClipboardApp.app"
 
