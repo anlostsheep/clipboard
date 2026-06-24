@@ -145,6 +145,18 @@ struct QuickPanelDetailPreview: Identifiable, Equatable {
   let source: String
   let body: String
   let isTruncated: Bool
+  /// Decoded image to render in the preview. When non-nil the preview shows the
+  /// image itself instead of `body`; `body` carries the text fallback otherwise.
+  let image: NSImage?
+
+  static func == (lhs: QuickPanelDetailPreview, rhs: QuickPanelDetailPreview) -> Bool {
+    lhs.id == rhs.id
+      && lhs.title == rhs.title
+      && lhs.source == rhs.source
+      && lhs.body == rhs.body
+      && lhs.isTruncated == rhs.isTruncated
+      && lhs.image === rhs.image
+  }
 }
 
 @MainActor
@@ -413,13 +425,28 @@ final class QuickPanelState: ObservableObject {
       return
     }
 
+    let source = QuickPanelRowPresentation.sourceName(for: record)
+
+    if case let .image(data, _) = payload, let image = NSImage(data: data) {
+      detailPreview = QuickPanelDetailPreview(
+        id: record.id,
+        title: record.title,
+        source: source,
+        body: "",
+        isTruncated: false,
+        image: image
+      )
+      return
+    }
+
     let body = detailBody(for: payload, fallback: record.plainTextPreview ?? record.title)
     detailPreview = QuickPanelDetailPreview(
       id: record.id,
       title: record.title,
-      source: QuickPanelRowPresentation.sourceName(for: record),
+      source: source,
       body: body.text,
-      isTruncated: body.isTruncated
+      isTruncated: body.isTruncated,
+      image: nil
     )
   }
 

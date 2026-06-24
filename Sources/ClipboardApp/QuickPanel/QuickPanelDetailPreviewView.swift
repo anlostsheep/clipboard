@@ -14,17 +14,25 @@ struct QuickPanelDetailPreviewView: View {
           .foregroundStyle(.secondary)
       }
 
-      ScrollView {
-        Text(preview.body)
-          .font(.system(.body, design: .monospaced))
-          .textSelection(.enabled)
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
+      if let image = preview.image {
+        Image(nsImage: image)
+          .resizable()
+          .scaledToFit()
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .accessibilityLabel(preview.title)
+      } else {
+        ScrollView {
+          Text(preview.body)
+            .font(.system(.body, design: .monospaced))
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
 
-      if preview.isTruncated {
-        Text("Preview truncated to keep QuickPanel responsive.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        if preview.isTruncated {
+          Text("Preview truncated to keep QuickPanel responsive.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
       }
     }
     .padding(16)

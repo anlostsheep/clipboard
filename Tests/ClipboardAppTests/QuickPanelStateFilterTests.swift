@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import ClipboardApp
 @testable import ClipboardCore
@@ -671,17 +672,37 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(state.detailPreview?.source, "Universal Clipboard")
   }
 
-  func testShowDetailPreviewUsesImageFallbackText() async throws {
+  func testShowDetailPreviewRendersDecodableImage() async throws {
     let store = InMemoryHistoryStore()
     let payloadStore = InMemoryPayloadStore()
     let record = makePanelRecord(hash: "image", title: "Image title", type: .image, lastCopiedAt: 1)
     _ = try await store.upsert(record)
+    try await payloadStore.save(.image(data: makeTestImageData(), uti: "public.tiff"), for: record.id)
+    let state = makeState(store: store, payloadStore: payloadStore)
+
+    await state.refresh()
+    await state.showDetailPreview()
+
+    XCTAssertNotNil(state.detailPreview?.image)
+    XCTAssertEqual(state.detailPreview?.title, "Image title")
+    XCTAssertEqual(state.detailPreview?.body, "")
+    XCTAssertFalse(state.detailPreview?.isTruncated ?? true)
+  }
+
+  func testShowDetailPreviewFallsBackToTextWhenImageUndecodable() async throws {
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let record = makePanelRecord(hash: "image", title: "Image title", type: .image, lastCopiedAt: 1)
+    _ = try await store.upsert(record)
+    // Data([1, 2, 3]) is not valid image data, so NSImage cannot decode it and the
+    // preview degrades gracefully to the text fallback.
     try await payloadStore.save(.image(data: Data([1, 2, 3]), uti: "public.png"), for: record.id)
     let state = makeState(store: store, payloadStore: payloadStore)
 
     await state.refresh()
     await state.showDetailPreview()
 
+    XCTAssertNil(state.detailPreview?.image)
     XCTAssertEqual(state.detailPreview?.body, "Image title")
     XCTAssertFalse(state.detailPreview?.isTruncated ?? true)
   }
@@ -768,6 +789,16 @@ private func makeState(
     ),
     mutationService: mutationService ?? HistoryMutationService(store: store, payloadStore: payloadStore)
   )
+}
+
+@MainActor
+private func makeTestImageData() -> Data {
+  let image = NSImage(size: NSSize(width: 2, height: 2))
+  image.lockFocus()
+  NSColor.red.setFill()
+  NSBezierPath(rect: NSRect(x: 0, y: 0, width: 2, height: 2)).fill()
+  image.unlockFocus()
+  return image.tiffRepresentation ?? Data()
 }
 
 private func makePanelRecord(
