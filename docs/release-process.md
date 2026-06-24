@@ -53,6 +53,39 @@ release package: .../dist/ClipboardApp-v0.1.0-macos.zip
 checksum: .../dist/ClipboardApp-v0.1.0-macos.zip.sha256
 ```
 
+## 一键发布(publish-release.sh)
+
+设置 tap 仓库本地克隆路径,然后用一条命令完成"构建 → 打包 → 发版 → 回写 cask":
+
+```bash
+git clone https://github.com/anlostsheep/homebrew-clipboard.git ../homebrew-clipboard
+
+TAP_REPO_DIR="$PWD/../homebrew-clipboard" \
+VERSION=0.2.0 \
+Scripts/publish-release.sh
+```
+
+脚本会:
+
+- 校验前置条件(版本号、在 master、工作树干净、tag 不存在、gh 已登录、tap 可达、GitHub
+  release 不存在)。
+- 以 `REQUIRE_STABLE_CODE_SIGNING=1` 调 `Scripts/package-release.sh` 产出稳定签名的 zip
+  和 `.sha256`。
+- 打并推 git tag `vX.Y.Z`。
+- 用 `gh release create` 上传 zip + `.sha256` + release notes。
+- 调 `Scripts/update-cask.sh` 把新 `version`/`sha256` 写进 tap 的 `Casks/clipboard.rb`,
+  并在 tap 仓库提交、推送。
+
+构建与稳定签名全程在本地完成;只有 `gh` 发布动作触网。App 自身不引入任何网络调用。
+
+## Homebrew Tap 维护
+
+tap 仓库 `anlostsheep/homebrew-clipboard` 的初始内容来自本仓库的 `packaging/homebrew/`。
+首次 bootstrap 见 `docs/superpowers/plans/2026-06-24-distribution-trust-chain-homebrew.md`
+的 go-live 步骤。bootstrap 之后,tap 仓库是 cask 的权威来源,`publish-release.sh` 每次发版
+原子地回写它的 `version` 与 `sha256`。tap 仓库的 CI(`.github/workflows/audit.yml`)对
+cask 跑 `brew style` 与 `brew audit`。
+
 ## 常用覆盖项
 
 指定版本号：
