@@ -145,7 +145,7 @@ swift run ClipboardManualProbe read-once
 - [x] pinned/history 混排时，pinned 行使用 `Command+A/S/D/F/G/H/J/K/L` 按可见顺序选择
 - [ ] 详情预览可查看安全大小文本记录的完整内容
 - [ ] 详情预览对大文本保持摘要优先，不在 QuickPanel 首帧加载全文
-- [ ] 对图片记录按 `Command+Y`，详情预览渲染真实图片（按比例适配窗口），而非显示图片信息文本
+- [x] 对图片记录按 `Command+Y`，详情预览渲染真实图片（按比例适配窗口），而非显示图片信息文本
 - [ ] 图片数据损坏无法解码时，详情预览回退为文本信息且不崩溃
 - [x] 暂停采集后复制 3 条内容，历史数量不增长
 - [x] 恢复采集后复制 1 条内容，历史数量增长
@@ -571,4 +571,30 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
   - 因锁屏阻断，未能在本轮由 Codex 直接完成真实 UI 验证；需要解锁后按上方 checklist 复验混合 pinned/history 场景。
 截图/录屏: /tmp/clipboard-quickpanel-acceptance.png 仅证明 UI 自动化被锁屏阻断，不作为功能通过证据。
 结论: AUTO PASS / UI BLOCKED，代码级行为、构建和签名通过；真实 QuickPanel 视觉与键盘交互需解锁后补验。
+```
+
+## cmd+Y 图片预览验收记录（2026-06-24）
+
+```text
+日期: 2026-06-24
+机器: 本机 Apple Silicon
+系统: macOS，当前桌面环境
+架构: arm64
+场景: cmd+Y 详情预览图片渲染修复（commit 4344fcf）验收，覆盖图片项真实渲染、损坏数据回退、全量自动化测试与稳定自签名 app bundle 构建
+命令:
+  - swift test（全量）
+  - Scripts/verify.sh
+  - git diff --check
+  - CODE_SIGN_KEYCHAIN="$HOME/Library/Keychains/clipboard-signing.keychain-db" LOCAL_CODE_SIGN_IDENTITY="ClipboardApp Local Code Signing" REQUIRE_STABLE_CODE_SIGNING=1 Scripts/build-app-bundle.sh
+结果:
+  - 全量 swift test 通过：331 tests, 0 failures
+  - Scripts/verify.sh 通过（exit 0）
+  - git diff --check 通过
+  - 稳定自签名 release app bundle 构建成功，codesign Authority=ClipboardApp Local Code Signing，签名校验 valid on disk
+  - 用户在真实 app 物理验证：对 Google Chrome 来源的 19.1MB 图片记录按 Cmd+Y，详情预览渲染真实截图（按比例适配窗口），不再显示 "Image 19.1 MB" 文本
+  - 损坏图片数据回退文本路径由自动化测试覆盖：QuickPanelStateFilterTests.testShowDetailPreviewFallsBackToTextWhenImageUndecodable
+问题:
+  - 「图片数据损坏无法解码时回退为文本」仅自动化测试覆盖，未做真实损坏数据物理验收，故清单中该项保留未勾选。
+截图/录屏: 用户提供 QuickPanel Cmd+Y 渲染真实图片的截图作为通过证据。
+结论: PASS，cmd+Y 图片预览主路径用户物理验收通过；损坏数据回退为 AUTO PASS。
 ```
