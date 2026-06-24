@@ -62,7 +62,9 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
 
         await state.refresh()
         controller.copySelectionOnly()
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await waitUntil("copy-only selection to write the pasteboard") {
+            pasteboard.lastText != nil
+        }
 
         XCTAssertEqual(pasteboard.lastText, "copy-only payload")
         XCTAssertFalse(eventPoster.didPostCommandV)
@@ -90,7 +92,9 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
 
         await state.refresh()
         controller.submitSelection()
-        try await Task.sleep(nanoseconds: 180_000_000)
+        try await waitUntil("submit selection to write the pasteboard") {
+            pasteboard.lastText != nil
+        }
 
         XCTAssertEqual(pasteboard.lastText, "copy-only submit payload")
         XCTAssertFalse(eventPoster.didPostCommandV)
@@ -126,7 +130,9 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         controller.show()
         await state.refresh()
         controller.pasteHistoryShortcut(number: 1)
-        try await Task.sleep(nanoseconds: 180_000_000)
+        try await waitUntil("history shortcut paste to post Command+V") {
+            pasteboard.lastText != nil && eventPoster.didPostCommandV && didRequestRestore
+        }
 
         XCTAssertEqual(pasteboard.lastText, "history payload")
         XCTAssertTrue(eventPoster.didPostCommandV)
@@ -353,6 +359,29 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
             NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
             "QuickPanel should become visible immediately, before capture/refresh work finishes."
         )
+    }
+}
+
+/// Polls `condition` on the main actor until it holds or `timeout` elapses.
+/// Replaces fixed sleeps that race the controller's async paste pipeline
+/// (which itself sleeps ~120ms before writing the pasteboard), so the wait is
+/// "at least until the asserted side effect happens" instead of a guessed
+/// duration that breaks under machine load.
+@MainActor
+private func waitUntil(
+    _ description: String,
+    timeout: TimeInterval = 2.0,
+    file: StaticString = #filePath,
+    line: UInt = #line,
+    _ condition: () -> Bool
+) async throws {
+    let start = Date()
+    while !condition() {
+        if Date().timeIntervalSince(start) > timeout {
+            XCTFail("Timed out after \(timeout)s waiting for \(description)", file: file, line: line)
+            return
+        }
+        try await Task.sleep(nanoseconds: 5_000_000)
     }
 }
 
