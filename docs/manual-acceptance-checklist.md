@@ -598,3 +598,14 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 截图/录屏: 用户提供 QuickPanel Cmd+Y 渲染真实图片的截图作为通过证据。
 结论: PASS，cmd+Y 图片预览主路径用户物理验收通过；损坏数据回退为 AUTO PASS。
 ```
+
+## 分发信任链(Homebrew 免费路)— 2026-06-24
+
+- [ ] 全新 Homebrew 安装:`brew tap anlostsheep/clipboard && brew install --cask clipboard` 成功。
+- [ ] Homebrew 安装后 App 打开无需 Gatekeeper 右键 Open 步骤。
+- [ ] `xattr -p com.apple.quarantine /Applications/ClipboardApp.app` 无输出。
+- [ ] 授予辅助功能权限后自动粘贴可用。
+- [ ] `brew upgrade --cask clipboard` 从版本 N 升到 N+1。
+- [ ] 辅助功能权限在 Homebrew 升级后仍保持(稳定签名守住)。
+- [ ] `brew uninstall --cask --zap clipboard` 移除 App 及本机数据目录。
+- [ ] 直接下载 zip 路径在文档化的 Gatekeeper 绕过步骤下仍可用。

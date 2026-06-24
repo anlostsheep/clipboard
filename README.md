@@ -34,6 +34,20 @@ Clipboard 是一个原生 macOS 剪贴板管理器，使用 SwiftPM、SwiftUI、
 - Xcode 或 Xcode Command Line Tools，支持 Swift 5.10。
 - Apple Silicon 是当前主要验证环境；Intel 覆盖仍在手工验收清单中跟踪。
 
+## 安装
+
+推荐使用 Homebrew:
+
+```bash
+brew tap anlostsheep/clipboard
+brew install --cask clipboard
+```
+
+Homebrew 安装 cask 时会去掉 quarantine 属性,App 直接打开,不会遇到 Gatekeeper 首次打开
+拦截(尽管本构建是自签名、未公证)。更新用 `brew upgrade --cask clipboard`。
+
+不使用 Homebrew 时,也可以从发布包安装。
+
 ## 从发布包安装
 
 如果已经有 release zip：
