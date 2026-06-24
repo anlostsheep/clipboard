@@ -55,5 +55,15 @@ make_cask; run_expect_fail "invalid version rejected" bash "$script" "$cask" "1.
 make_cask; run_expect_fail "invalid sha rejected"     bash "$script" "$cask" "1.2.3" "tooshort"
 run_expect_fail "missing file rejected"               bash "$script" "$work/nope.rb" "1.2.3" "$new_sha"
 
+# cask missing version stanza is rejected
+cat > "$cask" <<'RUBY'
+cask "clipboard" do
+  sha256 "1111111111111111111111111111111111111111111111111111111111111111"
+
+  url "https://example.com/v#{version}/app.zip"
+end
+RUBY
+run_expect_fail "missing version stanza rejected" bash "$script" "$cask" "1.2.3" "$new_sha"
+
 if [[ $fail -ne 0 ]]; then echo "TESTS FAILED" >&2; exit 1; fi
 echo "ALL TESTS PASSED"
