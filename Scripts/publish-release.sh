@@ -37,7 +37,9 @@ gh auth status >/dev/null 2>&1 || die "gh is not authenticated; run: gh auth log
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 [[ "$current_branch" == "$release_branch" ]] || die "must be on '$release_branch' (on '$current_branch')"
 
-git diff --quiet && git diff --cached --quiet || die "git working tree is not clean; commit or stash first"
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  die "git working tree is not clean; commit or stash first"
+fi
 
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   die "git tag $tag already exists"
@@ -61,6 +63,8 @@ sha256_value="$(awk '{print $1}' "$sha_path")"
 [[ "$sha256_value" =~ ^[0-9a-f]{64}$ ]] || die "could not read sha256 from $sha_path"
 
 # --- Publish to the network: tag, release, cask (local artifacts already complete) ---
+# If a step after the tag push fails, delete the remote tag before re-running:
+#   git push origin ":refs/tags/$tag" && git tag -d "$tag"
 echo "==> tagging $tag"
 git tag -a "$tag" -m "Release $tag"
 git push origin "$tag"
