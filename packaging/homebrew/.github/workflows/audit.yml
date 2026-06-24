@@ -11,11 +11,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # setup-homebrew auto-taps the checked-out repo as anlostsheep/clipboard,
+      # so an explicit `brew tap` here would double-tap and fail (remote mismatch).
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
-
-      - name: Tap this repo
-        run: brew tap anlostsheep/clipboard "$GITHUB_WORKSPACE"
 
       - name: brew style
         run: brew style anlostsheep/clipboard
