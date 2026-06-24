@@ -2,6 +2,31 @@
 
 Clipboard 当前提供的是未 notarized 的开源 beta 构建。它可以用于小范围内测，但首次启动需要你手动信任 App。
 
+## 通过 Homebrew 安装(推荐)
+
+```bash
+brew tap anlostsheep/clipboard
+brew install --cask clipboard
+```
+
+Homebrew 安装 cask 时会去掉 quarantine 属性,所以即使本构建是自签名、未公证,App 也能
+直接打开,不会遇到"未识别开发者"的 Gatekeeper 拦截。
+
+更新:
+
+```bash
+brew upgrade --cask clipboard
+```
+
+卸载:
+
+```bash
+brew uninstall --cask clipboard          # 仅移除 App
+brew uninstall --cask --zap clipboard    # 同时移除本机历史与偏好
+```
+
+如果你不使用 Homebrew,可继续走下面的直接下载方式(首次打开仍需手动信任)。
+
 ## 下载发布包
 
 从 GitHub Release 下载同一版本的两个文件：
