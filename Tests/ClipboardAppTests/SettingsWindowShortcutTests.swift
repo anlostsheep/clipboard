@@ -12,6 +12,9 @@ final class SettingsWindowShortcutTests: XCTestCase {
             backing: .buffered,
             defer: false
         )
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil) }
+
         var didClose = false
         let observer = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
