@@ -1,4 +1,4 @@
-cask "clipboard" do
+cask "clipboardapp" do
   version "0.1.0"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -28,6 +28,6 @@ cask "clipboard" do
       System Settings -> Privacy & Security -> Accessibility -> enable ClipboardApp.
 
     Updates are delivered through Homebrew:
-      brew upgrade --cask clipboard
+      brew upgrade --cask clipboardapp
   EOS
 end

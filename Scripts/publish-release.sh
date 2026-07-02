@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 version="${1:-${VERSION:-}}"
 tap_repo_dir="${TAP_REPO_DIR:-}"
 release_branch="${RELEASE_BRANCH:-master}"
-cask_relpath="${CASK_RELPATH:-Casks/clipboard.rb}"
+cask_relpath="${CASK_RELPATH:-Casks/clipboardapp.rb}"
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -79,11 +79,11 @@ This build is self-signed and not notarized. Recommended install (no Gatekeeper
 prompt) is via Homebrew:
 
     brew tap anlostsheep/clipboard
-    brew install --cask clipboard
+    brew install --cask clipboardapp
 
 Update later with:
 
-    brew upgrade --cask clipboard
+    brew upgrade --cask clipboardapp
 
 Direct-download users: see docs/install.md for the first-open Gatekeeper steps.
 EOF
@@ -95,11 +95,11 @@ Scripts/update-cask.sh "$cask_file" "$version" "$sha256_value"
 (
   cd "$tap_repo_dir"
   git add "$cask_relpath"
-  git commit -m "clipboard $version"
+  git commit -m "clipboardapp $version"
   git push
 )
 
 echo
 echo "==> done. verify with:"
-echo "    brew update && brew upgrade --cask clipboard"
+echo "    brew update && brew upgrade --cask clipboardapp"
 echo "    shasum -a 256 -c \"$sha_path\""

@@ -40,11 +40,11 @@ Clipboard 是一个原生 macOS 剪贴板管理器，使用 SwiftPM、SwiftUI、
 
 ```bash
 brew tap anlostsheep/clipboard
-brew install --cask clipboard
+brew install --cask clipboardapp
 ```
 
 Homebrew 安装 cask 时会去掉 quarantine 属性,App 直接打开,不会遇到 Gatekeeper 首次打开
-拦截(尽管本构建是自签名、未公证)。更新用 `brew upgrade --cask clipboard`。
+拦截(尽管本构建是自签名、未公证)。更新用 `brew upgrade --cask clipboardapp`。
 
 不使用 Homebrew 时,也可以从发布包安装。
 

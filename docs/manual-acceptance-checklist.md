@@ -601,11 +601,11 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 
 ## 分发信任链(Homebrew 免费路)— 2026-06-24
 
-- [ ] 全新 Homebrew 安装:`brew tap anlostsheep/clipboard && brew install --cask clipboard` 成功。
+- [ ] 全新 Homebrew 安装:`brew tap anlostsheep/clipboard && brew install --cask clipboardapp` 成功。
 - [ ] Homebrew 安装后 App 打开无需 Gatekeeper 右键 Open 步骤。
 - [ ] `xattr -p com.apple.quarantine /Applications/ClipboardApp.app` 无输出。
 - [ ] 授予辅助功能权限后自动粘贴可用。
-- [ ] `brew upgrade --cask clipboard` 从版本 N 升到 N+1。
+- [ ] `brew upgrade --cask clipboardapp` 从版本 N 升到 N+1。
 - [ ] 辅助功能权限在 Homebrew 升级后仍保持(稳定签名守住)。
-- [ ] `brew uninstall --cask --zap clipboard` 移除 App 及本机数据目录。
+- [ ] `brew uninstall --cask --zap clipboardapp` 移除 App 及本机数据目录。
 - [ ] 直接下载 zip 路径在文档化的 Gatekeeper 绕过步骤下仍可用。

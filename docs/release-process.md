@@ -73,7 +73,7 @@ Scripts/publish-release.sh
   和 `.sha256`。
 - 打并推 git tag `vX.Y.Z`。
 - 用 `gh release create` 上传 zip + `.sha256` + release notes。
-- 调 `Scripts/update-cask.sh` 把新 `version`/`sha256` 写进 tap 的 `Casks/clipboard.rb`,
+- 调 `Scripts/update-cask.sh` 把新 `version`/`sha256` 写进 tap 的 `Casks/clipboardapp.rb`,
   并在 tap 仓库提交、推送。
 
 构建与稳定签名全程在本地完成;只有 `gh` 发布动作触网。App 自身不引入任何网络调用。

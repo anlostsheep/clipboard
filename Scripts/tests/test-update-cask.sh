@@ -18,11 +18,11 @@ assert() {
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-cask="$work/clipboard.rb"
+cask="$work/clipboardapp.rb"
 
 make_cask() {
   cat > "$cask" <<'RUBY'
-cask "clipboard" do
+cask "clipboardapp" do
   version "0.0.0"
   sha256 "1111111111111111111111111111111111111111111111111111111111111111"
 
@@ -57,7 +57,7 @@ run_expect_fail "missing file rejected"               bash "$script" "$work/nope
 
 # cask missing version stanza is rejected
 cat > "$cask" <<'RUBY'
-cask "clipboard" do
+cask "clipboardapp" do
   sha256 "1111111111111111111111111111111111111111111111111111111111111111"
 
   url "https://example.com/v#{version}/app.zip"
