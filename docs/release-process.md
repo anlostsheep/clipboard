@@ -67,16 +67,26 @@ Scripts/publish-release.sh
 
 脚本会:
 
-- 校验前置条件(版本号、在 master、工作树干净、tag 不存在、gh 已登录、tap 可达、GitHub
-  release 不存在)。
+- 校验前置条件(版本号、在 master、工作树干净、tag 不存在、tap 可达、GitHub release 不存在,
+  以及 keychain 中的 GitHub PAT 能访问仓库)。
 - 以 `REQUIRE_STABLE_CODE_SIGNING=1` 调 `Scripts/package-release.sh` 产出稳定签名的 zip
   和 `.sha256`。
 - 打并推 git tag `vX.Y.Z`。
-- 用 `gh release create` 上传 zip + `.sha256` + release notes。
+- 用 GitHub REST API(curl + macOS keychain 中的 PAT)创建 release 并上传 zip + `.sha256`
+  + release notes;PAT 全程不打印、不进 URL。
 - 调 `Scripts/update-cask.sh` 把新 `version`/`sha256` 写进 tap 的 `Casks/clipboardapp.rb`,
   并在 tap 仓库提交、推送。
 
-构建与稳定签名全程在本地完成;只有 `gh` 发布动作触网。App 自身不引入任何网络调用。
+构建与稳定签名全程在本地完成;只有发布动作(curl 调 GitHub REST API)触网。App 自身不引入
+任何网络调用。发布脚本无需安装 `gh`。
+
+发布失败恢复:若打 tag 之后、发布未完成(如 release 已建但资产上传失败),脚本会在该步中止。
+恢复方式是先清掉半成品,再重跑:
+
+```bash
+git push origin ":refs/tags/vX.Y.Z" && git tag -d "vX.Y.Z"   # 删除远端与本地 tag
+# 在 GitHub 上删除该 tag 对应的半成品 release
+```
 
 ## Homebrew Tap 维护
 
