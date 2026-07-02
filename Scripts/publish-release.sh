@@ -99,8 +99,9 @@ echo "==> creating GitHub release $tag"
 notes="$(cat <<EOF
 Clipboard $tag — open-source beta.
 
-This build is self-signed and not notarized. Recommended install (no Gatekeeper
-prompt) is via Homebrew:
+This build is self-signed and not notarized. Recommended install is via Homebrew;
+the cask removes the quarantine attribute after install so the app opens without a
+Gatekeeper prompt:
 
     brew tap anlostsheep/clipboard
     brew install --cask clipboardapp
