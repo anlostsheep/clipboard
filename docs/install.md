@@ -9,8 +9,9 @@ brew tap anlostsheep/clipboard
 brew install --cask clipboardapp
 ```
 
-Homebrew 安装 cask 时会去掉 quarantine 属性,所以即使本构建是自签名、未公证,App 也能
-直接打开,不会遇到"未识别开发者"的 Gatekeeper 拦截。
+本 cask 在安装后通过 postflight 移除 quarantine 属性,所以即使本构建是自签名、未公证,App
+也能直接打开,不会遇到"未识别开发者"的 Gatekeeper 拦截。这相当于替你自动完成首次打开的手动
+信任(即绕过 Gatekeeper 对该 App 的这层校验),前提是你信任本 tap。
 
 更新:
 

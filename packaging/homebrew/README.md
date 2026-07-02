@@ -10,9 +10,10 @@ The tap repo is the authoritative home of the cask once bootstrapped (see
     brew tap anlostsheep/clipboard
     brew install --cask clipboardapp
 
-Homebrew removes the quarantine attribute on cask install, so the app opens
-without the Gatekeeper "unidentified developer" prompt even though the build is
-self-signed and not notarized.
+The cask's postflight removes the quarantine attribute after install, so the app
+opens without the Gatekeeper "unidentified developer" prompt even though the build
+is self-signed and not notarized. This bypasses Gatekeeper's check for this app --
+you are trusting this tap when you install it.
 
 ## Update
 

@@ -43,8 +43,9 @@ brew tap anlostsheep/clipboard
 brew install --cask clipboardapp
 ```
 
-Homebrew 安装 cask 时会去掉 quarantine 属性,App 直接打开,不会遇到 Gatekeeper 首次打开
-拦截(尽管本构建是自签名、未公证)。更新用 `brew upgrade --cask clipboardapp`。
+本 cask 在安装后通过 postflight 移除 quarantine 属性,App 直接打开,不会遇到 Gatekeeper
+首次打开拦截(尽管本构建是自签名、未公证)。这会绕过 Gatekeeper 对该 App 的校验,前提是你
+信任本 tap。更新用 `brew upgrade --cask clipboardapp`。
 
 不使用 Homebrew 时,也可以从发布包安装。
 
