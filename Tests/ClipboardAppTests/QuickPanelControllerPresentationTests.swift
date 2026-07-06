@@ -411,6 +411,40 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
             "Keep-open must leave the panel visible after submit completes.")
     }
 
+    // MARK: - Frontmost application tracking (keep-open)
+
+    func testShouldAdoptActivatedApplicationIgnoresSelfActivation() {
+        XCTAssertFalse(
+            QuickPanelFrontmostAppTracking.shouldAdoptActivatedApplication(
+                activatedBundleIdentifier: "com.example.ClipboardApp",
+                ownBundleIdentifier: "com.example.ClipboardApp"
+            ),
+            "Activating this app itself (e.g. the panel gaining focus) must not change the paste target."
+        )
+    }
+
+    func testShouldAdoptActivatedApplicationAcceptsForeignApplication() {
+        XCTAssertTrue(
+            QuickPanelFrontmostAppTracking.shouldAdoptActivatedApplication(
+                activatedBundleIdentifier: "com.apple.TextEdit",
+                ownBundleIdentifier: "com.example.ClipboardApp"
+            ),
+            "Activating a different app while the keep-open panel is visible should retarget the paste."
+        )
+    }
+
+    func testShouldAdoptActivatedApplicationFollowsRememberPreviousApplicationSemanticsForNilBundleIdentifier() {
+        // Same guard as `rememberPreviousApplication`: `nil != ownBundleIdentifier`
+        // evaluates true, so an activated app with no bundle identifier is
+        // still adopted as the new paste target.
+        XCTAssertTrue(
+            QuickPanelFrontmostAppTracking.shouldAdoptActivatedApplication(
+                activatedBundleIdentifier: nil,
+                ownBundleIdentifier: "com.example.ClipboardApp"
+            )
+        )
+    }
+
     func testCopySelectionOnlyKeepsPanelVisibleWhenKeepOpenEnabled() async throws {
         let store = InMemoryHistoryStore()
         let payloadStore = InMemoryPayloadStore()

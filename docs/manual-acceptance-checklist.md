@@ -648,3 +648,5 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [ ] 关闭该设置后恢复现状：粘贴后面板关闭。
 - [ ] 保留面板时 Esc 关闭面板并归还焦点。
 - [ ] （风险验证）自动粘贴 + 保留面板在 Terminal / 浏览器地址栏均能正确投递 Cmd+V；若不可靠，按 spec 降级为仅"仅复制"模式生效并在 spec 追记。
+- [ ] 保留面板开启时：先粘贴到 App A，再点击 App B 的输入框，回到面板选择另一条记录粘贴，内容落在 App B。
+- [ ] 保留面板开启时：粘贴完成后面板仍可见但目标 App 持有焦点；点击面板可恢复键盘操作（Return/方向键/数字键）。

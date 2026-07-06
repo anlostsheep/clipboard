@@ -14,6 +14,26 @@ enum TriggerSource {
     case statusBarClick(iconOrigin: NSPoint)
 }
 
+// MARK: - Frontmost Application Tracking
+
+/// Pure decision logic for whether a newly activated application should
+/// become the new paste target while the keep-open panel stays visible.
+/// Extracted so it is unit-testable without a real `NSWorkspace` notification.
+enum QuickPanelFrontmostAppTracking {
+    /// - Parameters:
+    ///   - activatedBundleIdentifier: `bundleIdentifier` of the application reported by
+    ///     `NSWorkspace.didActivateApplicationNotification`, if available.
+    ///   - ownBundleIdentifier: `Bundle.main.bundleIdentifier`, i.e. this app itself.
+    /// - Returns: `true` when the activation should update `previousApplication`
+    ///   (same "is this a foreign app" guard as `rememberPreviousApplication`).
+    static func shouldAdoptActivatedApplication(
+        activatedBundleIdentifier: String?,
+        ownBundleIdentifier: String?
+    ) -> Bool {
+        activatedBundleIdentifier != ownBundleIdentifier
+    }
+}
+
 // MARK: - QuickPanelController
 
 @MainActor
@@ -29,6 +49,7 @@ final class QuickPanelController {
     private let quitApplication: () -> Void
     private var panel: NSPanel?
     private var previousApplication: NSRunningApplication?
+    private var frontmostAppObserver: NSObjectProtocol?
 
     /// Bottom-left origin of the status-bar icon, updated by the menu-bar item
     /// before calling `toggle(trigger: .statusBarClick(...))`.
@@ -73,6 +94,7 @@ final class QuickPanelController {
 
     func show(trigger: TriggerSource = .hotkey) {
         rememberPreviousApplication()
+        startObservingFrontmostApplication()
         let panel = panel ?? makePanel()
         self.panel = panel
         panel.hidesOnDeactivate = !keepOpenAfterPaste()
@@ -91,6 +113,7 @@ final class QuickPanelController {
 
     func hide() {
         panel?.orderOut(nil)
+        stopObservingFrontmostApplication()
     }
 
     func cancel() {
@@ -200,6 +223,43 @@ final class QuickPanelController {
     private func rememberPreviousApplication() {
         let front = NSWorkspace.shared.frontmostApplication
         previousApplication = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
+    }
+
+    /// While the keep-open panel stays visible, the user can click into a
+    /// different app before pasting again. Without this, the next paste would
+    /// keep activating the app that was frontmost when the panel first opened,
+    /// defeating the point of keep-open (pasting into several different targets
+    /// in a row). This observer keeps `previousApplication` current with
+    /// whichever foreign app last became frontmost.
+    private func startObservingFrontmostApplication() {
+        guard frontmostAppObserver == nil else { return }
+        frontmostAppObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            let activated = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            Task { @MainActor in
+                self.handleApplicationActivated(activated)
+            }
+        }
+    }
+
+    private func stopObservingFrontmostApplication() {
+        guard let observer = frontmostAppObserver else { return }
+        NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        frontmostAppObserver = nil
+    }
+
+    private func handleApplicationActivated(_ app: NSRunningApplication?) {
+        guard QuickPanelFrontmostAppTracking.shouldAdoptActivatedApplication(
+            activatedBundleIdentifier: app?.bundleIdentifier,
+            ownBundleIdentifier: Bundle.main.bundleIdentifier
+        ) else {
+            return
+        }
+        previousApplication = app
     }
 
     func submitSelection() {
