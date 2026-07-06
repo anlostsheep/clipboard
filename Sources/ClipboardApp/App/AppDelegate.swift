@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindowController: NSWindowController?
     private var settingsWindow: NSWindow?
     private var healthSubscriber: AnyCancellable?
+    private var capturePausedSubscriber: AnyCancellable?
 
     // Explicit entry point: Swift's default `@main` synthesis on an
     // NSApplicationDelegate class does not set this instance as the application
@@ -85,6 +86,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         healthSubscriber = services.$storageHealth.sink { [weak self] health in
             self?.statusBarController.updateStorageHealth(health)
         }
+
+        // Keep the status bar icon in sync with capture-paused changes
+        // triggered outside the status bar itself (e.g. the settings page).
+        capturePausedSubscriber = services.$capturePaused
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.statusBarController?.captureStateDidChange()
+            }
     }
 
     // MARK: - Hot Key

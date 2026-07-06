@@ -4,15 +4,54 @@ import XCTest
 
 final class StatusBarControllerTests: XCTestCase {
     func testMissingCurrentEventFallsBackToOpeningPanel() {
-        XCTAssertEqual(StatusBarController.clickAction(for: nil), .openPanel)
+        XCTAssertEqual(StatusBarController.clickAction(for: nil, modifiers: []), .openPanel)
     }
 
     func testRightMouseUpShowsMenu() {
-        XCTAssertEqual(StatusBarController.clickAction(for: .rightMouseUp), .showMenu)
+        XCTAssertEqual(StatusBarController.clickAction(for: .rightMouseUp, modifiers: []), .showMenu)
     }
 
     func testLeftMouseUpOpensPanel() {
-        XCTAssertEqual(StatusBarController.clickAction(for: .leftMouseUp), .openPanel)
+        XCTAssertEqual(StatusBarController.clickAction(for: .leftMouseUp, modifiers: []), .openPanel)
+    }
+
+    func testLeftClickWithoutModifiersOpensPanel() {
+        XCTAssertEqual(
+            StatusBarController.clickAction(for: .leftMouseUp, modifiers: []),
+            .openPanel)
+    }
+
+    func testRightClickShowsMenuRegardlessOfModifiers() {
+        XCTAssertEqual(
+            StatusBarController.clickAction(for: .rightMouseUp, modifiers: [.option]),
+            .showMenu)
+    }
+
+    func testOptionLeftClickTogglesPause() {
+        XCTAssertEqual(
+            StatusBarController.clickAction(for: .leftMouseUp, modifiers: [.option]),
+            .togglePause)
+    }
+
+    func testOptionShiftLeftClickIgnoresNextCopy() {
+        XCTAssertEqual(
+            StatusBarController.clickAction(for: .leftMouseUp, modifiers: [.option, .shift]),
+            .ignoreNextCopy)
+    }
+
+    func testOtherModifierCombinationsOpenPanel() {
+        XCTAssertEqual(
+            StatusBarController.clickAction(for: .leftMouseUp, modifiers: [.command]),
+            .openPanel)
+        XCTAssertEqual(
+            StatusBarController.clickAction(for: .leftMouseUp, modifiers: [.shift]),
+            .openPanel)
+    }
+
+    func testNilEventTypeDefaultsToOpenPanel() {
+        XCTAssertEqual(
+            StatusBarController.clickAction(for: nil, modifiers: [.option]),
+            .openPanel)
     }
 
     @MainActor

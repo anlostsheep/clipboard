@@ -5,6 +5,8 @@ final class StatusBarController {
     enum ClickAction {
         case openPanel
         case showMenu
+        case togglePause
+        case ignoreNextCopy
     }
 
     private var statusItem: NSStatusItem?
@@ -34,8 +36,6 @@ final class StatusBarController {
 
     func setup() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Clipboard")
-        item.button?.image?.isTemplate = true
         item.button?.target = self
         item.button?.action = #selector(handleClick(_:))
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -54,8 +54,20 @@ final class StatusBarController {
         refreshIcon()
     }
 
+    /// Call when capture-paused state changes outside this controller
+    /// (settings toggle, programmatic pause) so the icon stays in sync.
+    func captureStateDidChange() {
+        refreshIcon()
+    }
+
     private func refreshIcon() {
         guard let button = statusItem?.button else { return }
+        let paused = isCapturePaused()
+        // Shape communicates paused state; tint communicates storage health.
+        let symbolName = paused ? "pause.circle" : "doc.on.clipboard"
+        let description = paused ? "Clipboard（已暂停采集）" : "Clipboard"
+        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description)
+        button.image?.isTemplate = true
         switch storageHealth {
         case .ok:
             button.contentTintColor = nil
@@ -72,19 +84,37 @@ final class StatusBarController {
 
     @MainActor @objc private func handleClick(_ sender: NSStatusBarButton) {
         let currentEvent = NSApp.currentEvent
-        switch Self.clickAction(for: currentEvent?.type) {
+        let modifiers = currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask) ?? []
+        switch Self.clickAction(for: currentEvent?.type, modifiers: modifiers) {
         case .openPanel:
             onLeftClick(iconOrigin)
         case .showMenu:
             showContextMenu()
+        case .togglePause:
+            onToggleCapture()
+            refreshIcon()
+        case .ignoreNextCopy:
+            onIgnoreNextCopy()
         }
     }
 
-    nonisolated static func clickAction(for eventType: NSEvent.EventType?) -> ClickAction {
+    nonisolated static func clickAction(
+        for eventType: NSEvent.EventType?,
+        modifiers: NSEvent.ModifierFlags
+    ) -> ClickAction {
         guard let eventType else {
             return .openPanel
         }
-        return eventType == .rightMouseUp ? .showMenu : .openPanel
+        if eventType == .rightMouseUp {
+            return .showMenu
+        }
+        if modifiers.contains(.option) && modifiers.contains(.shift) {
+            return .ignoreNextCopy
+        }
+        if modifiers.contains(.option) {
+            return .togglePause
+        }
+        return .openPanel
     }
 
     @MainActor
@@ -127,6 +157,7 @@ final class StatusBarController {
 
     @MainActor @objc private func toggleCapture() {
         onToggleCapture()
+        refreshIcon()
     }
 
     @MainActor @objc private func ignoreNextCopy() {
