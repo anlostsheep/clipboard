@@ -54,11 +54,10 @@ ad-hoc 签名的开发构建签名身份不稳定，SMAppService 注册可能失
 
 ### 查询路径（不改存储层协议）
 
-- `QuickPanelViewModel.refresh`：
+- **Plan 阶段修正**：现有实现中 `QuickPanelViewModel.refresh` 走 `store.fetchAll()` + 内存内 `HistoryQuery.matches` 过滤 + 内存内排序，SQLite store 本身持有全量内存索引（`indexByHash`），不存在 SQL 层文本过滤。因此模糊搜索直接落在 ViewModel：
   - query 为空 → 走现有路径，完全不变（排序见切片 3）。
-  - query 非空 → 以**空文本 + 类型筛选**调用 `fetchPage`（类型过滤仍在 SQL 层），在 ViewModel 内用 FuzzyMatcher 对 title / plainTextPreview / sourceAppName 打分、过滤、排序。
-- 不能在 SQL 层做文本预过滤：LIKE substring 会漏掉非连续子序列命中，模糊匹配必须拿到全量候选。
-- 候选集上限：默认按历史上限全量（最高 5 万条轻量元数据字段，纯 Swift 打分预期毫秒级，输入侧已有 debounce）。合入前用仓库 benchmark 流程验证；若实测退化，降级为"最近 1 万条"并在本文档追记取舍。
+  - query 非空 → 仍用 `fetchAll()` 拿全量，类型/分组过滤沿用 `HistoryQuery`（文本置空），文本匹配改用 FuzzyMatcher 对 title / plainTextPreview / sourceAppName 打分、过滤、排序。
+- 候选集天然为全量内存索引（最高 5 万条轻量元数据字段，纯 Swift 打分预期毫秒级，输入侧已有 debounce）。合入前用仓库 benchmark 流程验证；若实测退化，降级为"最近 1 万条"并在本文档追记取舍。
 
 ### 排序语义（搜索激活时）
 
@@ -73,7 +72,7 @@ ad-hoc 签名的开发构建签名身份不稳定，SMAppService 注册可能失
 ## 切片 3：排序选项
 
 - 新枚举 `HistorySortOrder`：`lastCopied`（默认，现状）/ `firstCopied` / `copyCount`。
-- `HistoryQuery` 增加 `sortOrder` 字段（带默认值，协议兼容）；`SQLiteHistoryStore` 映射到 ORDER BY，`InMemoryHistoryStore` 同步实现，两者用同一组测试对齐行为。
+- **Plan 阶段修正**：排序真实发生在 `QuickPanelViewModel.quickPanelSort`（内存内），不在 SQL。因此不改 `HistoryQuery` 与两个 store，`QuickPanelViewModel.refresh` 增加 `sortOrder` 参数（带默认值，调用方兼容），排序比较器按其分支。`firstCopied` 使用已存在的 `createdAt` 列（schema 已确认，无迁移）。
 - 设置项放「历史」页。
 - 作用范围：只影响**空 query 浏览**时 History 区的排序；Pinned 区仍按 pinnedAt；搜索激活时按 fuzzy 得分（切片 2 语义）。数字快捷键跟随可视顺序（现有行为自动继承）。
 - `firstCopied` 依赖首次复制时间列；plan 阶段确认现有 schema，若只有 createdAt 则直接用，不引入迁移。
