@@ -164,6 +164,7 @@ final class QuickPanelState: ObservableObject {
   @Published private(set) var query = ""
   @Published private(set) var contentFilter: QuickPanelContentFilter = .all
   @Published private(set) var items: [ClipboardRecord] = []
+  @Published private(set) var matchOffsets: [UUID: [Int]] = [:]
   @Published private(set) var selectedIndex = 0
   @Published private(set) var footerStatus = "Ready"
   @Published private(set) var actionPrompt: QuickPanelActionPrompt?
@@ -717,6 +718,7 @@ final class QuickPanelState: ObservableObject {
     }
 
     items = refreshedItems
+    matchOffsets = await viewModel.searchMatches.mapValues(\.primaryTextOffsets)
     selectedIndex = refreshedSelectedIndex
     selectedRecordID = items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil
     pendingOpenSelectionBehavior = nil

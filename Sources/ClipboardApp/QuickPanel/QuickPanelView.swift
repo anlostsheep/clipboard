@@ -323,6 +323,7 @@ struct QuickPanelView: View {
       isSelected: row.index == state.selectedIndex,
       shortcut: shortcut(for: row),
       sourceIcon: sourceAppIconProvider.icon(for: row.record),
+      highlightOffsets: state.matchOffsets[row.record.id] ?? [],
       imagePreviewLoader: { record in
         await state.imagePreview(for: record)
       }
@@ -558,6 +559,7 @@ private struct QuickPanelRow: View {
   let isSelected: Bool
   let shortcut: QuickPanelRowShortcut?
   let sourceIcon: NSImage?
+  let highlightOffsets: [Int]
   let imagePreviewLoader: (ClipboardRecord) async -> NSImage?
   @State private var imagePreview: NSImage?
 
@@ -578,7 +580,8 @@ private struct QuickPanelRow: View {
           record: record,
           imagePreview: imagePreview,
           contentVisual: QuickPanelRowPresentation.contentVisual(for: record),
-          isSelected: isSelected
+          isSelected: isSelected,
+          highlightOffsets: highlightOffsets
         )
 
         if showsSourceName {
@@ -695,6 +698,7 @@ private struct ContentPreviewView: View {
   let imagePreview: NSImage?
   let contentVisual: QuickPanelContentVisual
   let isSelected: Bool
+  let highlightOffsets: [Int]
 
   @ViewBuilder
   var body: some View {
@@ -724,7 +728,10 @@ private struct ContentPreviewView: View {
       }
     case .text:
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text(QuickPanelRowPresentation.primaryContentText(for: record))
+        Text(QuickPanelHighlight.attributed(
+          text: QuickPanelRowPresentation.primaryContentText(for: record),
+          highlightOffsets: highlightOffsets
+        ))
           .font(.callout.weight(.semibold))
           .lineLimit(1)
           .foregroundStyle(isSelected ? .white : .primary)
