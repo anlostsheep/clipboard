@@ -77,6 +77,9 @@ public enum FuzzyMatcher {
     for pair in zip(offsets, offsets.dropFirst()) where pair.1 == pair.0 + 1 {
       score += consecutiveBonus
     }
-    return FuzzyMatch(score: score, matchedOffsets: offsets)
+    // Cap below the substring tier's floor (substringBaseScore - 100) so a
+    // long subsequence match can never outrank any full substring hit.
+    let cappedScore = min(score, substringBaseScore - 101)
+    return FuzzyMatch(score: cappedScore, matchedOffsets: offsets)
   }
 }

@@ -60,6 +60,22 @@ final class FuzzyMatcherTests: XCTestCase {
         XCTAssertNil(FuzzyMatcher.match(query: "a", in: ""))
     }
 
+    func testLongSubsequenceNeverOutranksSubstring() {
+        // A near-contiguous 500-char subsequence (broken once in the middle)
+        // must still score strictly below any full substring hit, even one
+        // starting at a heavily penalized offset.
+        let query = String(repeating: "a", count: 500)
+        let subsequenceCandidate =
+            String(repeating: "a", count: 250) + "b" + String(repeating: "a", count: 250)
+        let substringCandidate = String(repeating: "x", count: 120) + query
+
+        let subsequence = FuzzyMatcher.match(query: query, in: subsequenceCandidate)!
+        let substring = FuzzyMatcher.match(query: query, in: substringCandidate)!
+
+        XCTAssertGreaterThan(substring.score, subsequence.score)
+        XCTAssertLessThan(subsequence.score, FuzzyMatcher.substringBaseScore - 100)
+    }
+
     func testEarlierSubstringStartScoresHigher() {
         let early = FuzzyMatcher.match(query: "clip", in: "clipboard")!
         let late = FuzzyMatcher.match(query: "clip", in: "my clipboard")!
