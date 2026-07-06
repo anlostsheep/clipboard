@@ -640,3 +640,11 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [ ] Option+Shift+点击菜单栏图标后，下一次复制不入历史，再下一次恢复正常。
 - [ ] 从设置页切换"暂停采集"时菜单栏图标同步更新。
 - [ ] 暂停态与存储健康色（橙/红）可同时呈现，互不覆盖。
+
+## 粘贴后保留面板(QuickPanel keepOpenAfterPaste)
+
+- [ ] 开启"粘贴后保留面板"后：自动粘贴模式下 Return 粘贴成功，目标 App 收到内容且面板保持可见。
+- [ ] 同设置下"仅复制"模式：选择后面板保持可见，手动 Cmd+V 粘贴成功。
+- [ ] 关闭该设置后恢复现状：粘贴后面板关闭。
+- [ ] 保留面板时 Esc 关闭面板并归还焦点。
+- [ ] （风险验证）自动粘贴 + 保留面板在 Terminal / 浏览器地址栏均能正确投递 Cmd+V；若不可靠，按 spec 降级为仅"仅复制"模式生效并在 spec 追记。

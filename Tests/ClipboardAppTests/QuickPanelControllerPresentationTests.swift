@@ -360,6 +360,82 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
             "QuickPanel should become visible immediately, before capture/refresh work finishes."
         )
     }
+
+    func testSubmitSelectionHidesPanelByDefault() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let record = makePresentationRecord()
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.text("keep-open default payload"), for: record.id)
+        let state = makePresentationState(store: store, payloadStore: payloadStore)
+        let controller = QuickPanelController(
+            state: state,
+            autoPasteEnabled: { false },
+            keepOpenAfterPaste: { false }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        controller.submitSelection()
+
+        XCTAssertFalse(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Default behavior must hide the panel on submit.")
+    }
+
+    func testSubmitSelectionKeepsPanelVisibleWhenKeepOpenEnabled() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let record = makePresentationRecord()
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.text("keep-open submit payload"), for: record.id)
+        let state = makePresentationState(store: store, payloadStore: payloadStore, pasteboard: pasteboard)
+        let controller = QuickPanelController(
+            state: state,
+            autoPasteEnabled: { false },
+            keepOpenAfterPaste: { true }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        controller.submitSelection()
+        try await waitUntil("submit selection to write the pasteboard") {
+            pasteboard.lastText != nil
+        }
+
+        XCTAssertTrue(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Keep-open must leave the panel visible after submit completes.")
+    }
+
+    func testCopySelectionOnlyKeepsPanelVisibleWhenKeepOpenEnabled() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let record = makePresentationRecord()
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.text("keep-open copy payload"), for: record.id)
+        let state = makePresentationState(store: store, payloadStore: payloadStore, pasteboard: pasteboard)
+        let controller = QuickPanelController(
+            state: state,
+            keepOpenAfterPaste: { true }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        controller.copySelectionOnly()
+        try await waitUntil("copy-only selection to write the pasteboard") {
+            pasteboard.lastText != nil
+        }
+
+        XCTAssertTrue(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Keep-open must leave the panel visible after copy-only completes.")
+    }
 }
 
 /// Polls `condition` on the main actor until it holds or `timeout` elapses.

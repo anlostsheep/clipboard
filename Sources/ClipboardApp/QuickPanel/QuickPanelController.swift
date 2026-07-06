@@ -22,6 +22,7 @@ final class QuickPanelController {
     private let prepareForShow: @MainActor () async -> Void
     private let autoPasteEnabled: () -> Bool
     private let isAutoPasteAuthorized: () -> Bool
+    private let keepOpenAfterPaste: () -> Bool
     private let requestAccessibilityAuthorizationAction: () -> Void
     private let openSelectionBehavior: () -> QuickPanelOpenSelectionBehavior
     private let activatePreviousApplication: (NSRunningApplication?) -> Void
@@ -38,6 +39,7 @@ final class QuickPanelController {
         prepareForShow: @escaping @MainActor () async -> Void = {},
         autoPasteEnabled: @escaping () -> Bool = { ClipboardAppSettings.quickPanelAutoPasteEnabled() },
         isAutoPasteAuthorized: @escaping () -> Bool = { AccessibilityAuthorizationProbe.settingsTrusted() },
+        keepOpenAfterPaste: @escaping () -> Bool = { ClipboardAppSettings.quickPanelKeepOpenAfterPaste() },
         requestAccessibilityAuthorization: @escaping () -> Void = { AccessibilityAuthorizationProbe.requestAuthorizationPrompt() },
         openSelectionBehavior: @escaping () -> QuickPanelOpenSelectionBehavior = { ClipboardAppSettings.quickPanelOpenSelectionBehavior() },
         activatePreviousApplication: @escaping (NSRunningApplication?) -> Void = { app in
@@ -54,6 +56,7 @@ final class QuickPanelController {
         self.prepareForShow = prepareForShow
         self.autoPasteEnabled = autoPasteEnabled
         self.isAutoPasteAuthorized = isAutoPasteAuthorized
+        self.keepOpenAfterPaste = keepOpenAfterPaste
         self.requestAccessibilityAuthorizationAction = requestAccessibilityAuthorization
         self.openSelectionBehavior = openSelectionBehavior
         self.activatePreviousApplication = activatePreviousApplication
@@ -72,6 +75,7 @@ final class QuickPanelController {
         rememberPreviousApplication()
         let panel = panel ?? makePanel()
         self.panel = panel
+        panel.hidesOnDeactivate = !keepOpenAfterPaste()
 
         state.prepareForPresentation(openSelectionBehavior: openSelectionBehavior())
         position(panel, trigger: trigger)
@@ -206,20 +210,32 @@ final class QuickPanelController {
             return
         }
 
-        hide()
+        let keepOpen = keepOpenAfterPaste()
+        if !keepOpen {
+            hide()
+        }
         activatePreviousApplication(targetApplication)
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 120_000_000)
             await state.selectCurrent(autoPaste: autoPaste)
+            if keepOpen {
+                await state.refresh()
+            }
         }
     }
 
     func copySelectionOnly() {
         let targetApplication = previousApplication
-        hide()
+        let keepOpen = keepOpenAfterPaste()
+        if !keepOpen {
+            hide()
+        }
         activatePreviousApplication(targetApplication)
         Task { @MainActor in
             await state.selectCurrent(autoPaste: false)
+            if keepOpen {
+                await state.refresh()
+            }
         }
     }
 
@@ -235,10 +251,16 @@ final class QuickPanelController {
             }
 
             let targetApplication = previousApplication
-            hide()
+            let keepOpen = keepOpenAfterPaste()
+            if !keepOpen {
+                hide()
+            }
             activatePreviousApplication(targetApplication)
             try? await Task.sleep(nanoseconds: 120_000_000)
             await state.pasteHistoryShortcut(number: number)
+            if keepOpen {
+                await state.refresh()
+            }
         }
     }
 
@@ -255,10 +277,16 @@ final class QuickPanelController {
             }
 
             let targetApplication = previousApplication
-            hide()
+            let keepOpen = keepOpenAfterPaste()
+            if !keepOpen {
+                hide()
+            }
             activatePreviousApplication(targetApplication)
             try? await Task.sleep(nanoseconds: 120_000_000)
             await state.pastePlainText(request)
+            if keepOpen {
+                await state.refresh()
+            }
         }
     }
 

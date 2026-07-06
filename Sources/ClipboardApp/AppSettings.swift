@@ -73,6 +73,12 @@ enum ClipboardAppSettings {
         !quickPanelReturnCopiesOnly(defaults: defaults)
     }
 
+    static let quickPanelKeepOpenAfterPasteKey = "quickPanel.keepOpenAfterPaste"
+
+    static func quickPanelKeepOpenAfterPaste(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: quickPanelKeepOpenAfterPasteKey)
+    }
+
     // MARK: - Hotkey
     static let hotkeyKeyCodeKey = "hotkey.keyCode"
     static let hotkeyModifiersKey = "hotkey.modifiers"

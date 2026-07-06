@@ -21,6 +21,9 @@ struct GeneralSettingsView: View {
     @AppStorage(ClipboardAppSettings.quickPanelReturnCopiesOnlyKey)
     private var returnCopiesOnly: Bool = false
 
+    @AppStorage(ClipboardAppSettings.quickPanelKeepOpenAfterPasteKey)
+    private var keepOpenAfterPaste: Bool = false
+
     @AppStorage(ClipboardAppSettings.appearanceModeKey)
     private var appearanceModeRaw: String = AppearanceMode.system.rawValue
 
@@ -191,6 +194,11 @@ struct GeneralSettingsView: View {
                     }
                     .font(.caption)
                 }
+
+                Toggle("粘贴后保留面板", isOn: $keepOpenAfterPaste)
+                Text("开启后，选择记录粘贴/复制完成时快捷面板保持打开，便于连续粘贴多条；Esc 随时关闭。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

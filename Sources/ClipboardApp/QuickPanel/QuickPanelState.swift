@@ -598,7 +598,6 @@ final class QuickPanelState: ObservableObject {
 
   private func currentRecordAndPayloadAfterRefresh() async -> (record: ClipboardRecord, payload: ClipboardPayload)? {
     let selectionQuery = query
-    let recordID = currentRecordID
     await refresh()
 
     guard selectionQuery == query else {
@@ -607,7 +606,10 @@ final class QuickPanelState: ObservableObject {
       return nil
     }
 
-    guard let recordID else {
+    // Read the selected record id after `refresh()` completes: a caller may
+    // invoke this before the panel's own initial-presentation refresh has
+    // populated `items`, in which case the pre-refresh id would be stale/nil.
+    guard let recordID = currentRecordID else {
       setUserActionFooterStatus("No clipboard item selected")
       return nil
     }
