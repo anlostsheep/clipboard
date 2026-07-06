@@ -27,6 +27,9 @@ struct GeneralSettingsView: View {
     @State private var conflictMessage: String = ""
     @StateObject private var accessibilityPermission = AccessibilityPermissionState()
 
+    private let loginItemManager: LoginItemManaging = SMAppServiceLoginItemManager()
+    @State private var loginItemStatus: LoginItemStatus = .notRegistered
+
     private var positionMode: Binding<PanelPositionMode> {
         Binding(
             get: { PanelPositionMode(rawValue: positionModeRaw) ?? .center },
@@ -67,6 +70,32 @@ struct GeneralSettingsView: View {
                 .onChange(of: appearanceModeRaw) { _, newRaw in
                     let mode = AppearanceMode(rawValue: newRaw) ?? .system
                     AppearanceController.apply(mode)
+                }
+            }
+
+            Section("启动") {
+                let presentation = LoginItemSettingPresentation.make(from: loginItemStatus)
+                Toggle("登录时自动启动", isOn: Binding(
+                    get: { presentation.isOn },
+                    set: { newValue in
+                        try? loginItemManager.setEnabled(newValue)
+                        loginItemStatus = loginItemManager.currentStatus()
+                    }
+                ))
+                .disabled(!presentation.isToggleEnabled)
+
+                if let hint = presentation.hint {
+                    HStack {
+                        Text(hint)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        if presentation.showsOpenSettingsButton {
+                            Spacer()
+                            Button("打开系统设置") {
+                                loginItemManager.openSystemLoginItemsSettings()
+                            }
+                        }
+                    }
                 }
             }
 
@@ -165,7 +194,10 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { accessibilityPermission.refresh() }
+        .onAppear {
+            accessibilityPermission.refresh()
+            loginItemStatus = loginItemManager.currentStatus()
+        }
         .onReceive(accessibilityRefreshTimer) { _ in
             accessibilityPermission.refresh()
         }

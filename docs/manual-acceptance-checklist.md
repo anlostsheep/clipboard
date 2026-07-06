@@ -614,3 +614,10 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - 补跑推迟说明 2026-07-02(以下三项暂缓,非遗漏):
   - `brew upgrade --cask clipboardapp` N→N+1 与"升级后辅助功能权限保持":需存在更高版本才能测,推迟到真正的 0.2.0 发布时一并验证(升级后 postflight 亦应再次去 quarantine)。
   - `brew uninstall --cask --zap clipboardapp`:本机数据目录 `~/Library/Application Support/com.local.clipboard-manager` 为 2.5GB 真实剪贴板历史(与日常使用共用同一 bundle id),zap 会永久删除,故此项只能在干净测试账户/另一台机验收,不在维护者主力机执行。
+
+## 开机自启(LoginItemManager + 设置 UI)
+
+- [ ] 设置「通用 › 启动」开启"登录时自动启动"后，重启 macOS，ClipboardApp 自动出现在菜单栏（稳定自签名构建验证）。
+- [ ] 关闭"登录时自动启动"后，系统设置「登录项」中对应条目消失，重启后不再自动启动。
+- [ ] 系统设置中手动移除登录项后，重新打开设置页，开关正确显示为关闭状态。
+- [ ] `swift run` 场景（非 .app 包）下开关禁用并显示原因说明。
