@@ -598,6 +598,12 @@ final class QuickPanelState: ObservableObject {
 
   private func currentRecordAndPayloadAfterRefresh() async -> (record: ClipboardRecord, payload: ClipboardPayload)? {
     let selectionQuery = query
+    // Capture the record the user had selected before the refresh. `applyRefresh`
+    // may reassign `selectedRecordID` (e.g. falling back to the top record) when
+    // the previously selected record vanished from the refreshed list; if we read
+    // `currentRecordID` only after `refresh()` we would silently adopt that
+    // fallback and paste a different record than the one the user picked.
+    let preRefreshRecordID = currentRecordID
     await refresh()
 
     guard selectionQuery == query else {
@@ -606,14 +612,18 @@ final class QuickPanelState: ObservableObject {
       return nil
     }
 
-    // Read the selected record id after `refresh()` completes: a caller may
-    // invoke this before the panel's own initial-presentation refresh has
-    // populated `items`, in which case the pre-refresh id would be stale/nil.
-    guard let recordID = currentRecordID else {
+    // Prefer the record selected before the refresh; fall back to the
+    // post-refresh selection only when nothing was selected yet (e.g. this is
+    // called before the panel's own initial-presentation refresh has
+    // populated `items`, in which case the pre-refresh id would be stale/nil).
+    guard let recordID = preRefreshRecordID ?? currentRecordID else {
       setUserActionFooterStatus("No clipboard item selected")
       return nil
     }
 
+    // If the pre-refresh record vanished from the refreshed list, this lookup
+    // fails and falls into the existing "no longer visible" path below —
+    // it must never fall back to pasting the post-refresh top record.
     guard let record = items.first(where: { $0.id == recordID }) else {
       setUserActionFooterStatus("Selected item is no longer visible")
       return nil

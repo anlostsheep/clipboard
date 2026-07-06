@@ -208,6 +208,36 @@ final class QuickPanelStateFilterTests: XCTestCase {
     XCTAssertEqual(pasteboard.lastText, "first payload")
   }
 
+  func testSelectCurrentNeverPastesSubstituteWhenSelectedRecordVanishesMidRefresh() async throws {
+    // Regression test: `selectCurrent` used to read the selected record id
+    // AFTER `refresh()` completed. If the previously selected record vanished
+    // from the store between selection and invocation (eviction, deletion,
+    // pushed past the page limit), `applyRefresh` reassigns `selectedRecordID`
+    // to the new top record, and the paste would silently target that
+    // substitute record instead of surfacing a failure.
+    let store = InMemoryHistoryStore()
+    let payloadStore = InMemoryPayloadStore()
+    let pasteboard = AppTestPasteboardWriter()
+    let selected = makePanelRecord(hash: "selected", title: "Selected", type: .text, lastCopiedAt: 2)
+    let other = makePanelRecord(hash: "other", title: "Other", type: .text, lastCopiedAt: 1)
+    _ = try await store.upsert(selected)
+    _ = try await store.upsert(other)
+    try await payloadStore.save(.text("selected payload"), for: selected.id)
+    try await payloadStore.save(.text("other payload"), for: other.id)
+    let state = makeState(store: store, payloadStore: payloadStore, pasteboard: pasteboard)
+
+    await state.refresh()
+    state.selectItem(at: 0)
+    XCTAssertEqual(state.items[state.selectedIndex].title, "Selected")
+
+    // Remove the selected record from the store behind the panel's back.
+    _ = try await store.deleteRecord(id: selected.id)
+
+    await state.selectCurrent(autoPaste: false)
+
+    XCTAssertNil(pasteboard.lastText, "Must not paste a substitute record when the selection vanished.")
+    XCTAssertEqual(state.footerStatus, "Selected item is no longer visible")
+  }
 
   func testContentTypeFilterRefreshesVisibleItems() async throws {
     let store = InMemoryHistoryStore()
