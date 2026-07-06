@@ -702,6 +702,11 @@ final class QuickPanelState: ObservableObject {
 
     let selectionRecordID = selectedRecordID
     let refreshedItems = await viewModel.items
+    // Read match offsets before publishing any state: an await between the
+    // `items` and `matchOffsets` assignments would let SwiftUI render a frame
+    // with new items but stale offsets (one-frame highlight mismatch across
+    // the actor hop).
+    let refreshedOffsets = await viewModel.searchMatches.mapValues(\.primaryTextOffsets)
     let refreshedSelectedIndex: Int
     if pendingOpenSelectionBehavior == .latestRecord {
       refreshedSelectedIndex = defaultSelectionIndex(in: refreshedItems)
@@ -718,7 +723,7 @@ final class QuickPanelState: ObservableObject {
     }
 
     items = refreshedItems
-    matchOffsets = await viewModel.searchMatches.mapValues(\.primaryTextOffsets)
+    matchOffsets = refreshedOffsets
     selectedIndex = refreshedSelectedIndex
     selectedRecordID = items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil
     pendingOpenSelectionBehavior = nil
