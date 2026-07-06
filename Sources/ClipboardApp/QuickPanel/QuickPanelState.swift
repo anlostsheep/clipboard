@@ -684,7 +684,11 @@ final class QuickPanelState: ObservableObject {
     generation: Int,
     requireCurrentGeneration: Bool = true
   ) async -> Bool {
-    let didRefreshViewModel = await viewModel.refresh(query: querySnapshot, contentTypes: filterSnapshot.contentTypes)
+    let didRefreshViewModel = await viewModel.refresh(
+      query: querySnapshot,
+      contentTypes: filterSnapshot.contentTypes,
+      sortOrder: ClipboardAppSettings.historySortOrder()
+    )
     guard didRefreshViewModel else {
       return false
     }

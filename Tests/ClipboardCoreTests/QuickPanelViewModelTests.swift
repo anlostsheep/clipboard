@@ -313,4 +313,71 @@ final class QuickPanelViewModelTests: XCTestCase {
     XCTAssertEqual(items.count, 1)
     XCTAssertEqual(items.first?.sourceAppName, "Safari")
   }
+
+  func testDefaultSortOrderIsLastCopiedDescending() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "old", lastCopiedAt: 100))
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "new", lastCopiedAt: 200))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "")
+
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertEqual(titles, ["new", "old"])
+  }
+
+  func testCopyCountSortOrderRanksMostCopiedFirst() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "frequent", lastCopiedAt: 100, copyCount: 9))
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "recent", lastCopiedAt: 200))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "", sortOrder: .copyCount)
+
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertEqual(titles.first, "frequent")
+  }
+
+  func testFirstCopiedSortOrderUsesCreatedAtDescending() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "created-early", lastCopiedAt: 900, createdAt: 100))
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "created-late", lastCopiedAt: 600, createdAt: 500))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "", sortOrder: .firstCopied)
+
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertEqual(titles, ["created-late", "created-early"])
+  }
+
+  func testSortOrderDoesNotAffectPinnedSectionOrder() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "pinned-low", lastCopiedAt: 100, isPinned: true, pinnedAt: 100, copyCount: 1))
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "unpinned-high", lastCopiedAt: 200, copyCount: 50))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "", sortOrder: .copyCount)
+
+    let items = await viewModel.items
+    XCTAssertTrue(items[0].isPinned)
+  }
+
+  func testSortOrderIsIgnoredDuringActiveSearch() async throws {
+    // Fuzzy score ranking wins while a query is active: the substring hit
+    // outranks the scattered subsequence hit despite a huge copyCount.
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "cxxlxxixxp", lastCopiedAt: 100, copyCount: 99))
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "clip", lastCopiedAt: 50))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "clip", sortOrder: .copyCount)
+
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertEqual(titles.first, "clip")
+  }
 }

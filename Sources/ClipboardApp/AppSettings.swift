@@ -158,6 +158,16 @@ enum ClipboardAppSettings {
         return defaults.bool(forKey: notifyOnAutoEvictKey)
     }
 
+    static let historySortOrderKey = "history.sortOrder"
+
+    static func historySortOrder(defaults: UserDefaults = .standard) -> HistorySortOrder {
+        guard let raw = defaults.string(forKey: historySortOrderKey),
+              let order = HistorySortOrder(rawValue: raw) else {
+            return .lastCopied
+        }
+        return order
+    }
+
     // MARK: - Privacy
 
     static let ignoreUniversalClipboardKey = "privacy.ignoreUniversalClipboard"
@@ -254,6 +264,18 @@ enum StorageFailureStrategy: String, CaseIterable {
         case .continueEvicting: return "自动删除最旧记录直到能继续保存"
         case .pauseMonitoring:  return "暂停剪贴板监控"
         case .skipRecord:       return "跳过当前记录，不删除历史"
+        }
+    }
+}
+
+// MARK: - History Sort Order display
+
+extension HistorySortOrder {
+    var displayName: String {
+        switch self {
+        case .lastCopied:  return "最近复制"
+        case .firstCopied: return "首次复制"
+        case .copyCount:   return "复制次数"
         }
     }
 }

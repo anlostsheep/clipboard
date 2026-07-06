@@ -627,3 +627,9 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [ ] 关闭"登录时自动启动"后，系统设置「登录项」中对应条目消失，重启后不再自动启动。
 - [ ] 系统设置中手动移除登录项后，重新打开设置页，开关正确显示为关闭状态。
 - [ ] `swift run` 场景（非 .app 包）下开关禁用并显示原因说明。
+
+## 历史排序选项(HistorySortOrder)
+
+- [ ] 「历史」设置切到"复制次数"后，QuickPanel 空搜索浏览时高频记录排前。
+- [ ] 切回"最近复制"后恢复现状排序；置顶区顺序在三种排序下都不变。
+- [ ] 排序为"复制次数"时数字快捷键 Cmd+1~9 跟随新的可视顺序。

@@ -37,7 +37,8 @@ public actor QuickPanelViewModel {
   public func refresh(
     query: String,
     contentTypes: Set<ClipboardContentType> = [],
-    groupIDs: Set<String> = []
+    groupIDs: Set<String> = [],
+    sortOrder: HistorySortOrder = .lastCopied
   ) async -> Bool {
     refreshGeneration += 1
     let generation = refreshGeneration
@@ -51,7 +52,7 @@ public actor QuickPanelViewModel {
     let refreshedItems: [ClipboardRecord]
     var matches: [UUID: QuickPanelSearchMatch] = [:]
     if trimmedQuery.isEmpty {
-      refreshedItems = scoped.sorted(by: Self.quickPanelSort)
+      refreshedItems = scoped.sorted { Self.quickPanelSort($0, $1, sortOrder: sortOrder) }
     } else {
       let scored: [(record: ClipboardRecord, match: QuickPanelSearchMatch)] = scoped.compactMap { record in
         let primaryText = QuickPanelRowPresentation.primaryContentText(for: record)
@@ -96,7 +97,11 @@ public actor QuickPanelViewModel {
     return true
   }
 
-  private static func quickPanelSort(_ lhs: ClipboardRecord, _ rhs: ClipboardRecord) -> Bool {
+  private static func quickPanelSort(
+    _ lhs: ClipboardRecord,
+    _ rhs: ClipboardRecord,
+    sortOrder: HistorySortOrder
+  ) -> Bool {
     if lhs.isPinned != rhs.isPinned {
       return lhs.isPinned && !rhs.isPinned
     }
@@ -107,8 +112,22 @@ public actor QuickPanelViewModel {
         return lhsPinnedAt > rhsPinnedAt
       }
     }
-    if lhs.lastCopiedAt != rhs.lastCopiedAt {
-      return lhs.lastCopiedAt > rhs.lastCopiedAt
+    switch sortOrder {
+    case .lastCopied:
+      if lhs.lastCopiedAt != rhs.lastCopiedAt {
+        return lhs.lastCopiedAt > rhs.lastCopiedAt
+      }
+    case .firstCopied:
+      if lhs.createdAt != rhs.createdAt {
+        return lhs.createdAt > rhs.createdAt
+      }
+    case .copyCount:
+      if lhs.copyCount != rhs.copyCount {
+        return lhs.copyCount > rhs.copyCount
+      }
+      if lhs.lastCopiedAt != rhs.lastCopiedAt {
+        return lhs.lastCopiedAt > rhs.lastCopiedAt
+      }
     }
     return lhs.id.uuidString < rhs.id.uuidString
   }

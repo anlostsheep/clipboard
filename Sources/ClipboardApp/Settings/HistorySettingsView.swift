@@ -14,6 +14,9 @@ struct HistorySettingsView: View {
     @AppStorage(ClipboardAppSettings.maxAgeDaysKey)
     private var maxAgeDays: Int = ClipboardAppSettings.defaultMaxAgeDays
 
+    @AppStorage(ClipboardAppSettings.historySortOrderKey)
+    private var sortOrderRaw: String = HistorySortOrder.lastCopied.rawValue
+
     @AppStorage(ClipboardAppSettings.failureRecoveryStrategyKey)
     private var failureStrategyRaw: String = StorageFailureStrategy.continueEvicting.rawValue
 
@@ -38,6 +41,14 @@ struct HistorySettingsView: View {
                 Stepper("超过 \(maxAgeDays) 天的记录自动删除（pinned / 收藏除外）",
                         value: $maxAgeDays, in: 7...365, step: 1)
                 Text("修改后会立即应用到当前历史记录。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("历史排序", selection: $sortOrderRaw) {
+                    ForEach(HistorySortOrder.allCases, id: \.rawValue) { order in
+                        Text(order.displayName).tag(order.rawValue)
+                    }
+                }
+                Text("影响快捷面板浏览时的历史区排序；搜索时按匹配度排序，置顶区不受影响。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
