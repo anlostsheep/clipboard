@@ -32,6 +32,7 @@ struct GeneralSettingsView: View {
 
     private let loginItemManager: LoginItemManaging = SMAppServiceLoginItemManager()
     @State private var loginItemStatus: LoginItemStatus = .notRegistered
+    @State private var loginItemError: String?
 
     private var positionMode: Binding<PanelPositionMode> {
         Binding(
@@ -81,7 +82,12 @@ struct GeneralSettingsView: View {
                 Toggle("登录时自动启动", isOn: Binding(
                     get: { presentation.isOn },
                     set: { newValue in
-                        try? loginItemManager.setEnabled(newValue)
+                        do {
+                            try loginItemManager.setEnabled(newValue)
+                            loginItemError = nil
+                        } catch {
+                            loginItemError = error.localizedDescription
+                        }
                         loginItemStatus = loginItemManager.currentStatus()
                     }
                 ))
@@ -99,6 +105,12 @@ struct GeneralSettingsView: View {
                             }
                         }
                     }
+                }
+
+                if let loginItemError {
+                    Text("设置登录项失败：\(loginItemError)")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
             }
 
@@ -205,6 +217,7 @@ struct GeneralSettingsView: View {
         .onAppear {
             accessibilityPermission.refresh()
             loginItemStatus = loginItemManager.currentStatus()
+            loginItemError = nil
         }
         .onReceive(accessibilityRefreshTimer) { _ in
             accessibilityPermission.refresh()
