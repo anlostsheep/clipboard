@@ -198,7 +198,10 @@ final class QuickPanelViewModelTests: XCTestCase {
     lastCopiedAt: TimeInterval,
     groupIds: [String] = [],
     isPinned: Bool = false,
-    pinnedAt: TimeInterval? = nil
+    pinnedAt: TimeInterval? = nil,
+    sourceAppName: String = "Terminal",
+    createdAt: TimeInterval = 1,
+    copyCount: Int = 1
   ) -> ClipboardRecord {
     ClipboardRecord(
       id: id,
@@ -207,11 +210,11 @@ final class QuickPanelViewModelTests: XCTestCase {
       title: title,
       plainTextPreview: title,
       sourceAppBundleId: nil,
-      sourceAppName: "Terminal",
+      sourceAppName: sourceAppName,
       sourceDeviceHint: .local,
-      createdAt: Date(timeIntervalSince1970: 1),
+      createdAt: Date(timeIntervalSince1970: createdAt),
       lastCopiedAt: Date(timeIntervalSince1970: lastCopiedAt),
-      copyCount: 1,
+      copyCount: copyCount,
       isPinned: isPinned,
       pinnedAt: pinnedAt.map(Date.init(timeIntervalSince1970:)),
       isFavorite: false,
@@ -220,5 +223,94 @@ final class QuickPanelViewModelTests: XCTestCase {
       metadata: nil,
       pasteboardTypes: ["public.utf8-plain-text"]
     )
+  }
+
+  func testFuzzyQueryMatchesNonContiguousCharacters() async throws {
+    // "cbm" is not a substring of either title, but is an in-order
+    // subsequence of "clipboard manager" only.
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "clipboard manager", lastCopiedAt: 1))
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "unrelated", lastCopiedAt: 2))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "cbm")
+
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertEqual(titles, ["clipboard manager"])
+  }
+
+  func testSubstringMatchRanksAboveSubsequenceMatch() async throws {
+    // "clip" is a substring of "my clip notes" but only a scattered
+    // subsequence of "cool lion iron plate". The substring hit must rank
+    // first even though the subsequence record is more recent.
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "my clip notes", lastCopiedAt: 100))
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "cool lion iron plate", lastCopiedAt: 200))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "clip")
+
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertEqual(titles.first, "my clip notes")
+  }
+
+  func testSearchMatchesExposesPrimaryTextOffsets() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "clipboard", lastCopiedAt: 1))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "board")
+
+    let items = await viewModel.items
+    let matches = await viewModel.searchMatches
+    XCTAssertEqual(items.count, 1)
+    XCTAssertEqual(matches[items[0].id]?.primaryTextOffsets, [4, 5, 6, 7, 8])
+  }
+
+  func testEmptyQueryClearsSearchMatchesAndKeepsRecencyOrder() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "older", lastCopiedAt: 100))
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "newer", lastCopiedAt: 200))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "old")
+    await viewModel.refresh(query: "")
+
+    let matches = await viewModel.searchMatches
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertTrue(matches.isEmpty)
+    XCTAssertEqual(titles, ["newer", "older"])
+  }
+
+  func testPinnedRecordsStayFirstDuringFuzzySearch() async throws {
+    // A pinned weak (subsequence) match must still be listed before an
+    // unpinned strong (substring) match.
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "capable item board", lastCopiedAt: 1, isPinned: true, pinnedAt: 1))
+    _ = try await store.upsert(makeRecord(id: UUID(), title: "cab", lastCopiedAt: 2))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "cab")
+
+    let items = await viewModel.items
+    XCTAssertEqual(items.count, 2)
+    XCTAssertTrue(items[0].isPinned)
+  }
+
+  func testFuzzyQueryStillMatchesSourceAppName() async throws {
+    // The query hits only the source app name, not the content.
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "hello world", lastCopiedAt: 1, sourceAppName: "Safari"))
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "other", lastCopiedAt: 2, sourceAppName: "Xcode"))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "safari")
+
+    let items = await viewModel.items
+    XCTAssertEqual(items.count, 1)
+    XCTAssertEqual(items.first?.sourceAppName, "Safari")
   }
 }

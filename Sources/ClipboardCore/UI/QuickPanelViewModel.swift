@@ -10,12 +10,23 @@ public struct QuickPanelSelectionIntent: Equatable, Sendable {
   }
 }
 
+public struct QuickPanelSearchMatch: Equatable, Sendable {
+  public let score: Int
+  public let primaryTextOffsets: [Int]
+
+  public init(score: Int, primaryTextOffsets: [Int]) {
+    self.score = score
+    self.primaryTextOffsets = primaryTextOffsets
+  }
+}
+
 public actor QuickPanelViewModel {
   private let store: any HistoryStore
   private let pageLimit: Int
   private var refreshGeneration = 0
   public private(set) var items: [ClipboardRecord] = []
   public private(set) var selectedIndex: Int = 0
+  public private(set) var searchMatches: [UUID: QuickPanelSearchMatch] = [:]
 
   public init(store: any HistoryStore, pageLimit: Int = 50) {
     self.store = store
@@ -30,16 +41,57 @@ public actor QuickPanelViewModel {
   ) async -> Bool {
     refreshGeneration += 1
     let generation = refreshGeneration
-    let historyQuery = HistoryQuery(text: query, contentTypes: contentTypes, groupIDs: groupIDs)
-    let refreshedItems = ((try? await store.fetchAll()) ?? [])
-      .filter { historyQuery.matches($0) }
-      .sorted(by: Self.quickPanelSort)
+    let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Type/group scoping still goes through HistoryQuery; text matching is
+    // handled by FuzzyMatcher below because substring pre-filtering would
+    // drop non-contiguous subsequence hits.
+    let scopeQuery = HistoryQuery(text: "", contentTypes: contentTypes, groupIDs: groupIDs)
+    let scoped = ((try? await store.fetchAll()) ?? []).filter { scopeQuery.matches($0) }
+
+    let refreshedItems: [ClipboardRecord]
+    var matches: [UUID: QuickPanelSearchMatch] = [:]
+    if trimmedQuery.isEmpty {
+      refreshedItems = scoped.sorted(by: Self.quickPanelSort)
+    } else {
+      let scored: [(record: ClipboardRecord, match: QuickPanelSearchMatch)] = scoped.compactMap { record in
+        let primaryText = QuickPanelRowPresentation.primaryContentText(for: record)
+        let primaryMatch = FuzzyMatcher.match(query: trimmedQuery, in: primaryText)
+        let titleMatch = FuzzyMatcher.match(query: trimmedQuery, in: record.title)
+        let sourceMatch = record.sourceAppName.flatMap {
+          FuzzyMatcher.match(query: trimmedQuery, in: $0)
+        }
+        guard let best = [primaryMatch, titleMatch, sourceMatch].compactMap({ $0?.score }).max() else {
+          return nil
+        }
+        return (
+          record,
+          QuickPanelSearchMatch(score: best, primaryTextOffsets: primaryMatch?.matchedOffsets ?? [])
+        )
+      }
+      let ranked = scored.sorted { lhs, rhs in
+        if lhs.record.isPinned != rhs.record.isPinned {
+          return lhs.record.isPinned
+        }
+        if lhs.match.score != rhs.match.score {
+          return lhs.match.score > rhs.match.score
+        }
+        if lhs.record.lastCopiedAt != rhs.record.lastCopiedAt {
+          return lhs.record.lastCopiedAt > rhs.record.lastCopiedAt
+        }
+        return lhs.record.id.uuidString < rhs.record.id.uuidString
+      }
+      refreshedItems = ranked.map(\.record)
+      for entry in ranked {
+        matches[entry.record.id] = entry.match
+      }
+    }
 
     guard generation == refreshGeneration else {
       return false
     }
 
     items = QuickPanelListPolicy.limitedItems(refreshedItems, limit: pageLimit)
+    searchMatches = matches
     selectedIndex = items.isEmpty ? 0 : min(selectedIndex, items.count - 1)
     return true
   }

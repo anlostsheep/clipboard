@@ -67,6 +67,10 @@ swift run ClipboardManualProbe read-once
 - [x] QuickPanel 首屏显示最近复制的 session 历史，最新记录排在最上方
 - [x] QuickPanel 每行左侧显示来源 App 图标；无法识别来源 App 时回退为内容类型图标
 - [x] 输入搜索关键词后，列表只保留匹配标题、摘要或来源 App 的记录
+- [ ] QuickPanel 搜索输入非连续字符（如对"clipboard manager"输入"cbm"）能命中记录。
+- [ ] 搜索中文时按字符子序列命中（如对"剪贴板历史"输入"剪史"）。
+- [ ] 完整子串命中的记录排在纯模糊命中的记录之前。
+- [ ] 搜索激活时置顶记录仍显示在 Pinned 区且位于最上方。
 - [x] 按 `Down` / `Up` 可以移动选中项，选中行有明显视觉状态
 - [x] 按 `Escape` 关闭 QuickPanel
 - [x] 打开过设置页后，切到其他 App 呼出 QuickPanel，再按 `Escape` 关闭，焦点保留在呼出前的 App，不重新弹出设置页
