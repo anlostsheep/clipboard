@@ -112,6 +112,15 @@ struct GeneralSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+
+                // Spec-mandated warning: SMAppService registration is unreliable
+                // under ad-hoc signing because the signing identity changes across
+                // rebuilds (see spec 切片1 已知限制).
+                if accessibilityPermission.usesAdHocSignature {
+                    Text("当前为 ad-hoc 签名的开发构建：签名身份不稳定，登录项注册可能失效或产生重复条目。请使用稳定自签名构建验证开机自启。")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
 
             Section("辅助功能权限") {

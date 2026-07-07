@@ -127,4 +127,5 @@ defaults delete com.local.clipboard-manager 2>/dev/null || true
 
 - 当前发布包不是 Apple notarized app；直接下载 zip 时无法完全消除 Gatekeeper 首次打开提示(通过 Homebrew 安装会自动去掉 quarantine，不受此影响)。
 - 自动粘贴依赖 Accessibility 权限。
+- "登录时自动启动"（SMAppService 登录项）在 ad-hoc 签名的开发构建下不可靠：每次重新构建签名身份都会变化，登录项注册可能失效或在系统设置中产生重复条目。请使用发布包或稳定自签名构建（`Authority=ClipboardApp Local Code Signing`）使用与验证该功能；设置页在 ad-hoc 构建下也会显示相应提示。
 - 剪贴板历史保存在本机，可能包含敏感信息。反馈问题时不要上传真实数据库、payload 文件或包含敏感内容的截图。
