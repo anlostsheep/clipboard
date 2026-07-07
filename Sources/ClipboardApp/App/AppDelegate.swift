@@ -163,6 +163,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // within the same app would otherwise leave the QuickPanel visible.
         services.quickPanelController.hide()
 
+        // While the settings window exists, give the app a Dock icon and a
+        // Cmd+Tab entry so users can switch back after visiting another app.
+        // Reverted to .accessory in windowWillClose. Policy must be set before
+        // ordering the window front, otherwise activation can leave it behind
+        // the previously frontmost app.
+        NSApp.setActivationPolicy(.regular)
+
         if let existing = settingsWindow, existing.isVisible || existing.isMiniaturized {
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -197,5 +204,8 @@ extension AppDelegate: NSWindowDelegate {
         guard let window = notification.object as? NSWindow, window === settingsWindow else { return }
         settingsWindow = nil
         settingsWindowController = nil
+        // Drop the temporary Dock icon and Cmd+Tab entry once the settings
+        // window is gone; the app returns to menu-bar-only presence.
+        NSApp.setActivationPolicy(.accessory)
     }
 }

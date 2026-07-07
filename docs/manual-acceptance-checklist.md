@@ -628,6 +628,13 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [ ] 系统设置中手动移除登录项后，设置页保持打开的状态下，开关在 1~2 秒内自动同步为关闭（无需重新打开设置页）。
 - [ ] `swift run` 场景（非 .app 包）下开关禁用并显示原因说明。
 
+## 设置窗口 Dock/Cmd+Tab 可达性(动态 activation policy)
+
+- [ ] 打开设置窗口时 Dock 出现 ClipboardApp 图标，Cmd+Tab 列表中可见；切到其它 App 后可用 Cmd+Tab 或点 Dock 图标切回设置页。
+- [ ] 关闭设置窗口后 Dock 图标与 Cmd+Tab 条目消失，恢复纯菜单栏形态。
+- [ ] 设置窗口打开期间（policy 为 regular）：全局快捷键呼出 QuickPanel、选择粘贴、Esc 关闭等行为不变。
+- [ ] 设置窗口最小化后再从 Dock 恢复正常；恢复后关闭窗口仍能正确移除 Dock 图标。
+
 ## 历史排序选项(HistorySortOrder)
 
 - [ ] 「历史」设置切到"复制次数"后，QuickPanel 空搜索浏览时高频记录排前。
