@@ -625,7 +625,7 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 
 - [ ] 设置「通用 › 启动」开启"登录时自动启动"后，重启 macOS，ClipboardApp 自动出现在菜单栏（稳定自签名构建验证）。
 - [ ] 关闭"登录时自动启动"后，系统设置「登录项」中对应条目消失，重启后不再自动启动。
-- [ ] 系统设置中手动移除登录项后，重新打开设置页，开关正确显示为关闭状态。
+- [ ] 系统设置中手动移除登录项后，设置页保持打开的状态下，开关在 1~2 秒内自动同步为关闭（无需重新打开设置页）。
 - [ ] `swift run` 场景（非 .app 包）下开关禁用并显示原因说明。
 
 ## 历史排序选项(HistorySortOrder)

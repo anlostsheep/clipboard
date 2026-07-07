@@ -230,6 +230,11 @@ struct GeneralSettingsView: View {
         }
         .onReceive(accessibilityRefreshTimer) { _ in
             accessibilityPermission.refresh()
+            // SMAppService has no change notification; poll the live status on
+            // the same cadence as the accessibility row so external changes
+            // (user removing the login item in System Settings) sync while
+            // the pane stays open.
+            loginItemStatus = loginItemManager.currentStatus()
         }
     }
 
