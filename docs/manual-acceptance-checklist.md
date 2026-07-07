@@ -611,14 +611,15 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [x] Homebrew 安装后 App 打开无需 Gatekeeper 右键 Open 步骤。
 - [x] `xattr -p com.apple.quarantine /Applications/ClipboardApp.app` 无输出。
 - [x] 授予辅助功能权限后自动粘贴可用。
-- [ ] `brew upgrade --cask clipboardapp` 从版本 N 升到 N+1。
-- [ ] 辅助功能权限在 Homebrew 升级后仍保持(稳定签名守住)。
+- [x] `brew upgrade --cask clipboardapp` 从版本 N 升到 N+1。
+- [x] 辅助功能权限在 Homebrew 升级后仍保持(稳定签名守住)。
 - [ ] `brew uninstall --cask --zap clipboardapp` 移除 App 及本机数据目录。
 - [ ] 直接下载 zip 路径在文档化的 Gatekeeper 绕过步骤下仍可用。
 
 - 验收记录 2026-07-02:v0.1.0 经 `brew install --cask clipboardapp` 全新安装,cask postflight 已移除 quarantine —— `xattr -p com.apple.quarantine /Applications/ClipboardApp.app` 无输出。这是"免 Gatekeeper 首开"的权威依据(只由 quarantine 属性触发,与历史授权无关,对全新用户同样成立)。App 打开无拦截、辅助功能授权后自动粘贴正常、sha256 校验 OK。免摩擦由 **cask postflight** 而非 Homebrew 提供(纠正了原 spec 的错误前提)。注:维护者本机此前授权过该 App,故 GUI"无拦截"观察本身有历史授权干扰,但上面的 `xattr` 机械事实不受此干扰。
 - 补跑推迟说明 2026-07-02(以下三项暂缓,非遗漏):
   - `brew upgrade --cask clipboardapp` N→N+1 与"升级后辅助功能权限保持":需存在更高版本才能测,推迟到真正的 0.2.0 发布时一并验证(升级后 postflight 亦应再次去 quarantine)。
+    - 补跑记录 2026-07-07:0.2.0 发布后执行 `brew update && brew upgrade --cask clipboardapp`,0.1.0→0.2.0 升级成功;`/Applications` 实装 CFBundleShortVersionString=0.2.0,签名 `Authority=ClipboardApp Local Code Signing`,`xattr` 无 quarantine(升级路径 postflight 生效);启动后 `Cmd+Shift+V` 呼出 QuickPanel 回车自动粘贴直接生效、无重新授权提示——辅助功能权限跨版本保持。结论: PASS。
   - `brew uninstall --cask --zap clipboardapp`:本机数据目录 `~/Library/Application Support/com.local.clipboard-manager` 为 2.5GB 真实剪贴板历史(与日常使用共用同一 bundle id),zap 会永久删除,故此项只能在干净测试账户/另一台机验收,不在维护者主力机执行。
 
 ## 开机自启(LoginItemManager + 设置 UI)
