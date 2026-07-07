@@ -121,6 +121,9 @@ public actor QuickPanelViewModel {
       if lhs.createdAt != rhs.createdAt {
         return lhs.createdAt > rhs.createdAt
       }
+      if lhs.lastCopiedAt != rhs.lastCopiedAt {
+        return lhs.lastCopiedAt > rhs.lastCopiedAt
+      }
     case .copyCount:
       if lhs.copyCount != rhs.copyCount {
         return lhs.copyCount > rhs.copyCount

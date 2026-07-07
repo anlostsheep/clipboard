@@ -352,6 +352,20 @@ final class QuickPanelViewModelTests: XCTestCase {
     XCTAssertEqual(titles, ["created-late", "created-early"])
   }
 
+  func testFirstCopiedSortOrderTieBreaksByLastCopiedAtDescending() async throws {
+    let store = InMemoryHistoryStore()
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "copied-earlier", lastCopiedAt: 100, createdAt: 500))
+    _ = try await store.upsert(
+      makeRecord(id: UUID(), title: "copied-later", lastCopiedAt: 200, createdAt: 500))
+    let viewModel = QuickPanelViewModel(store: store, pageLimit: 20)
+
+    await viewModel.refresh(query: "", sortOrder: .firstCopied)
+
+    let titles = await viewModel.items.map(\.title)
+    XCTAssertEqual(titles, ["copied-later", "copied-earlier"])
+  }
+
   func testSortOrderDoesNotAffectPinnedSectionOrder() async throws {
     let store = InMemoryHistoryStore()
     _ = try await store.upsert(
