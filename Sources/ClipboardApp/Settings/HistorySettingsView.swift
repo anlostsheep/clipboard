@@ -43,6 +43,9 @@ struct HistorySettingsView: View {
                 Text("修改后会立即应用到当前历史记录。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("排序") {
                 Picker("历史排序", selection: $sortOrderRaw) {
                     ForEach(HistorySortOrder.allCases, id: \.rawValue) { order in
                         Text(order.displayName).tag(order.rawValue)
