@@ -25,6 +25,10 @@ public enum FuzzyMatcher {
   public static let subsequenceCharScore = 10
   public static let consecutiveBonus = 15
   public static let prefixBonus = 20
+  /// Cap on the start-offset penalty subtracted from `substringBaseScore`
+  /// for substring hits (see `match(query:in:)`). Named so the subsequence
+  /// score cap below can be derived from it instead of hard-coding `100`.
+  public static let substringStartPenaltyCap = 100
 
   public static func match(query: String, in candidate: String) -> FuzzyMatch? {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -34,7 +38,10 @@ public enum FuzzyMatcher {
 
     if let start = substringStart(of: queryChars, in: candidateChars) {
       let offsets = Array(start..<(start + queryChars.count))
-      return FuzzyMatch(score: substringBaseScore - min(start, 100), matchedOffsets: offsets)
+      return FuzzyMatch(
+        score: substringBaseScore - min(start, substringStartPenaltyCap),
+        matchedOffsets: offsets
+      )
     }
     return subsequenceMatch(queryChars, in: candidateChars)
   }
@@ -77,9 +84,10 @@ public enum FuzzyMatcher {
     for pair in zip(offsets, offsets.dropFirst()) where pair.1 == pair.0 + 1 {
       score += consecutiveBonus
     }
-    // Cap below the substring tier's floor (substringBaseScore - 100) so a
-    // long subsequence match can never outrank any full substring hit.
-    let cappedScore = min(score, substringBaseScore - 101)
+    // The substring tier's floor is `substringBaseScore - substringStartPenaltyCap`
+    // (its worst-case start-offset penalty). Subtract one more so a long
+    // subsequence match can never tie or outrank any full substring hit.
+    let cappedScore = min(score, substringBaseScore - substringStartPenaltyCap - 1)
     return FuzzyMatch(score: cappedScore, matchedOffsets: offsets)
   }
 }
