@@ -49,6 +49,11 @@ final class QuickPanelController {
     private let quitApplication: () -> Void
     private var panel: NSPanel?
     private var previousApplication: NSRunningApplication?
+    /// Block-based observer token for `NSWorkspace.didActivateApplicationNotification`.
+    /// Never torn down in `deinit` because `QuickPanelController` lives for the
+    /// app's whole lifetime (owned by `AppDelegate`), so it is never deallocated
+    /// while running. If that ownership ever changes, `removeObserver` must be
+    /// called from `deinit` to avoid leaking the registration.
     private var frontmostAppObserver: NSObjectProtocol?
 
     /// Bottom-left origin of the status-bar icon, updated by the menu-bar item
@@ -246,6 +251,14 @@ final class QuickPanelController {
         }
     }
 
+    /// Only reached through the explicit `hide()` path. When keep-open is off,
+    /// `panel.hidesOnDeactivate = true` lets AppKit auto-hide the panel
+    /// directly on deactivation, bypassing `hide()` entirely — so this
+    /// observer intentionally keeps running until the next explicit `hide()`.
+    /// That's harmless: `startObservingFrontmostApplication()`'s registration
+    /// is idempotent (guarded by `frontmostAppObserver == nil`), and
+    /// `rememberPreviousApplication()` re-primes the paste target on every
+    /// subsequent `show()` regardless of whether the observer was still alive.
     private func stopObservingFrontmostApplication() {
         guard let observer = frontmostAppObserver else { return }
         NSWorkspace.shared.notificationCenter.removeObserver(observer)

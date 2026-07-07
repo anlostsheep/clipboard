@@ -445,6 +445,115 @@ final class QuickPanelControllerPresentationTests: XCTestCase {
         )
     }
 
+    func testPasteHistoryShortcutKeepsPanelVisibleWhenKeepOpenEnabled() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord()
+        _ = try await store.upsert(record)
+        try await payloadStore.save(.text("keep-open history shortcut payload"), for: record.id)
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        )
+        let controller = QuickPanelController(
+            state: state,
+            isAutoPasteAuthorized: { true },
+            keepOpenAfterPaste: { true }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        controller.pasteHistoryShortcut(number: 1)
+        try await waitUntil("history shortcut paste to post Command+V") {
+            pasteboard.lastText != nil && eventPoster.didPostCommandV
+        }
+
+        XCTAssertEqual(pasteboard.lastText, "keep-open history shortcut payload")
+        XCTAssertTrue(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Keep-open must leave the panel visible after a history shortcut paste completes.")
+    }
+
+    func testPastePlainTextSelectionKeepsPanelVisibleWhenKeepOpenEnabled() async throws {
+        let store = InMemoryHistoryStore()
+        let payloadStore = InMemoryPayloadStore()
+        let pasteboard = PresentationTestPasteboardWriter()
+        let eventPoster = PresentationTestPasteEventPoster()
+        let record = makePresentationRecord(type: .richText)
+        _ = try await store.upsert(record)
+        try await payloadStore.save(
+            .richText(plainText: "keep-open plain text payload", rtfData: Data("{\\rtf1 styled}".utf8)),
+            for: record.id
+        )
+        let state = makePresentationState(
+            store: store,
+            payloadStore: payloadStore,
+            pasteboard: pasteboard,
+            eventPoster: eventPoster
+        )
+        let controller = QuickPanelController(
+            state: state,
+            isAutoPasteAuthorized: { true },
+            keepOpenAfterPaste: { true }
+        )
+
+        controller.show()
+        defer { controller.hide() }
+        await state.refresh()
+        let pasteTask = controller.pastePlainTextSelection()
+        await pasteTask.value
+
+        XCTAssertEqual(pasteboard.lastText, "keep-open plain text payload")
+        XCTAssertTrue(eventPoster.didPostCommandV)
+        XCTAssertTrue(
+            NSApp.windows.contains { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Keep-open must leave the panel visible after a plain-text paste completes.")
+    }
+
+    func testShowAppliesHidesOnDeactivateFromKeepOpenSetting() async throws {
+        let keepOpenState = makePresentationState()
+        let keepOpenController = QuickPanelController(
+            state: keepOpenState,
+            keepOpenAfterPaste: { true }
+        )
+
+        keepOpenController.show()
+        // `isReleasedWhenClosed = false` means a hidden panel lingers in
+        // `NSApp.windows` afterward, so disambiguate by visibility rather
+        // than just title.
+        let keepOpenPanel = try XCTUnwrap(
+            NSApp.windows.first { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Expected the QuickPanel window to be visible after show()."
+        )
+        XCTAssertFalse(
+            keepOpenPanel.hidesOnDeactivate,
+            "Keep-open enabled must not let AppKit auto-hide the panel on deactivate."
+        )
+        keepOpenController.hide()
+
+        let defaultState = makePresentationState()
+        let defaultController = QuickPanelController(
+            state: defaultState,
+            keepOpenAfterPaste: { false }
+        )
+
+        defaultController.show()
+        defer { defaultController.hide() }
+        let defaultPanel = try XCTUnwrap(
+            NSApp.windows.first { $0.title == "Clipboard QuickPanel" && $0.isVisible },
+            "Expected the QuickPanel window to be visible after show()."
+        )
+        XCTAssertTrue(
+            defaultPanel.hidesOnDeactivate,
+            "Keep-open disabled must let AppKit auto-hide the panel on deactivate."
+        )
+    }
+
     func testCopySelectionOnlyKeepsPanelVisibleWhenKeepOpenEnabled() async throws {
         let store = InMemoryHistoryStore()
         let payloadStore = InMemoryPayloadStore()
