@@ -58,6 +58,7 @@ ad-hoc 签名的开发构建签名身份不稳定，SMAppService 注册可能失
   - query 为空 → 走现有路径，完全不变（排序见切片 3）。
   - query 非空 → 仍用 `fetchAll()` 拿全量，类型/分组过滤沿用 `HistoryQuery`（文本置空），文本匹配改用 FuzzyMatcher 对 title / plainTextPreview / sourceAppName 打分、过滤、排序。
 - 候选集天然为全量内存索引（最高 5 万条轻量元数据字段，纯 Swift 打分预期毫秒级，输入侧已有 debounce）。合入前用仓库 benchmark 流程验证；若实测退化，降级为"最近 1 万条"并在本文档追记取舍。
+- **性能验证记录（2026-07-06 追记）**：实现完成后在真实存储（803 条记录，含 text/link/richText/image，payload 约 1.6GB）上运行 `Scripts/benchmark-maccy-replacement.sh`：`search_http_50_ms` median 7.719ms / p95 7.987ms，`fetch_recent_50_ms` median 3.810ms，无退化，未触发降级路径（报告：`clipboard-benchmark-20260706T121343Z.json`）。基准探针只读真实存储、不支持合成数据集；若未来真实历史增长后搜索出现可感知延迟，按上一条降级为"最近 1 万条"候选集。
 
 ### 排序语义（搜索激活时）
 
