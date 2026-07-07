@@ -613,7 +613,7 @@ osascript -e 'tell application "System Events" to tell appearance preferences to
 - [x] 授予辅助功能权限后自动粘贴可用。
 - [x] `brew upgrade --cask clipboardapp` 从版本 N 升到 N+1。
 - [x] 辅助功能权限在 Homebrew 升级后仍保持(稳定签名守住)。
-- [ ] `brew uninstall --cask --zap clipboardapp` 移除 App 及本机数据目录。
+- [ ] （可选项，2026-07-07 标记：仅在干净测试账户/另一台机验收，不阻塞发布）`brew uninstall --cask --zap clipboardapp` 移除 App 及本机数据目录。
 - [ ] 直接下载 zip 路径在文档化的 Gatekeeper 绕过步骤下仍可用。
 
 - 验收记录 2026-07-02:v0.1.0 经 `brew install --cask clipboardapp` 全新安装,cask postflight 已移除 quarantine —— `xattr -p com.apple.quarantine /Applications/ClipboardApp.app` 无输出。这是"免 Gatekeeper 首开"的权威依据(只由 quarantine 属性触发,与历史授权无关,对全新用户同样成立)。App 打开无拦截、辅助功能授权后自动粘贴正常、sha256 校验 OK。免摩擦由 **cask postflight** 而非 Homebrew 提供(纠正了原 spec 的错误前提)。注:维护者本机此前授权过该 App,故 GUI"无拦截"观察本身有历史授权干扰,但上面的 `xattr` 机械事实不受此干扰。
