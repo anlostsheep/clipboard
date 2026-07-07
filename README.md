@@ -2,31 +2,36 @@
 
 Clipboard 是一个原生 macOS 剪贴板管理器，使用 SwiftPM、SwiftUI、AppKit 和 SQLite 构建。
 
-当前状态是 **early beta**。它已经适合给熟悉 macOS 辅助功能权限和自签名 App 安装流程的小范围开发者/内测用户使用；还不是面向陌生大众用户的 notarized 稳定版。
+当前状态是 **early beta**，最新发布版本 **v0.2.0**（2026-07-07，通过 Homebrew cask `clipboardapp` 与 GitHub release 分发）。它已经适合给熟悉 macOS 辅助功能权限和自签名 App 安装流程的小范围开发者/内测用户日常使用；还不是面向陌生大众用户的 notarized 稳定版。
 
 ## 当前可用能力
 
-- 菜单栏 App，不显示 Dock 图标。
-- 通过菜单栏图标或 `Command+Shift+V` 打开 QuickPanel。
-- 支持搜索、键盘导航、类型过滤、来源 App 图标。
+- 菜单栏 App，默认不显示 Dock 图标；设置窗口打开期间临时显示 Dock 图标与 `Command+Tab` 条目，便于切走后找回，关闭设置后恢复纯菜单栏形态。
+- 通过菜单栏图标或 `Command+Shift+V` 打开 QuickPanel（快捷键可自定义）。
+- 模糊搜索：按字符子序列匹配（中文可用），完整子串命中优先排序，列表行内命中字符高亮。
+- 键盘导航、`Tab` 类型过滤循环、来源 App 图标、`Command+Y` 详情预览。
 - 支持文本、富文本、链接、图片、文件 URL 历史。
-- 支持自动粘贴模式和仅复制模式。
+- 历史排序可选：最近复制（默认）/ 首次复制 / 复制次数。
+- 支持自动粘贴模式和仅复制模式；可选"粘贴后保留面板"用于连续粘贴多条到不同目标 App。
 - 支持 `Option+Shift+Enter` 对文本、链接、富文本执行无格式粘贴。
 - 支持数字快捷键选择或粘贴当前可见记录。
+- 开机自启（SMAppService 登录项，状态与系统设置实时同步）。
+- 菜单栏图标快捷操作：`Option+点击` 暂停/恢复采集（暂停时图标变化），`Option+Shift+点击` 忽略下一次复制。
 - 使用 SQLite 持久化历史记录。
 - 支持置顶、删除、清除历史和 payload 清理。
 - 支持基础隐私控制：暂停采集、忽略下一次复制、忽略剪贴板类型、忽略来源 App、可选忽略 Universal Clipboard。
 - 已有 Maccy / Clipaste 导入代码路径和自动化覆盖。
-- 可以构建稳定自签名 App 包，用于小范围 beta 分发。
+- 通过 Homebrew tap 分发稳定自签名构建，升级走 `brew upgrade`（辅助功能权限跨版本保持）。
 
 详细验收矩阵和历史记录见 [docs/manual-acceptance-checklist.md](docs/manual-acceptance-checklist.md)。
 
 ## 当前限制
 
-- 公开分发包尚未使用 Developer ID 签名和 notarization，首次打开仍需要处理 Gatekeeper 提示。
+- 公开分发包尚未使用 Developer ID 签名和 notarization；通过 Homebrew 安装时 cask postflight 会移除 quarantine（信任本 tap 的前提下无 Gatekeeper 首开拦截），直接下载 zip 仍需手动处理 Gatekeeper 提示。
 - 自动粘贴依赖 macOS 辅助功能权限；未授权时仅复制模式仍可把记录写入剪贴板，但不会模拟 `Command+V`。
-- 部分手工验收仍未完成：更完整的系统/硬件矩阵、Universal Clipboard 场景、长时间性能、真实 Maccy / Clipaste 数据库导入、部分失败状态 UI。
-- 当前还没有正式截图和 release notes，项目定位应视为早期开源 beta，而不是成熟公开产品页。
+- 开机自启在 ad-hoc 签名的开发构建下不可靠（签名身份不稳定），请使用发布包或稳定自签名构建。
+- 部分手工验收仍未完成：更完整的系统/硬件矩阵（Intel、多系统版本）、Universal Clipboard 场景、超大内容长时间性能、部分失败状态 UI；`brew uninstall --zap` 仅在干净测试机验收（可选项）。
+- 项目定位仍是早期开源 beta，而不是成熟公开产品页。
 
 ## 环境要求
 
