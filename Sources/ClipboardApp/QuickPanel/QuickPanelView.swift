@@ -146,6 +146,9 @@ struct QuickPanelView: View {
       } label: {
         Label("Delete Selected", systemImage: "trash")
       }
+      // Display-only hint; the real handler is the QuickPanelKeyCaptureView
+      // local monitor, which consumes the event before this fires.
+      .keyboardShortcut(.delete, modifiers: .option)
       .disabled(selectedRecord == nil)
 
       Button {
@@ -155,6 +158,7 @@ struct QuickPanelView: View {
       } label: {
         Label(selectedRecord?.isPinned == true ? "Unpin Item" : "Pin Item", systemImage: "pin")
       }
+      .keyboardShortcut("p", modifiers: .option)
       .disabled(selectedRecord == nil)
 
       Divider()
@@ -166,12 +170,14 @@ struct QuickPanelView: View {
       } label: {
         Label("Clear Unpinned", systemImage: "pin.slash")
       }
+      .keyboardShortcut(.delete, modifiers: [.option, .command])
 
       Button(role: .destructive) {
         confirmsClearAll = true
       } label: {
         Label("Clear All", systemImage: "trash.slash")
       }
+      .keyboardShortcut(.delete, modifiers: [.shift, .option, .command])
     } label: {
       Image(systemName: "ellipsis.circle")
         .foregroundStyle(.secondary)

@@ -127,6 +127,7 @@ swift run ClipboardManualProbe read-once
 - [ ] QuickPanel `Option+P` 置顶/取消置顶当前项
 - [ ] QuickPanel `Option+Command+Delete` 清除未置顶项，置顶项保留
 - [ ] QuickPanel `Shift+Option+Command+Delete` 弹出确认，确认后清除全部历史
+- [ ] 打开 QuickPanel 右上 `⋯` 菜单，各动作项右侧显示对应快捷键（Pin Item ⌥P、Delete Selected ⌥⌫、Clear Unpinned ⌥⌘⌫、Clear All ⇧⌥⌘⌫），且用菜单项与快捷键分别触发均只执行一次（无双触发）
 - [ ] `Scripts/benchmark-maccy-replacement.sh` 生成 JSON 报告和可读摘要
 - [ ] 报告中的 Maccy 对比项只使用 `better` / `same` / `worse` / `not_comparable` 表述
 
